@@ -71,8 +71,8 @@ export default async function HomePage() {
             <Link href="/studio" className="btn-primary">
               去投稿
             </Link>
-            <a href="/admin/install" className="btn-ghost">
-              打开安装器
+            <a href="/admin/" className="btn-ghost">
+              管理后台
             </a>
           </div>
         </div>
