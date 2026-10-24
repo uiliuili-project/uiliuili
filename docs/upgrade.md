@@ -8,8 +8,8 @@
 4. Run `pnpm cli migrate`.
 5. Restart API, worker, web, and admin.
 
-If the database schema is newer than the code, the API refuses to start. Restore
-a compatible backup or deploy the matching release.
+If migrations are pending, run `pnpm cli migrate`. If you downgrade the code,
+restore a database backup taken before the upgrade.
 
 ## Backup
 

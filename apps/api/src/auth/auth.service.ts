@@ -409,14 +409,14 @@ export class AuthService {
     );
     const refreshToken = randomToken(48);
     const csrfToken = randomToken(24);
+    const security = await this.settings.getSecuritySettings();
+    const sessionDays = Math.max(1, Number(security.sessionDays ?? REFRESH_TOKEN_TTL_DAYS));
     await this.database.db.insert(refreshSessions).values({
       userId: user.id,
       tokenHash: hashToken(refreshToken),
       userAgent: (meta.userAgent ?? '').slice(0, 500),
       ipHash: this.hashIp(meta.ip),
-      expiresAt: new Date(
-        Date.now() + (remember ? REFRESH_TOKEN_TTL_DAYS : 1) * 24 * 60 * 60 * 1000,
-      ),
+      expiresAt: new Date(Date.now() + (remember ? sessionDays : 1) * 24 * 60 * 60 * 1000),
     });
     await this.audit.record({
       actorId: user.id,
