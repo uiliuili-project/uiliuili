@@ -61,6 +61,7 @@ export class SearchService {
         .where(
           and(
             eq(videos.status, 'published'),
+            eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
             ilike(videos.title, needle),
           ),
