@@ -348,6 +348,7 @@ export class StudioService {
     const reviewRequired = Boolean(upload.requireReview) && !canReview;
     const status = reviewRequired && video.status !== 'published' ? 'pending_review' : 'published';
     const publishedAt = publishAt ? new Date(publishAt) : new Date();
+    const delaySeconds = Math.max(0, Math.floor((publishedAt.getTime() - Date.now()) / 1000));
     const [updated] = await this.database.db
       .update(videos)
       .set({
@@ -358,11 +359,15 @@ export class StudioService {
       .where(eq(videos.id, id))
       .returning();
     if (status === 'published') {
-      await this.queue.enqueue('search-index', { videoId: id }, { idempotencyKey: `search:${id}` });
+      await this.queue.enqueue(
+        'search-index',
+        { videoId: id },
+        { idempotencyKey: `search:${id}`, delaySeconds },
+      );
       await this.queue.enqueue(
         'notify-followers',
         { videoId: id },
-        { idempotencyKey: `notify-followers:${id}` },
+        { idempotencyKey: `notify-followers:${id}`, delaySeconds },
       );
     }
     return updated ? this.studioPayload(updated) : null;

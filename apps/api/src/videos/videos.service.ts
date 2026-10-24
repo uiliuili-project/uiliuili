@@ -651,6 +651,9 @@ export class VideosService {
     if (video.status !== 'published' && !privileged) {
       throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
     }
+    if (video.publishedAt && video.publishedAt > new Date() && !privileged) {
+      throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
+    }
   }
 
   async tagsFor(videoIds: string[]): Promise<Map<string, string[]>> {
