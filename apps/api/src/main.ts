@@ -88,6 +88,9 @@ async function bootstrap(): Promise<void> {
     try {
       await redisAdapter.connectToRedis(config.redisUrl);
       app.useWebSocketAdapter(redisAdapter);
+      const closeRedis = () => void redisAdapter.close();
+      process.once('SIGINT', closeRedis);
+      process.once('SIGTERM', closeRedis);
     } catch (error) {
       new Logger('Bootstrap').warn(
         `Redis adapter unavailable, using in-memory Socket.IO: ${
