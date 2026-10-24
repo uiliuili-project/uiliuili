@@ -184,7 +184,7 @@ export class InstallService {
     try {
       const result: InstallResult = await runInstall(installConfig, {
         root: process.cwd(),
-        production: config.production,
+        production: config.production || installConfig.site.url.startsWith('https://'),
         onProgress: (progress) => {
           this.update(progress);
           this.logger.log(`${progress.percent}% ${progress.message}`);

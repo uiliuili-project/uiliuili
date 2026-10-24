@@ -99,7 +99,9 @@ export async function runInstall(
 
   progress(options, 'config', 22, '正在写入运行配置');
   const envContent = buildEnvFile(config, {
-    production: options.production ?? process.env.NODE_ENV === 'production',
+    production:
+      options.production ??
+      (process.env.NODE_ENV === 'production' || config.site.url.startsWith('https://')),
     appKey,
   });
   writeEnvFile(paths.envFile, envContent);
