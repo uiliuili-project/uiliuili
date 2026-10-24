@@ -5,9 +5,10 @@
 uiliuili is a complete video community: uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin panel.
 
 - **License:** MIT
-- **Stack:** NestJS · PostgreSQL · Drizzle · pg-boss · Next.js · React · Ant Design · FFmpeg
+- **Stack:** NestJS · PostgreSQL · Drizzle · Next.js · React · Ant Design · FFmpeg
 - **Hard dependencies:** Node.js 22, PostgreSQL 16+, FFmpeg 7+
 - **Optional:** Redis, Meilisearch, S3-compatible storage, SMTP, GitHub/Google/OIDC login
+- **Queue:** PostgreSQL-backed jobs with `FOR UPDATE SKIP LOCKED`
 - **Runtime:** No Docker required
 
 ## Features
@@ -40,12 +41,14 @@ pnpm build
 cp .env.example .env   # optional; the installer writes .env for you
 pnpm start:api
 pnpm start:worker
+pnpm start:web
 ```
 
-Start the web and admin applications using your process manager, then open
-`http://localhost:3000`. The root page redirects to `/admin/install` until the
-instance is configured. The installer asks for a one-time token printed in the
-API console (or stored in `storage/install-token`).
+Start the web app with `pnpm start:web` and serve `apps/admin/dist` at `/admin`
+with Nginx (or use `pnpm --filter @uiliuili/admin dev` for development). Open
+`http://localhost:3000`; until the instance is configured the home page links to
+`/admin/install`. The installer asks for a one-time token printed in the API
+console (or stored in `storage/install-token`).
 
 For a headless installation:
 
@@ -80,6 +83,7 @@ packages/*     Database, installer, media, shared contracts, danmaku, i18n
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
 - [S3 storage](docs/s3.md)
+- [Native deployment](docs/deployment.md)
 - [Mail and OAuth](docs/oauth.md)
 - [Upgrade and backup](docs/upgrade.md)
 - [Danmaku](docs/danmaku.md)

@@ -12,7 +12,7 @@ Do not commit either file.
 | Variable | Description |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `DB_SCHEMA` | Application schema, default `uiliuili` |
+| `DB_SCHEMA` | Application schema (fixed to `uiliuili` in this release) |
 | `APP_KEY` | 32-byte hex key for encrypting provider secrets |
 | `APP_URL` | Public site URL |
 | `API_INTERNAL_URL` | Internal API URL used by Next.js SSR |

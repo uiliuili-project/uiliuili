@@ -9,6 +9,9 @@
 
 ## Build
 
+Run `pnpm cli doctor` after installing dependencies to check Node.js, FFmpeg,
+PostgreSQL, write permissions, and migration status.
+
 ```bash
 corepack enable
 pnpm install

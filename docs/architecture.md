@@ -8,7 +8,7 @@ Browser
 Nginx ── Next.js public site
   │    ├─ Admin SPA
   │    └─ /api ── NestJS API
-  │                   ├─ PostgreSQL (business data + pg-boss jobs)
+  │                   ├─ PostgreSQL (business data + job queue)
   │                   ├─ optional Redis (cache, limits, pub/sub)
   │                   ├─ optional Meilisearch
   │                   └─ Local disk / S3
