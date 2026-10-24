@@ -29,6 +29,16 @@ const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+const subtitleSchema = z.object({
+  language: z
+    .string()
+    .min(2)
+    .max(16)
+    .regex(/^[a-zA-Z0-9-]+$/),
+  label: z.string().min(1).max(40),
+  content: z.string().min(1).max(5_000_000),
+});
+
 const completeSchema = z.object({
   parts: z
     .array(z.object({ partNumber: z.number().int().positive(), etag: z.string().min(1) }))
@@ -139,6 +149,16 @@ export class StudioController {
     @Body(zodBody(publishVideoSchema)) body: z.infer<typeof publishVideoSchema>,
   ) {
     return this.studio.publish(user, id, body.publishAt);
+  }
+
+  @Post('videos/:id/subtitles')
+  @RequirePermissions('video:upload')
+  async subtitle(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(subtitleSchema)) body: z.infer<typeof subtitleSchema>,
+  ) {
+    return this.studio.setSubtitle(user.id, id, body.language, body.label, body.content);
   }
 
   @Put('videos/:id/cover')
