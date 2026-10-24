@@ -27,7 +27,7 @@ import {
   searchConfigSchema,
   storageConfigSchema,
 } from '@uiliuili/shared';
-import { and, count, desc, eq, gte, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service';
 import { CacheService } from '../common/cache.service';
@@ -980,7 +980,13 @@ export class AdminService {
     return this.database.db
       .select()
       .from(announcements)
-      .where(eq(announcements.active, true))
+      .where(
+        and(
+          eq(announcements.active, true),
+          or(isNull(announcements.startsAt), lte(announcements.startsAt, new Date())),
+          or(isNull(announcements.endsAt), gte(announcements.endsAt, new Date())),
+        ),
+      )
       .orderBy(desc(announcements.createdAt))
       .limit(5);
   }
