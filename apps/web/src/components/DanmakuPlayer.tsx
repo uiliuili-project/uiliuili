@@ -1,0 +1,648 @@
+'use client';
+
+import { api } from '@/lib/api';
+import { cn } from '@/lib/cn';
+import { formatCount } from '@/lib/format';
+import { DanmakuEngine, type DanmakuItem, type DanmakuOptions } from '@uiliuili/danmaku';
+import type { VideoDetail } from '@uiliuili/shared';
+import Hls from 'hls.js';
+import {
+  Maximize,
+  MessageSquare,
+  Pause,
+  Play,
+  Send,
+  Settings2,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { type Socket, io } from 'socket.io-client';
+
+interface SegmentResponse {
+  items: DanmakuItem[];
+  segment: number;
+}
+
+const defaultOptions: DanmakuOptions = {
+  opacity: 0.9,
+  fontSize: 25,
+  speed: 6,
+  displayArea: 0.75,
+  scrollEnabled: true,
+  topEnabled: true,
+  bottomEnabled: true,
+  bold: false,
+  fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
+  shadow: true,
+  blockedWords: [],
+  blockedUsers: [],
+};
+
+function timeLabel(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+export function DanmakuPlayer({ video }: { video: VideoDetail }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<DanmakuEngine | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const loadedSegments = useRef(new Set<number>());
+  const seenIds = useRef(new Set<string>());
+  const lastSaved = useRef(0);
+  const viewed = useRef(false);
+
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(video.durationSeconds);
+  const [volume, setVolume] = useState(0.8);
+  const [muted, setMuted] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [levels, setLevels] = useState<Array<{ index: number; height: number }>>([]);
+  const [quality, setQuality] = useState(-1);
+  const [danmakuOn, setDanmakuOn] = useState(video.status !== 'failed');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [options, setOptions] = useState<DanmakuOptions>(defaultOptions);
+  const [viewers, setViewers] = useState(0);
+  const [message, setMessage] = useState('');
+  const [sendText, setSendText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadSegment = async (segment: number) => {
+    if (loadedSegments.current.has(segment)) return;
+    loadedSegments.current.add(segment);
+    try {
+      const data = await api.get<SegmentResponse>(
+        `/api/v1/videos/${video.id}/danmaku?segment=${segment}`,
+      );
+      for (const item of data.items) {
+        if (seenIds.current.has(item.id)) continue;
+        seenIds.current.add(item.id);
+        engineRef.current?.add(item);
+      }
+    } catch {
+      loadedSegments.current.delete(segment);
+    }
+  };
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const stored = localStorage.getItem('uiliuili:danmaku-options');
+    let initial = defaultOptions;
+    if (stored) {
+      try {
+        initial = { ...defaultOptions, ...(JSON.parse(stored) as Partial<DanmakuOptions>) };
+      } catch {}
+    }
+    setOptions(initial);
+    const engine = new DanmakuEngine(canvasRef.current, {
+      ...initial,
+      opacity: initial.opacity,
+    });
+    engineRef.current = engine;
+    if (!danmakuOn) engine.setOptions({ opacity: 0 });
+    return () => {
+      engine.destroy();
+      engineRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl || !video.playlistUrl) return;
+    const source = video.playlistUrl;
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true;
+        },
+      });
+      hlsRef.current = hls;
+      hls.loadSource(source);
+      hls.attachMedia(videoEl);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setLevels(hls.levels.map((level, index) => ({ index, height: level.height })));
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) setError('视频加载失败，请稍后重试');
+      });
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    }
+    videoEl.src = source;
+    return undefined;
+  }, [video.playlistUrl]);
+
+  useEffect(() => {
+    const socket = io(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/danmaku`, {
+      path: '/socket.io',
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+    });
+    socketRef.current = socket;
+    socket.emit('join', { videoId: video.id });
+    socket.on('danmaku', (event: { videoId: string; item: DanmakuItem }) => {
+      if (event.videoId !== video.id) return;
+      if (seenIds.current.has(event.item.id)) return;
+      seenIds.current.add(event.item.id);
+      engineRef.current?.add(event.item);
+    });
+    socket.on('viewers', (data: { videoId: string; count: number }) => {
+      if (data.videoId === video.id) setViewers(data.count);
+    });
+    socket.on('blocked', (data: { message?: string }) => {
+      setMessage(data.message ?? '发送失败');
+    });
+    return () => {
+      socket.emit('leave');
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [video.id]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onLoaded = () => {
+      setDuration(el.duration || video.durationSeconds);
+      if (
+        video.progressMs > 5000 &&
+        video.progressMs < (el.duration || video.durationSeconds) * 1000 - 5000
+      ) {
+        el.currentTime = video.progressMs / 1000;
+      }
+    };
+    const onTime = () => {
+      const time = el.currentTime;
+      setCurrentTime(time);
+      const segment = Math.floor((time * 1000) / (6 * 60 * 1000));
+      void loadSegment(segment);
+      void loadSegment(segment + 1);
+      if (Date.now() - lastSaved.current > 10_000) {
+        lastSaved.current = Date.now();
+        void api
+          .post(`/api/v1/videos/${video.id}/progress`, {
+            positionMs: Math.floor(time * 1000),
+            durationMs: Math.floor((el.duration || 0) * 1000),
+            completed: false,
+          })
+          .catch(() => undefined);
+      }
+    };
+    const onPlay = () => {
+      setPlaying(true);
+      if (!viewed.current) {
+        viewed.current = true;
+        void api.get(`/api/v1/videos/${video.id}/playlist`).catch(() => undefined);
+      }
+      const tick = () => {
+        if (videoRef.current) {
+          engineRef.current?.setTime(videoRef.current.currentTime * 1000);
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(tick);
+    };
+    const onPause = () => {
+      setPlaying(false);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      engineRef.current?.setTime(el.currentTime * 1000);
+    };
+    const onSeeked = () => {
+      engineRef.current?.setTime(el.currentTime * 1000);
+      const segment = Math.floor((el.currentTime * 1000) / (6 * 60 * 1000));
+      void loadSegment(segment);
+    };
+    const onEnded = () => {
+      void api
+        .post(`/api/v1/videos/${video.id}/progress`, {
+          positionMs: Math.floor(el.duration * 1000),
+          durationMs: Math.floor(el.duration * 1000),
+          completed: true,
+        })
+        .catch(() => undefined);
+    };
+    el.addEventListener('loadedmetadata', onLoaded);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
+    el.addEventListener('seeked', onSeeked);
+    el.addEventListener('ended', onEnded);
+    return () => {
+      el.removeEventListener('loadedmetadata', onLoaded);
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('seeked', onSeeked);
+      el.removeEventListener('ended', onEnded);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [video.id, video.progressMs, video.durationSeconds]);
+
+  useEffect(() => {
+    engineRef.current?.setOptions({ ...options, opacity: danmakuOn ? options.opacity : 0 });
+    localStorage.setItem('uiliuili:danmaku-options', JSON.stringify(options));
+  }, [options, danmakuOn]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.volume = volume;
+    el.muted = muted;
+    el.playbackRate = speed;
+  }, [volume, muted, speed]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
+        return;
+      if (event.code === 'Space') {
+        event.preventDefault();
+        void togglePlay();
+      }
+      if (event.key.toLowerCase() === 'f') void toggleFullscreen();
+      if (event.key.toLowerCase() === 'd') setDanmakuOn((value) => !value);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const togglePlay = async () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) await el.play().catch(() => undefined);
+    else el.pause();
+  };
+
+  const toggleFullscreen = async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await container.requestFullscreen().catch(() => undefined);
+  };
+
+  const sendDanmaku = async () => {
+    const text = sendText.trim();
+    if (!text) return;
+    setSending(true);
+    setMessage('');
+    try {
+      const payload = {
+        videoId: video.id,
+        progressMs: Math.floor((videoRef.current?.currentTime ?? 0) * 1000),
+        mode: 'scroll',
+        color: '#ffffff',
+        fontSize: options.fontSize,
+        content: text,
+      };
+      const socket = socketRef.current;
+      if (socket?.connected) {
+        await new Promise<void>((resolve, reject) => {
+          socket
+            .timeout(5000)
+            .emit(
+              'send',
+              payload,
+              (err: Error | null, response: { ok: boolean; error?: string }) => {
+                if (err) return reject(err);
+                if (!response?.ok) return reject(new Error(response?.error ?? '发送失败'));
+                resolve();
+              },
+            );
+        });
+      } else {
+        const response = await api.post<{ item: DanmakuItem }>(
+          `/api/v1/videos/${video.id}/danmaku`,
+          payload,
+        );
+        if (!seenIds.current.has(response.item.id)) {
+          seenIds.current.add(response.item.id);
+          engineRef.current?.add(response.item);
+        }
+      }
+      setSendText('');
+      setMessage('弹幕已发送');
+    } catch (sendError) {
+      setMessage(sendError instanceof Error ? sendError.message : '发送失败');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  if (!video.playlistUrl) {
+    return (
+      <div className="relative overflow-hidden rounded-xl2 bg-black">
+        <div className="aspect-video">
+          {video.coverUrl && (
+            <img src={video.coverUrl} alt="" className="h-full w-full object-cover opacity-50" />
+          )}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+            <p className="text-lg font-semibold">
+              {video.status === 'processing' || video.status === 'uploading'
+                ? '视频正在处理中'
+                : video.status === 'failed'
+                  ? '视频处理失败'
+                  : '视频暂不可播放'}
+            </p>
+            <p className="mt-2 text-sm text-white/65">请稍后刷新页面</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        ref={containerRef}
+        className="player-shell group relative overflow-hidden rounded-xl2 bg-black"
+        onMouseEnter={() => setShowControls(true)}
+        onMouseLeave={() => playing && setShowControls(false)}
+      >
+        <video
+          ref={videoRef}
+          className="aspect-video w-full bg-black"
+          playsInline
+          poster={video.coverUrl ?? undefined}
+          onClick={() => void togglePlay()}
+        >
+          {video.subtitles.map((subtitle) => (
+            <track
+              key={subtitle.language}
+              kind="subtitles"
+              src={subtitle.url}
+              srcLang={subtitle.language}
+              label={subtitle.label}
+            />
+          ))}
+        </video>
+        <canvas ref={canvasRef} className="danmaku-canvas" />
+
+        <div
+          className={cn(
+            'absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2 pt-10 text-white transition',
+            showControls || !playing ? 'opacity-100' : 'opacity-0',
+          )}
+        >
+          <div className="relative mb-2 h-1.5 rounded-full bg-white/25">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-brand"
+              style={{ width: `${progressPercent}%` }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, duration)}
+              step={0.1}
+              value={currentTime}
+              onChange={(event) => {
+                const el = videoRef.current;
+                if (el) el.currentTime = Number(event.target.value);
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              aria-label="播放进度"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => void togglePlay()}
+              className="rounded p-1 hover:bg-white/15"
+            >
+              {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMuted((value) => !value)}
+              className="rounded p-1 hover:bg-white/15"
+            >
+              {muted || volume === 0 ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : volume}
+              onChange={(event) => {
+                setVolume(Number(event.target.value));
+                setMuted(false);
+              }}
+              className="hidden w-20 accent-[#fb7299] sm:block"
+              aria-label="音量"
+            />
+            <span className="tabular-nums text-xs text-white/85">
+              {timeLabel(currentTime)} / {timeLabel(duration)}
+            </span>
+            {viewers > 0 && <span className="ml-1 text-xs text-white/55">{viewers} 人在看</span>}
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDanmakuOn((value) => !value)}
+                className={cn(
+                  'rounded p-1 hover:bg-white/15',
+                  danmakuOn ? 'text-brand' : 'text-white/60',
+                )}
+                title="弹幕开关"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((value) => !value)}
+                className="rounded p-1 hover:bg-white/15"
+                title="弹幕设置"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+              <select
+                value={quality}
+                onChange={(event) => {
+                  const level = Number(event.target.value);
+                  setQuality(level);
+                  if (hlsRef.current) hlsRef.current.currentLevel = level;
+                }}
+                className="rounded bg-black/40 px-1.5 py-1 text-xs text-white outline-none"
+              >
+                <option value={-1}>自动</option>
+                {levels.map((level) => (
+                  <option key={level.index} value={level.index}>
+                    {level.height}p
+                  </option>
+                ))}
+              </select>
+              <select
+                value={speed}
+                onChange={(event) => setSpeed(Number(event.target.value))}
+                className="rounded bg-black/40 px-1.5 py-1 text-xs text-white outline-none"
+              >
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => (
+                  <option key={value} value={value}>
+                    {value}x
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                className="rounded p-1 hover:bg-white/15"
+                title="全屏"
+              >
+                <Maximize className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {settingsOpen && (
+          <div className="absolute right-3 top-3 w-72 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="font-semibold">弹幕设置</span>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                className="text-white/60"
+              >
+                关闭
+              </button>
+            </div>
+            <label className="mb-3 block">
+              <span className="mb-1 flex justify-between">
+                <span>不透明度</span>
+                <span>{Math.round(options.opacity * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={options.opacity}
+                onChange={(event) =>
+                  setOptions((current) => ({ ...current, opacity: Number(event.target.value) }))
+                }
+                className="w-full accent-[#fb7299]"
+              />
+            </label>
+            <label className="mb-3 block">
+              <span className="mb-1 flex justify-between">
+                <span>字号</span>
+                <span>{options.fontSize}px</span>
+              </span>
+              <input
+                type="range"
+                min={14}
+                max={40}
+                step={1}
+                value={options.fontSize}
+                onChange={(event) =>
+                  setOptions((current) => ({ ...current, fontSize: Number(event.target.value) }))
+                }
+                className="w-full accent-[#fb7299]"
+              />
+            </label>
+            <label className="mb-3 block">
+              <span className="mb-1 flex justify-between">
+                <span>速度</span>
+                <span>{options.speed}</span>
+              </span>
+              <input
+                type="range"
+                min={2}
+                max={12}
+                step={1}
+                value={options.speed}
+                onChange={(event) =>
+                  setOptions((current) => ({ ...current, speed: Number(event.target.value) }))
+                }
+                className="w-full accent-[#fb7299]"
+              />
+            </label>
+            <label className="mb-3 block">
+              <span className="mb-1 flex justify-between">
+                <span>显示区域</span>
+                <span>{Math.round(options.displayArea * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={0.25}
+                max={1}
+                step={0.05}
+                value={options.displayArea}
+                onChange={(event) =>
+                  setOptions((current) => ({
+                    ...current,
+                    displayArea: Number(event.target.value),
+                  }))
+                }
+                className="w-full accent-[#fb7299]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block">屏蔽词（逗号分隔）</span>
+              <input
+                value={options.blockedWords.join(',')}
+                onChange={(event) =>
+                  setOptions((current) => ({
+                    ...current,
+                    blockedWords: event.target.value
+                      .split(',')
+                      .map((word) => word.trim())
+                      .filter(Boolean),
+                  }))
+                }
+                className="w-full rounded border border-white/20 bg-white/10 px-2 py-1 text-white outline-none"
+              />
+            </label>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 rounded-xl2 border border-line bg-white p-2">
+        <input
+          value={sendText}
+          onChange={(event) => setSendText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') void sendDanmaku();
+          }}
+          maxLength={100}
+          placeholder="发个弹幕见证当下"
+          className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => void sendDanmaku()}
+          disabled={sending || !sendText.trim()}
+          className="btn-primary h-9 rounded-full px-4"
+        >
+          <Send className="h-4 w-4" />
+          发送
+        </button>
+      </div>
+      {(message || error) && (
+        <p className={cn('mt-2 text-xs', error ? 'text-red-500' : 'text-muted')}>
+          {error ?? message}
+        </p>
+      )}
+      <div className="mt-2 text-xs text-muted">
+        {formatCount(video.danmaku)} 条弹幕 · 当前 {viewers} 人在看
+      </div>
+    </div>
+  );
+}
