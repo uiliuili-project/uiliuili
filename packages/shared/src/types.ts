@@ -34,6 +34,7 @@ export interface VideoCard {
   coins: number;
   favorites: number;
   comments: number;
+  danmaku: number;
   publishedAt: string | null;
   createdAt: string;
   category: Category | null;
@@ -56,7 +57,7 @@ export interface VideoDetail extends VideoCard {
   }>;
   subtitles: Array<{ language: string; label: string; url: string }>;
   liked: boolean;
-  coincount: number;
+  coinCount: number;
   favorited: boolean;
   following: boolean;
   progressMs: number;

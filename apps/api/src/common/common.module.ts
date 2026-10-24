@@ -4,11 +4,13 @@ import { CacheService } from './cache.service';
 import { DatabaseService } from './database.service';
 import { MailService } from './mail.service';
 import { QueueService } from './queue.service';
+import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 import { StorageService } from './storage.service';
 
 @Global()
 @Module({
+  controllers: [SettingsController],
   providers: [
     DatabaseService,
     CacheService,

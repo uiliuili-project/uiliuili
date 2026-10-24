@@ -1,0 +1,24 @@
+{
+  "name": "@uiliuili/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@uiliuili/db": "workspace:*",
+    "@uiliuili/media": "workspace:*",
+    "@uiliuili/shared": "workspace:*",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

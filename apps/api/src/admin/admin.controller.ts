@@ -1,0 +1,271 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  adminCommentQuerySchema,
+  adminDanmakuQuerySchema,
+  adminReportQuerySchema,
+  adminUserQuerySchema,
+  adminUserUpdateSchema,
+  adminVideoQuerySchema,
+  adminVideoUpdateSchema,
+  announcementCreateSchema,
+  categoryCreateSchema,
+  categoryUpdateSchema,
+  jobQuerySchema,
+  moderationActionSchema,
+  settingsUpdateSchema,
+} from '@uiliuili/shared';
+import { z } from 'zod';
+import type { AuthUser } from '../common/auth-user';
+import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { zodBody, zodQuery } from '../common/zod';
+import { AdminService } from './admin.service';
+
+const auditQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().max(100).optional(),
+});
+
+const oauthSchema = z.object({
+  enabled: z.boolean().default(false),
+  clientId: z.string().default(''),
+  clientSecret: z.string().default(''),
+  issuer: z.string().default(''),
+  scopes: z.array(z.string()).default([]),
+});
+
+@Controller('api/v1/admin')
+export class AdminController {
+  constructor(private readonly admin: AdminService) {}
+
+  @Get('dashboard')
+  @RequirePermissions('audit:read')
+  async dashboard() {
+    return this.admin.dashboard();
+  }
+
+  @Get('users')
+  @RequirePermissions('user:manage')
+  async users(@Query(zodQuery(adminUserQuerySchema)) query: z.infer<typeof adminUserQuerySchema>) {
+    return this.admin.listUsers(query);
+  }
+
+  @Patch('users/:id')
+  @RequirePermissions('user:manage')
+  async updateUser(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(adminUserUpdateSchema)) body: z.infer<typeof adminUserUpdateSchema>,
+  ) {
+    return this.admin.updateUser(actor.id, id, body);
+  }
+
+  @Get('videos')
+  @RequirePermissions('video:manage_any')
+  async videos(
+    @Query(zodQuery(adminVideoQuerySchema)) query: z.infer<typeof adminVideoQuerySchema>,
+  ) {
+    return this.admin.listVideos(query);
+  }
+
+  @Patch('videos/:id')
+  @RequirePermissions('video:manage_any')
+  async updateVideo(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(adminVideoUpdateSchema)) body: z.infer<typeof adminVideoUpdateSchema>,
+  ) {
+    return this.admin.updateVideo(actor.id, id, body);
+  }
+
+  @Get('danmaku')
+  @RequirePermissions('danmaku:manage')
+  async danmaku(
+    @Query(zodQuery(adminDanmakuQuerySchema)) query: z.infer<typeof adminDanmakuQuerySchema>,
+  ) {
+    return this.admin.listDanmaku(query);
+  }
+
+  @Post('danmaku/:id/moderate')
+  @RequirePermissions('danmaku:manage')
+  async moderateDanmaku(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(moderationActionSchema)) body: z.infer<typeof moderationActionSchema>,
+  ) {
+    return this.admin.moderateDanmaku(actor.id, id, body.action);
+  }
+
+  @Get('comments')
+  @RequirePermissions('comment:manage')
+  async comments(
+    @Query(zodQuery(adminCommentQuerySchema)) query: z.infer<typeof adminCommentQuerySchema>,
+  ) {
+    return this.admin.listComments(query);
+  }
+
+  @Post('comments/:id/moderate')
+  @RequirePermissions('comment:manage')
+  async moderateComment(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(moderationActionSchema)) body: z.infer<typeof moderationActionSchema>,
+  ) {
+    return this.admin.moderateComment(actor.id, id, body.action);
+  }
+
+  @Get('reports')
+  @RequirePermissions('report:manage')
+  async reports(
+    @Query(zodQuery(adminReportQuerySchema)) query: z.infer<typeof adminReportQuerySchema>,
+  ) {
+    return this.admin.listReports(query);
+  }
+
+  @Post('reports/:id/handle')
+  @RequirePermissions('report:manage')
+  async handleReport(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(moderationActionSchema)) body: z.infer<typeof moderationActionSchema>,
+  ) {
+    return this.admin.handleReport(actor.id, id, body);
+  }
+
+  @Get('categories')
+  @RequirePermissions('settings:manage')
+  async categories() {
+    return { items: await this.admin.listCategories() };
+  }
+
+  @Post('categories')
+  @RequirePermissions('settings:manage')
+  async createCategory(
+    @CurrentUser() actor: AuthUser,
+    @Body(zodBody(categoryCreateSchema)) body: z.infer<typeof categoryCreateSchema>,
+  ) {
+    return this.admin.createCategory(actor.id, body);
+  }
+
+  @Patch('categories/:id')
+  @RequirePermissions('settings:manage')
+  async updateCategory(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(categoryUpdateSchema)) body: z.infer<typeof categoryUpdateSchema>,
+  ) {
+    return this.admin.updateCategory(actor.id, id, body);
+  }
+
+  @Delete('categories/:id')
+  @RequirePermissions('settings:manage')
+  async deleteCategory(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    return this.admin.deleteCategory(actor.id, id);
+  }
+
+  @Get('tags')
+  @RequirePermissions('settings:manage')
+  async tags() {
+    return { items: await this.admin.listTags() };
+  }
+
+  @Get('settings')
+  @RequirePermissions('settings:manage')
+  async settings() {
+    return this.admin.getSettings();
+  }
+
+  @Put('settings')
+  @RequirePermissions('settings:manage')
+  async updateSettings(
+    @CurrentUser() actor: AuthUser,
+    @Body(zodBody(settingsUpdateSchema)) body: z.infer<typeof settingsUpdateSchema>,
+  ) {
+    return this.admin.updateSettings(actor.id, body.patches);
+  }
+
+  @Put('oauth/:provider')
+  @RequirePermissions('settings:manage')
+  async updateOAuth(
+    @CurrentUser() actor: AuthUser,
+    @Param('provider') provider: string,
+    @Body(zodBody(oauthSchema)) body: z.infer<typeof oauthSchema>,
+  ) {
+    return this.admin.updateOAuth(actor.id, provider, body);
+  }
+
+  @Get('system')
+  @RequirePermissions('system:manage')
+  async system() {
+    return this.admin.system();
+  }
+
+  @Get('system/update')
+  @RequirePermissions('system:manage')
+  async checkUpdate() {
+    return this.admin.checkUpdate();
+  }
+
+  @Get('jobs')
+  @RequirePermissions('system:manage')
+  async jobs(@Query(zodQuery(jobQuerySchema)) query: z.infer<typeof jobQuerySchema>) {
+    return this.admin.listJobs(query);
+  }
+
+  @Post('jobs/:id/retry')
+  @RequirePermissions('system:manage')
+  async retryJob(@Param('id') id: string) {
+    return this.admin.retryJob(id);
+  }
+
+  @Post('jobs/:id/cancel')
+  @RequirePermissions('system:manage')
+  async cancelJob(@Param('id') id: string) {
+    return this.admin.cancelJob(id);
+  }
+
+  @Get('audit')
+  @RequirePermissions('audit:read')
+  async audit(@Query(zodQuery(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>) {
+    return this.admin.listAudit(query);
+  }
+
+  @Get('announcements')
+  @RequirePermissions('settings:manage')
+  async announcements() {
+    return { items: await this.admin.listAnnouncements() };
+  }
+
+  @Post('announcements')
+  @RequirePermissions('settings:manage')
+  async createAnnouncement(
+    @CurrentUser() actor: AuthUser,
+    @Body(zodBody(announcementCreateSchema)) body: z.infer<typeof announcementCreateSchema>,
+  ) {
+    return this.admin.createAnnouncement(actor.id, body);
+  }
+
+  @Patch('announcements/:id')
+  @RequirePermissions('settings:manage')
+  async updateAnnouncement(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(announcementCreateSchema.partial())) body: z.infer<
+      typeof announcementCreateSchema
+    >,
+  ) {
+    return this.admin.updateAnnouncement(actor.id, id, body);
+  }
+
+  @Delete('announcements/:id')
+  @RequirePermissions('settings:manage')
+  async deleteAnnouncement(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    return this.admin.deleteAnnouncement(actor.id, id);
+  }
+
+  @Post('search/reindex')
+  @RequirePermissions('system:manage')
+  async reindex() {
+    return this.admin.reindex();
+  }
+}
