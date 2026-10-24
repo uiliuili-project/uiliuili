@@ -524,6 +524,7 @@ export default function StudioPage() {
                         setCurrent(video);
                         setTitle(video.title);
                         setDescription(video.description);
+                        setCategoryId(video.categoryId ?? '');
                         setVisibility(video.visibility as typeof visibility);
                       }}
                       className="text-brand hover:underline"
