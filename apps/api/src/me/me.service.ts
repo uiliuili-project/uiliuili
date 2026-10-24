@@ -11,7 +11,7 @@ import {
   watchHistories,
 } from '@uiliuili/db';
 import { AppError, ERROR_CODES } from '@uiliuili/shared';
-import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';

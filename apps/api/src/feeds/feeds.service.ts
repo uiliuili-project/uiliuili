@@ -8,7 +8,7 @@ import {
   videos,
   watchHistories,
 } from '@uiliuili/db';
-import { and, desc, eq, isNull, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -131,6 +131,7 @@ export class FeedsService {
           eq(videos.status, 'published'),
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
+          lte(videos.publishedAt, new Date()),
         ),
       )
       .orderBy(desc(watchHistories.updatedAt))

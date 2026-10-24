@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { follows, notifications, users, videos } from '@uiliuili/db';
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 
@@ -49,6 +49,7 @@ export class UsersService {
             eq(videos.uploaderId, user.id),
             eq(videos.status, 'published'),
             eq(videos.visibility, 'public'),
+            lte(videos.publishedAt, new Date()),
           ),
         ),
       this.database.db
