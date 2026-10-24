@@ -43,6 +43,9 @@ async function createDatabase(config: DatabaseConfig): Promise<void> {
 }
 
 export async function testDatabase(config: DatabaseConfig): Promise<DatabaseTestResult> {
+  if (config.schema !== 'uiliuili') {
+    throw new Error('当前版本仅支持固定的 uiliuili schema');
+  }
   const warnings: string[] = [];
   let createdDatabase = false;
   let exists = await databaseExists(config);
@@ -63,10 +66,6 @@ export async function testDatabase(config: DatabaseConfig): Promise<DatabaseTest
     if (major < 14) {
       warnings.push(`当前 PostgreSQL 版本为 ${major || '未知'}，建议使用 16 或更高版本`);
     }
-    if (!/CREATE/.test(serverVersion.split(' ').slice(0, 2).join(' '))) {
-      // version strings do not contain privileges; kept for readability
-    }
-
     assertIdentifier(config.schema, 'Schema');
     let schemaReady = false;
     let canCreateTables = false;

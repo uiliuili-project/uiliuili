@@ -13,9 +13,11 @@ import { AppError, ERROR_CODES } from '@uiliuili/shared';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuthUser, RequestWithUser } from '../common/auth-user';
+import { CacheService } from '../common/cache.service';
 import { CurrentUser, Public } from '../common/decorators';
 import { SettingsService } from '../common/settings.service';
 import { zodBody } from '../common/zod';
+import { config } from '../config';
 import { AuthService } from './auth.service';
 import { CookieService } from './cookie.service';
 import { OAuthService } from './oauth.service';
@@ -27,6 +29,7 @@ export class AuthController {
     private readonly cookies: CookieService,
     private readonly oauth: OAuthService,
     private readonly settings: SettingsService,
+    private readonly cache: CacheService,
   ) {}
 
   @Public()
@@ -37,6 +40,7 @@ export class AuthController {
       token = crypto.randomUUID();
       reply.setCookie('ul_csrf', token, {
         httpOnly: false,
+        secure: config.isSecure,
         sameSite: 'lax',
         path: '/',
         maxAge: 30 * 24 * 60 * 60,
@@ -58,6 +62,10 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    const attempts = await this.cache.increment(`register:${request.ip ?? 'unknown'}`, 300);
+    if (attempts > 5) {
+      throw new AppError(ERROR_CODES.RATE_LIMITED, '注册过于频繁，请稍后再试', 429);
+    }
     try {
       const tokens = await this.auth.register(body);
       this.cookies.setAuthCookies(reply, tokens, true);
@@ -74,6 +82,12 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    const security = await this.settings.getSecuritySettings();
+    const limit = Number(security.loginRateLimit ?? 10);
+    const attempts = await this.cache.increment(`login:${request.ip ?? 'unknown'}`, 60);
+    if (attempts > limit) {
+      throw new AppError(ERROR_CODES.RATE_LIMITED, '登录尝试过于频繁，请稍后再试', 429);
+    }
     try {
       const tokens = await this.auth.login(body.identifier, body.password, {
         ip: request.ip,

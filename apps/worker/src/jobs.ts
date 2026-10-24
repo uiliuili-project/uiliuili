@@ -1,4 +1,4 @@
-import { type Db, backgroundJobs, grantDailyCoins, siteSettings } from '@uiliuili/db';
+import { type Db, backgroundJobs, grantDailyCoins, siteSettings, videos } from '@uiliuili/db';
 import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { runCleanup } from './cleanup';
 import { transcodeVideo } from './media';
@@ -89,9 +89,17 @@ export async function processJob(db: Db, job: Job): Promise<unknown> {
         const videoId = String(payload.videoId ?? '');
         const sourceKey = String(payload.sourceKey ?? '');
         if (!videoId || !sourceKey) throw new Error('Invalid transcode payload');
-        await transcodeVideo(db, videoId, sourceKey, job.id, async (progress) => {
-          await updateProgress(db, job.id, progress);
-        });
+        try {
+          await transcodeVideo(db, videoId, sourceKey, job.id, async (progress) => {
+            await updateProgress(db, job.id, progress);
+          });
+        } catch (error) {
+          await db
+            .update(videos)
+            .set({ status: 'failed', updatedAt: new Date() })
+            .where(eq(videos.id, videoId));
+          throw error;
+        }
         await enqueue(
           db,
           'search-index',

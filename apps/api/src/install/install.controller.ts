@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Req, Res } from '@nestjs/common';
 import {
   COOKIE_NAMES,
   databaseConfigSchema,
@@ -19,8 +19,8 @@ export class InstallController {
   constructor(private readonly installer: InstallService) {}
 
   @Get('status')
-  status() {
-    return this.installer.status();
+  status(@Req() request: FastifyRequest) {
+    return this.installer.status(request.ip, request.headers['x-forwarded-for']);
   }
 
   @Post('unlock')
@@ -29,7 +29,11 @@ export class InstallController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = this.installer.unlock(body.token, request.ip);
+    const result = this.installer.unlock(
+      body.token,
+      request.ip,
+      request.headers['x-forwarded-for'],
+    );
     if ('sessionId' in result) {
       reply.setCookie(COOKIE_NAMES.install, result.sessionId, {
         httpOnly: true,
@@ -96,8 +100,10 @@ export class InstallController {
 
   private requireSession(request: FastifyRequest): void {
     const sessionId = request.cookies?.[COOKIE_NAMES.install];
-    if (!this.installer.hasValidSession(sessionId, request.ip)) {
-      throw new Error('安装会话已失效，请输入安装令牌');
+    if (
+      !this.installer.hasValidSession(sessionId, request.ip, request.headers['x-forwarded-for'])
+    ) {
+      throw new ForbiddenException('安装会话已失效，请输入安装令牌');
     }
   }
 }

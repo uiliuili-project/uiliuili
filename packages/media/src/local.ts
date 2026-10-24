@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { CompletedPart, LocalStorageOptions, MultipartInit, StorageProvider } from './types';
 
 function normalizeKey(key: string): string {
@@ -144,12 +145,7 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       for (const part of [...parts].sort((a, b) => a.partNumber - b.partNumber)) {
         const partPath = path.join(dir, `${String(part.partNumber).padStart(8, '0')}.part`);
-        await new Promise<void>((resolve, reject) => {
-          const input = fs.createReadStream(partPath);
-          input.on('error', reject);
-          input.on('end', resolve);
-          input.pipe(output, { end: false });
-        });
+        await pipeline(fs.createReadStream(partPath), output, { end: false });
       }
     } finally {
       output.end();

@@ -48,9 +48,7 @@ export async function checkEnvironment(root = process.cwd()): Promise<Environmen
   const paths = resolveInstallerPaths(root);
   try {
     ensureRuntimeDirs(paths);
-  } catch {
-    // reported by the write checks below
-  }
+  } catch {}
   checks.push({
     id: 'config-writable',
     label: '配置目录可写',
@@ -100,9 +98,7 @@ export async function checkEnvironment(root = process.cwd()): Promise<Environmen
       const stats = fs.statfsSync(paths.root);
       diskFreeMb = Math.round((stats.bavail * stats.bsize) / 1024 / 1024);
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
   checks.push({
     id: 'disk',
     label: '磁盘空间不少于 2 GB',

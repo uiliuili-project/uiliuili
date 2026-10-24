@@ -92,13 +92,13 @@ export async function probeVideo(file: string, options: FfmpegOptions = {}): Pro
   });
 }
 
-export function buildLadder(sourceHeight: number): RenditionPlan[] {
+export function buildLadder(sourceHeight: number, aspectRatio = 16 / 9): RenditionPlan[] {
   const max = Math.max(360, sourceHeight);
   const selected = LADDER.filter((item) => item.height <= max);
   if (selected.length === 0) selected.push(LADDER[0]!);
   return selected.map((item) => {
     const height = Math.min(item.height, max);
-    const width = Math.max(2, Math.round((height * 16) / 9 / 2) * 2);
+    const width = Math.max(2, Math.round((height * aspectRatio) / 2) * 2);
     return {
       quality: `${height}p`,
       width,
@@ -128,9 +128,10 @@ export async function transcodeToHls(
   const ffmpeg = options.ffmpegPath ?? process.env.FFMPEG_PATH ?? 'ffmpeg';
   const probe = await probeVideo(input, options);
   options.onProgress?.({ stage: 'probe', percent: 5 });
-  const ladder = buildLadder(options.maxHeight ?? probe.height ?? 1080).filter(
-    (rendition) => rendition.height <= (options.maxHeight ?? 1080),
-  );
+  const sourceHeight = probe.height || 1080;
+  const sourceAspect = probe.width && probe.height ? probe.width / probe.height : 16 / 9;
+  const cap = Math.min(options.maxHeight ?? 1080, sourceHeight);
+  const ladder = buildLadder(cap, sourceAspect);
   await fsp.mkdir(outputDir, { recursive: true });
 
   const renditions: TranscodeResult['renditions'] = [];

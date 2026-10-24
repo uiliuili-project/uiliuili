@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { VideosModule } from '../videos/videos.module';
 import { DanmakuBus } from './danmaku.bus';
 import { DanmakuController } from './danmaku.controller';
@@ -6,7 +7,7 @@ import { DanmakuGateway } from './danmaku.gateway';
 import { DanmakuService } from './danmaku.service';
 
 @Module({
-  imports: [VideosModule],
+  imports: [AuthModule, VideosModule],
   controllers: [DanmakuController],
   providers: [DanmakuBus, DanmakuService, DanmakuGateway],
   exports: [DanmakuService, DanmakuBus],

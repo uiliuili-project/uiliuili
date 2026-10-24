@@ -24,7 +24,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  USER: ['video:read', 'danmaku:send'],
+  USER: ['video:read', 'video:upload', 'video:manage_own', 'danmaku:send'],
   UPLOADER: ['video:read', 'video:upload', 'video:manage_own', 'danmaku:send'],
   REVIEWER: [
     'video:read',
