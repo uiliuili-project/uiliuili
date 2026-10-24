@@ -42,15 +42,34 @@ export async function request<T>(
     const csrf = readCookie('ul_csrf');
     if (csrf) headers.set('x-csrf-token', csrf);
   }
-  const response = await fetch(path, {
+  const body = (
+    options.body === undefined || options.body instanceof FormData
+      ? options.body
+      : JSON.stringify(options.body)
+  ) as BodyInit | undefined;
+  let response = await fetch(path, {
     ...options,
     method,
     headers,
     credentials: 'include',
-    body: (options.body === undefined || options.body instanceof FormData
-      ? options.body
-      : JSON.stringify(options.body)) as BodyInit | undefined,
+    body,
   });
+  if (response.status === 401 && !path.includes('/auth/refresh')) {
+    const refreshed = await fetch('/api/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'x-csrf-token': readCookie('ul_csrf') ?? '' },
+    });
+    if (refreshed.ok) {
+      response = await fetch(path, {
+        ...options,
+        method,
+        headers,
+        credentials: 'include',
+        body,
+      });
+    }
+  }
   const text = await response.text();
   let data: unknown = null;
   try {
