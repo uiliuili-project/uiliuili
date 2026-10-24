@@ -756,13 +756,6 @@ export function SettingsPage() {
                   <Form.Item label="登录限流（次/分钟）" name="loginRateLimit">
                     <InputNumber min={1} style={{ width: '100%' }} />
                   </Form.Item>
-                  <Form.Item
-                    label="安装令牌要求"
-                    name="installTokenRequired"
-                    valuePropName="checked"
-                  >
-                    <Switch />
-                  </Form.Item>
                   <Button type="primary" loading={saving} onClick={() => void saveSecurity()}>
                     保存安全设置
                   </Button>

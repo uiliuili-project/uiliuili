@@ -101,11 +101,20 @@ export class VideosService {
       conditions.push(inArray(videos.id, tagged));
     }
 
+    const recommendation = await this.settings.getRecommendationSettings();
+    const weights = recommendation.weights as Record<string, number>;
+    const weight = (key: string, fallback: number) => Math.max(0, Number(weights[key] ?? fallback));
+    const freshness = Math.max(0.1, Number(weights.freshness ?? 1.2));
     const score = sql<number>`(
-      ${videos.viewCount} + ${videos.likeCount} * 4 + ${videos.coinCount} * 6 +
-      ${videos.favoriteCount} * 5 + ${videos.commentCount} * 3 + ${videos.danmakuCount} * 2 +
-      CASE WHEN ${videos.featured} THEN 80 ELSE 0 END
-    ) / (1 + EXTRACT(EPOCH FROM (now() - COALESCE(${videos.publishedAt}, ${videos.createdAt}))) / 86400)`;
+      ${videos.viewCount} * ${weight('views', 0.06)} +
+      ${videos.likeCount} * ${weight('likes', 0.24)} +
+      ${videos.coinCount} * ${weight('coins', 0.28)} +
+      ${videos.favoriteCount} * ${weight('favorites', 0.22)} +
+      ${videos.commentCount} * ${weight('comments', 0.12)} +
+      ${videos.danmakuCount} * 0.04 +
+      ${videos.completionRate} * ${weight('completion', 0.08)} +
+      CASE WHEN ${videos.featured} THEN 0.5 ELSE 0 END
+    ) / (1 + EXTRACT(EPOCH FROM (now() - COALESCE(${videos.publishedAt}, ${videos.createdAt}))) / 86400 / ${freshness * 30})`;
 
     const rows = await this.database.db
       .select({ video: videos, uploader: users, category: categories })
