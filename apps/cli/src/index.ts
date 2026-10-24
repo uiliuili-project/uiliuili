@@ -66,7 +66,8 @@ program
     try {
       const result = await runInstall(parsed.data, {
         root,
-        production: process.env.NODE_ENV === 'production',
+        production:
+          process.env.NODE_ENV === 'production' || parsed.data.site.url.startsWith('https://'),
         onProgress: logProgress,
       });
       console.log('');

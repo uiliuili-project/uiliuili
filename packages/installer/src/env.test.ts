@@ -58,4 +58,17 @@ describe('installer environment files', () => {
     expect(content).not.toContain('REDIS_URL=');
     expect(content).not.toContain('MEILISEARCH_URL=');
   });
+
+  it('disables localhost installer bypass in production', () => {
+    const content = buildEnvFile(baseConfig, {
+      production: true,
+      appKey: 'c'.repeat(64),
+    });
+    expect(content).toContain('INSTALL_ALLOW_LOCALHOST=false');
+    const development = buildEnvFile(baseConfig, {
+      production: false,
+      appKey: 'd'.repeat(64),
+    });
+    expect(development).toContain('INSTALL_ALLOW_LOCALHOST=true');
+  });
 });

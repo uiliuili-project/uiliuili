@@ -44,7 +44,7 @@ export function buildEnvFile(config: InstallConfig, options: EnvFileOptions): st
     ['FFMPEG_PATH', 'ffmpeg'],
     ['FFPROBE_PATH', 'ffprobe'],
     ['TRANSCODE_CONCURRENCY', '2'],
-    ['INSTALL_ALLOW_LOCALHOST', 'true'],
+    ['INSTALL_ALLOW_LOCALHOST', options.production ? 'false' : 'true'],
   ];
 
   const lines = [
