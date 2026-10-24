@@ -208,6 +208,29 @@ export default function StudioPage() {
     }, 3000);
   };
 
+  const saveMetadata = async (video: StudioVideo) => {
+    setError('');
+    setMessage('');
+    try {
+      const updated = await api.patch<StudioVideo>(`/api/v1/studio/videos/${video.id}`, {
+        title,
+        description,
+        categoryId: categoryId || undefined,
+        visibility,
+        tags: tags
+          .split(/[,，\s]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .slice(0, 12),
+      });
+      setCurrent(updated);
+      await loadVideos();
+      setMessage('稿件信息已保存');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : '保存失败');
+    }
+  };
+
   const publish = async (video: StudioVideo) => {
     setError('');
     setMessage('');
@@ -408,6 +431,13 @@ export default function StudioPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => void saveMetadata(current)}
+                  className="btn-ghost"
+                >
+                  保存稿件信息
+                </button>
+                <button
+                  type="button"
                   onClick={() => void uploadVideo()}
                   disabled={!file || uploading}
                   className="btn-primary"
@@ -431,6 +461,20 @@ export default function StudioPage() {
                     查看视频
                   </Link>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrent(null);
+                    setTitle('');
+                    setDescription('');
+                    setTags('');
+                    setFile(null);
+                    setCover(null);
+                  }}
+                  className="btn-ghost"
+                >
+                  新建稿件
+                </button>
               </div>
             </div>
           )}
