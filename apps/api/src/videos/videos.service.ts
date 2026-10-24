@@ -16,6 +16,7 @@ import {
   videoCoins,
   videoLikes,
   videoRenditions,
+  videoSimilarities,
   videoSubtitles,
   videoTags,
   videos,
@@ -271,14 +272,42 @@ export class VideosService {
       ne(videos.id, id),
     ];
     if (row.video.categoryId) conditions.push(eq(videos.categoryId, row.video.categoryId));
-    const rows = await this.database.db
+    const similar = await this.database.db
       .select({ video: videos, uploader: users, category: categories })
-      .from(videos)
+      .from(videoSimilarities)
+      .innerJoin(videos, eq(videos.id, videoSimilarities.relatedVideoId))
       .innerJoin(users, eq(users.id, videos.uploaderId))
       .leftJoin(categories, eq(categories.id, videos.categoryId))
-      .where(and(...conditions))
-      .orderBy(desc(videos.viewCount), desc(videos.publishedAt))
+      .where(
+        and(
+          eq(videoSimilarities.videoId, id),
+          eq(videos.status, 'published'),
+          eq(videos.visibility, 'public'),
+          isNull(videos.deletedAt),
+          lte(videos.publishedAt, new Date()),
+        ),
+      )
+      .orderBy(desc(videoSimilarities.score))
       .limit(limit);
+    const rows = [...similar];
+    if (rows.length < limit) {
+      const categoryRows = await this.database.db
+        .select({ video: videos, uploader: users, category: categories })
+        .from(videos)
+        .innerJoin(users, eq(users.id, videos.uploaderId))
+        .leftJoin(categories, eq(categories.id, videos.categoryId))
+        .where(and(...conditions))
+        .orderBy(desc(videos.viewCount), desc(videos.publishedAt))
+        .limit(limit);
+      const seen = new Set(rows.map((item) => item.video.id));
+      for (const item of categoryRows) {
+        if (rows.length >= limit) break;
+        if (!seen.has(item.video.id)) {
+          rows.push(item);
+          seen.add(item.video.id);
+        }
+      }
+    }
     if (rows.length < limit) {
       const seen = new Set(rows.map((item) => item.video.id));
       seen.add(id);
