@@ -20,7 +20,6 @@ export function buildDatabaseUrl(
 export interface EnvFileOptions {
   production: boolean;
   appKey: string;
-  installToken?: string;
 }
 
 export function buildEnvFile(config: InstallConfig, options: EnvFileOptions): string {
@@ -45,7 +44,6 @@ export function buildEnvFile(config: InstallConfig, options: EnvFileOptions): st
     ['FFMPEG_PATH', 'ffmpeg'],
     ['FFPROBE_PATH', 'ffprobe'],
     ['TRANSCODE_CONCURRENCY', '2'],
-    ['INSTALL_TOKEN', options.installToken],
     ['INSTALL_ALLOW_LOCALHOST', 'true'],
   ];
 

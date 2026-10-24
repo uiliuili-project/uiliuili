@@ -11,7 +11,7 @@ import {
   watchHistories,
 } from '@uiliuili/db';
 import { AppError, ERROR_CODES } from '@uiliuili/shared';
-import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -42,7 +42,14 @@ export class MeService {
       .innerJoin(videos, eq(videos.id, watchHistories.videoId))
       .innerJoin(users, eq(users.id, videos.uploaderId))
       .leftJoin(categories, eq(categories.id, videos.categoryId))
-      .where(and(eq(watchHistories.userId, userId), isNull(videos.deletedAt)))
+      .where(
+        and(
+          eq(watchHistories.userId, userId),
+          eq(videos.status, 'published'),
+          isNull(videos.deletedAt),
+          ne(videos.visibility, 'private'),
+        ),
+      )
       .orderBy(desc(watchHistories.updatedAt))
       .limit(limit)
       .offset(offset);
@@ -62,7 +69,9 @@ export class MeService {
 
   async favorites(userId: string, folderId?: string) {
     const folders = await this.folderList(userId);
-    const active = folderId ?? folders.find((folder) => folder.isDefault)?.id ?? folders[0]?.id;
+    const requested = folderId ? folders.find((folder) => folder.id === folderId) : undefined;
+    const active =
+      requested?.id ?? folders.find((folder) => folder.isDefault)?.id ?? folders[0]?.id;
     if (!active) return { folders, folderId: null, items: [] };
     const rows = await this.database.db
       .select({ video: videos, uploader: users, category: categories })
@@ -70,7 +79,14 @@ export class MeService {
       .innerJoin(videos, eq(videos.id, favoriteItems.videoId))
       .innerJoin(users, eq(users.id, videos.uploaderId))
       .leftJoin(categories, eq(categories.id, videos.categoryId))
-      .where(eq(favoriteItems.folderId, active))
+      .where(
+        and(
+          eq(favoriteItems.folderId, active),
+          eq(videos.status, 'published'),
+          isNull(videos.deletedAt),
+          ne(videos.visibility, 'private'),
+        ),
+      )
       .orderBy(desc(favoriteItems.createdAt))
       .limit(100);
     const tagsByVideo = await this.videos.tagsFor(rows.map((row) => row.video.id));
@@ -117,10 +133,17 @@ export class MeService {
       .where(and(eq(favoriteFolders.id, folderId), eq(favoriteFolders.userId, userId)))
       .limit(1);
     if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '收藏夹不存在', 404);
-    await this.database.db
+    const inserted = await this.database.db
       .insert(favoriteItems)
       .values({ folderId, videoId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ videoId: favoriteItems.videoId });
+    if (inserted.length > 0) {
+      await this.database.db
+        .update(videos)
+        .set({ favoriteCount: sql`${videos.favoriteCount} + 1` })
+        .where(eq(videos.id, videoId));
+    }
     return { ok: true };
   }
 
@@ -131,9 +154,16 @@ export class MeService {
       .where(and(eq(favoriteFolders.id, folderId), eq(favoriteFolders.userId, userId)))
       .limit(1);
     if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '收藏夹不存在', 404);
-    await this.database.db
+    const deleted = await this.database.db
       .delete(favoriteItems)
-      .where(and(eq(favoriteItems.folderId, folderId), eq(favoriteItems.videoId, videoId)));
+      .where(and(eq(favoriteItems.folderId, folderId), eq(favoriteItems.videoId, videoId)))
+      .returning({ videoId: favoriteItems.videoId });
+    if (deleted.length > 0) {
+      await this.database.db
+        .update(videos)
+        .set({ favoriteCount: sql`GREATEST(0, ${videos.favoriteCount} - 1)` })
+        .where(eq(videos.id, videoId));
+    }
     return { ok: true };
   }
 

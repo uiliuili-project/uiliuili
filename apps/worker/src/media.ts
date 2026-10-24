@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Db } from '@uiliuili/db';
-import { videoRenditions, videoSubtitles, videos } from '@uiliuili/db';
+import { siteSettings, videoRenditions, videos } from '@uiliuili/db';
 import {
   type StorageProvider,
   type TranscodeResult,
@@ -56,10 +56,28 @@ export async function transcodeVideo(
       ffmpegPath: workerConfig.ffmpegPath,
       ffprobePath: workerConfig.ffprobePath,
     });
+    const uploadRows = await db
+      .select()
+      .from(siteSettings)
+      .where(eq(siteSettings.key, 'upload'))
+      .limit(1);
+    const uploadSettings = (uploadRows[0]?.value ?? {}) as {
+      maxDurationSeconds?: number;
+      maxResolution?: number;
+    };
+    if (
+      uploadSettings.maxDurationSeconds &&
+      probe.durationSeconds > uploadSettings.maxDurationSeconds
+    ) {
+      throw new Error(
+        `视频时长超过限制（${probe.durationSeconds}s > ${uploadSettings.maxDurationSeconds}s）`,
+      );
+    }
+    const maxHeight = Math.min(1080, Number(uploadSettings.maxResolution ?? 1080));
     const result = await transcodeToHls(sourcePath, outputDir, {
       ffmpegPath: workerConfig.ffmpegPath,
       ffprobePath: workerConfig.ffprobePath,
-      maxHeight: 1080,
+      maxHeight,
       onProgress: async (progress) => {
         await onProgress(Math.min(90, 8 + Math.round(progress.percent * 0.82)));
       },
@@ -104,7 +122,7 @@ export async function transcodeVideo(
       await tx
         .update(videos)
         .set({
-          status: 'ready',
+          status: video.publishedAt ? 'published' : 'ready',
           durationSeconds: probe.durationSeconds,
           width: probe.width,
           height: probe.height,
@@ -120,8 +138,4 @@ export async function transcodeVideo(
   } finally {
     await fsp.rm(tempDir, { recursive: true, force: true });
   }
-}
-
-export async function cleanupStaleSubtitles(_db: Db): Promise<void> {
-  // Placeholder for future subtitle cleanup hooks.
 }

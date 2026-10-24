@@ -315,7 +315,7 @@ export class AdminService {
         recommendWeight: input.recommendWeight,
         blockReason: input.blockReason,
         publishedAt: input.status === 'published' && !video.publishedAt ? new Date() : undefined,
-        deletedAt: input.status === 'deleted' ? new Date() : undefined,
+        deletedAt: input.status === 'deleted' ? new Date() : input.status ? null : undefined,
         updatedAt: new Date(),
       })
       .where(eq(videos.id, id))
@@ -670,6 +670,7 @@ export class AdminService {
           mergeMasked(value, await this.settings.getStorageConfig()),
         );
         await this.settings.set(key, parsed, true);
+        await this.settings.set('storage', { driver: parsed.driver }, false);
       } else if (key === 'mail_config') {
         const existing = await this.settings.getSecret<Record<string, unknown> | null>(
           'mail_config',
@@ -677,18 +678,25 @@ export class AdminService {
         );
         const parsed = mailConfigSchema.parse(mergeMasked(value, existing ?? {}));
         await this.settings.set(key, parsed, true);
+        await this.settings.set(
+          'mail',
+          {
+            enabled: parsed.enabled,
+            verificationRequired: parsed.verificationRequired,
+          },
+          false,
+        );
       } else if (key === 'search_config') {
         const existing = await this.settings.getSearchConfig();
         const parsed = searchConfigSchema.parse(mergeMasked(value, existing));
         await this.settings.set(key, parsed, true);
+        await this.settings.set('search', { driver: parsed.driver }, false);
       } else if (key === 'redis_config') {
         const existing = await this.settings.getRedisConfig();
         const merged = mergeMasked(value, existing ?? {});
-        await this.settings.set(
-          key,
-          merged && (merged as { url?: string }).url ? merged : null,
-          true,
-        );
+        const hasRedis = Boolean(merged && (merged as { url?: string }).url);
+        await this.settings.set(key, hasRedis ? merged : null, true);
+        await this.settings.set('cache', { driver: hasRedis ? 'redis' : 'memory' }, false);
       } else if (
         [
           'site',

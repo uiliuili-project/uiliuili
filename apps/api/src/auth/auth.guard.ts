@@ -23,12 +23,11 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
-
     const optional = this.reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
+    if (isPublic && !optional) return true;
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const authorization = request.headers.authorization;
     const bearer =

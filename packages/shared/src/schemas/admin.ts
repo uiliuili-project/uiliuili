@@ -9,7 +9,10 @@ export const adminPaginationSchema = z.object({
 
 export const adminUserQuerySchema = adminPaginationSchema.extend({
   role: z.enum(USER_ROLES).optional(),
-  banned: z.coerce.boolean().optional(),
+  banned: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
 });
 
 export const adminUserUpdateSchema = z.object({
@@ -22,7 +25,10 @@ export const adminUserUpdateSchema = z.object({
 export const adminVideoQuerySchema = adminPaginationSchema.extend({
   status: z.enum(VIDEO_STATUSES).optional(),
   categoryId: z.string().uuid().optional(),
-  featured: z.coerce.boolean().optional(),
+  featured: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
 });
 
 export const adminVideoUpdateSchema = z.object({

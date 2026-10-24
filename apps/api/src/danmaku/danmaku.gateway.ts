@@ -78,9 +78,7 @@ export class DanmakuGateway
       if (user && !user.banned) {
         (client.data as SocketData).user = user;
       }
-    } catch {
-      // Anonymous sockets are allowed to watch public videos.
-    }
+    } catch {}
   }
 
   handleDisconnect(client: Socket): void {

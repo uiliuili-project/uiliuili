@@ -38,7 +38,5 @@ export function writeFileAtomic(file: string, content: string, mode = 0o600): vo
   fs.renameSync(temporary, file);
   try {
     fs.chmodSync(file, mode);
-  } catch {
-    // best effort on platforms without POSIX permissions
-  }
+  } catch {}
 }

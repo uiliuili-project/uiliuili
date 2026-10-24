@@ -73,6 +73,7 @@ export class AuthService {
       .limit(1);
     if (existing.length > 0) throw new Error('用户名或邮箱已被使用');
 
+    const social = await this.settings.getSocialSettings();
     const mail = await this.settings.getMailConfig();
     const verificationRequired = Boolean(
       mail &&
@@ -94,7 +95,7 @@ export class AuthService {
         passwordHash,
         emailVerified: !verificationRequired,
         roles: ['USER'],
-        coinBalance: 0,
+        coinBalance: Number(social.dailyCoins ?? 2),
       })
       .returning();
     if (!created) throw new Error('注册失败');

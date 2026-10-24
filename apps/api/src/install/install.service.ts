@@ -66,23 +66,28 @@ export class InstallService {
     warnings: [],
   };
 
-  status(): InstallStatus {
+  status(ip?: string, forwardedFor?: string | string[]): InstallStatus {
     const instance = readInstance();
+    const localBypass = this.isLocalRequest(ip, forwardedFor);
     return {
       installed: Boolean(instance) || instanceExists(),
       version: APP_VERSION,
       siteUrl: instance?.siteUrl,
       instanceId: instance?.instanceId,
-      tokenRequired: !config.installAllowLocalhost,
-      localhostBypass: config.installAllowLocalhost,
+      tokenRequired: !localBypass,
+      localhostBypass: localBypass,
       running: this.state.running,
       failed: this.state.failed,
       error: this.state.error,
     };
   }
 
-  unlock(token: string, ip?: string): { sessionId: string } | { bypass: true } {
-    if (config.installAllowLocalhost && isLoopback(ip) && !token) {
+  unlock(
+    token: string,
+    ip?: string,
+    forwardedFor?: string | string[],
+  ): { sessionId: string } | { bypass: true } {
+    if (this.isLocalRequest(ip, forwardedFor) && !token) {
       return { bypass: true };
     }
     if (!verifyInstallToken(process.cwd(), token)) {
@@ -96,8 +101,12 @@ export class InstallService {
     return { sessionId };
   }
 
-  hasValidSession(sessionId: string | undefined, ip?: string): boolean {
-    if (config.installAllowLocalhost && isLoopback(ip)) return true;
+  hasValidSession(
+    sessionId: string | undefined,
+    ip?: string,
+    forwardedFor?: string | string[],
+  ): boolean {
+    if (this.isLocalRequest(ip, forwardedFor)) return true;
     if (!sessionId) return false;
     const session = this.sessions.get(sessionId);
     if (!session) return false;
@@ -150,6 +159,14 @@ export class InstallService {
 
   progress(): InstallProgressState {
     return this.state;
+  }
+
+  private isLocalRequest(ip?: string, forwardedFor?: string | string[]): boolean {
+    if (!config.installAllowLocalhost) return false;
+    if (forwardedFor && (Array.isArray(forwardedFor) ? forwardedFor.length > 0 : forwardedFor)) {
+      return false;
+    }
+    return isLoopback(ip);
   }
 
   private update(progress: InstallProgress): void {

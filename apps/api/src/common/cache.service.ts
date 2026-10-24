@@ -33,9 +33,7 @@ export class CacheService implements OnModuleDestroy {
       try {
         if (this.redis.status === 'wait') await this.redis.connect();
         return await this.redis.get(key);
-      } catch {
-        // fall back to memory
-      }
+      } catch {}
     }
     const entry = this.memory.get(key);
     if (!entry) return null;
@@ -52,9 +50,7 @@ export class CacheService implements OnModuleDestroy {
         if (this.redis.status === 'wait') await this.redis.connect();
         await this.redis.set(key, value, 'EX', ttlSeconds);
         return;
-      } catch {
-        // fall back to memory
-      }
+      } catch {}
     }
     this.memory.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
     if (this.memory.size > 5000) {
@@ -70,9 +66,7 @@ export class CacheService implements OnModuleDestroy {
       try {
         if (this.redis.status === 'wait') await this.redis.connect();
         if (keys.length) await this.redis.del(...keys);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     for (const key of keys) this.memory.delete(key);
   }
@@ -84,9 +78,7 @@ export class CacheService implements OnModuleDestroy {
         const value = await this.redis.incr(key);
         if (value === 1) await this.redis.expire(key, ttlSeconds);
         return value;
-      } catch {
-        // fall back to memory
-      }
+      } catch {}
     }
     const entry = this.memory.get(key);
     const next = entry && entry.expiresAt > Date.now() ? Number(entry.value) + 1 : 1;

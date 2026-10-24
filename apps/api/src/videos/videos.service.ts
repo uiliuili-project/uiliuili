@@ -151,6 +151,7 @@ export class VideosService {
           eq(videos.status, 'published'),
           ne(videos.visibility, 'private'),
           isNull(videos.deletedAt),
+          lte(videos.publishedAt, new Date()),
         ),
       )
       .orderBy(

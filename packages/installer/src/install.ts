@@ -91,14 +91,16 @@ export async function runInstall(
 
   const instanceId = options.instanceId ?? crypto.randomUUID();
   const appKey = options.appKey ?? process.env.APP_KEY ?? crypto.randomBytes(32).toString('hex');
-  const installToken = process.env.INSTALL_TOKEN ?? getOrCreateInstallToken(root);
+  if (!/^[0-9a-f]{64}$/.test(appKey)) {
+    throw new Error('APP_KEY 必须是 64 个十六进制字符');
+  }
+  getOrCreateInstallToken(root);
   const paths = resolveInstallerPaths(root);
 
   progress(options, 'config', 22, '正在写入运行配置');
   const envContent = buildEnvFile(config, {
     production: options.production ?? process.env.NODE_ENV === 'production',
     appKey,
-    installToken,
   });
   writeEnvFile(paths.envFile, envContent);
 
@@ -123,10 +125,37 @@ export async function runInstall(
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:install'))`);
 
       progress(options, 'migrate', 35, '正在创建数据表');
+      await tx.execute(sql`CREATE SCHEMA IF NOT EXISTS "uiliuili"`);
+      await tx.execute(
+        sql`CREATE TABLE IF NOT EXISTS "uiliuili"."schema_migrations" (
+          "name" text PRIMARY KEY NOT NULL,
+          "applied_at" timestamp with time zone DEFAULT now() NOT NULL
+        )`,
+      );
+      const trackingRows = await tx.execute<{ count: number }>(
+        sql`SELECT COUNT(*)::int AS count FROM "uiliuili"."schema_migrations"`,
+      );
+      if (Number(trackingRows[0]?.count ?? 0) === 0 && migrations[0]) {
+        const existing = await tx.execute<{ exists: boolean }>(
+          sql`SELECT to_regclass('uiliuili.app_instance') IS NOT NULL AS exists`,
+        );
+        if (existing[0]?.exists) {
+          await tx.execute(
+            sql`INSERT INTO "uiliuili"."schema_migrations" ("name") VALUES (${migrations[0].name}) ON CONFLICT DO NOTHING`,
+          );
+        }
+      }
       for (const migration of migrations) {
+        const applied = await tx.execute<{ name: string }>(
+          sql`SELECT name FROM "uiliuili"."schema_migrations" WHERE name = ${migration.name} LIMIT 1`,
+        );
+        if (applied.length > 0) continue;
         for (const statement of splitStatements(migration.sql)) {
           await tx.execute(sql.raw(statement));
         }
+        await tx.execute(
+          sql`INSERT INTO "uiliuili"."schema_migrations" ("name") VALUES (${migration.name})`,
+        );
       }
 
       progress(options, 'seed', 55, '正在初始化站点数据');
