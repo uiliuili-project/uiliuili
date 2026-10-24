@@ -14,6 +14,7 @@
     "@fastify/cookie": "^9.4.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/helmet": "^11.1.1",
+    "@fastify/static": "^7.0.4",
     "@nestjs/common": "^10.4.15",
     "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
@@ -22,8 +23,8 @@
     "@nestjs/swagger": "^7.4.2",
     "@nestjs/websockets": "^10.4.15",
     "@socket.io/redis-adapter": "^8.3.0",
+    "@uiliuili/danmaku": "workspace:*",
     "@uiliuili/db": "workspace:*",
-    "@uiliuili/i18n": "workspace:*",
     "@uiliuili/installer": "workspace:*",
     "@uiliuili/media": "workspace:*",
     "@uiliuili/shared": "workspace:*",
@@ -32,20 +33,18 @@
     "drizzle-orm": "^0.44.0",
     "fastify": "^4.29.0",
     "ioredis": "^5.4.2",
+    "mime-types": "^2.1.35",
     "nodemailer": "^6.9.16",
     "postgres": "^3.4.5",
     "redis": "^4.7.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
-    "zod": "^3.24.1",
-    "mime-types": "^2.1.35",
-    "@uiliuili/danmaku": "workspace:*",
-    "@fastify/static": "^7.0.4"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/mime-types": "^2.1.4",
     "@types/nodemailer": "^6.4.17",
-    "tsx": "^4.19.2",
-    "@types/mime-types": "^2.1.4"
+    "tsx": "^4.19.2"
   }
 }
