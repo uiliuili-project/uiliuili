@@ -93,16 +93,27 @@ export async function probeVideo(file: string, options: FfmpegOptions = {}): Pro
 }
 
 export function buildLadder(sourceHeight: number, aspectRatio = 16 / 9): RenditionPlan[] {
-  const max = Math.max(360, sourceHeight);
-  const selected = LADDER.filter((item) => item.height <= max);
-  if (selected.length === 0) selected.push(LADDER[0]!);
+  const height = Math.max(2, Math.floor(sourceHeight));
+  const selected = LADDER.filter((item) => item.height <= height);
+  if (selected.length === 0) {
+    const scaledWidth = Math.max(2, Math.round((height * aspectRatio) / 2) * 2);
+    return [
+      {
+        quality: `${height}p`,
+        width: scaledWidth,
+        height,
+        videoBitrate: Math.max(300_000, height * 3_000),
+        audioBitrate: 96_000,
+      },
+    ];
+  }
   return selected.map((item) => {
-    const height = Math.min(item.height, max);
-    const width = Math.max(2, Math.round((height * aspectRatio) / 2) * 2);
+    const renditionHeight = Math.min(item.height, height);
+    const width = Math.max(2, Math.round((renditionHeight * aspectRatio) / 2) * 2);
     return {
-      quality: `${height}p`,
+      quality: `${renditionHeight}p`,
       width,
-      height,
+      height: renditionHeight,
       videoBitrate: item.videoBitrate,
       audioBitrate: item.audioBitrate,
     };

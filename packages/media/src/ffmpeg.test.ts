@@ -13,6 +13,12 @@ describe('HLS ladder', () => {
     expect(ladder.map((item) => item.height)).toEqual([360, 480, 720, 1080]);
   });
 
+  it('does not upscale a 240p source', () => {
+    const ladder = buildLadder(240);
+    expect(ladder).toHaveLength(1);
+    expect(ladder[0]).toMatchObject({ quality: '240p', height: 240 });
+  });
+
   it('preserves non-16:9 aspect ratios', () => {
     const ladder = buildLadder(480, 9 / 16);
     expect(ladder.at(-1)?.width).toBeLessThan(ladder.at(-1)!.height);
