@@ -42,7 +42,11 @@ export async function indexVideo(db: Db, videoId: string): Promise<void> {
     configured = true;
   }
 
-  if (row.video.status !== 'published' || row.video.deletedAt) {
+  if (
+    row.video.status !== 'published' ||
+    row.video.visibility !== 'public' ||
+    row.video.deletedAt
+  ) {
     await fetch(`${base}/indexes/${index}/documents/${encodeURIComponent(videoId)}`, {
       method: 'DELETE',
       headers,

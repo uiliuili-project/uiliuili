@@ -100,7 +100,7 @@ export class FeedsService {
         and(
           eq(follows.followerId, user.id),
           eq(videos.status, 'published'),
-          ne(videos.visibility, 'private'),
+          eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
         ),
@@ -129,6 +129,7 @@ export class FeedsService {
           eq(watchHistories.userId, userId),
           eq(watchHistories.completed, false),
           eq(videos.status, 'published'),
+          eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
         ),
       )

@@ -46,8 +46,10 @@ independently.
 ## Request paths
 
 - Public pages are rendered by Next.js. API calls use same-origin `/api`.
-- Video bytes never pass through the business API in S3 mode.
-- Local storage is served by Nginx or the media controller with HTTP Range.
+- Uploads go directly to S3 in cloud mode; HLS playback is proxied by the API
+  so private and unlisted access checks apply. Public deployments can put a CDN
+  in front of the API media route.
+- Covers and local media are served by the media controller with HTTP Range.
 - Danmaku history is loaded in 6-minute segments. New danmaku is persisted and
   broadcast over Socket.IO.
 - Uploads use resumable chunks for local storage and multipart presigned URLs
@@ -56,8 +58,8 @@ independently.
 ## Data integrity
 
 - Likes, coins, favorites, follows, and OAuth identities use unique constraints.
-- Counters are buffered and flushed asynchronously; interaction rows are the
-  source of truth.
+- Interaction rows are the source of truth; aggregate counters are updated in the
+  same transactions.
 - Installer migrations run in a transaction under a PostgreSQL advisory lock.
 - The installer writes `config/instance.json` last. Without that file the API
   runs in install-only mode.

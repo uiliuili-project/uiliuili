@@ -11,7 +11,7 @@ import {
   watchHistories,
 } from '@uiliuili/db';
 import { AppError, ERROR_CODES } from '@uiliuili/shared';
-import { and, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -47,7 +47,7 @@ export class MeService {
           eq(watchHistories.userId, userId),
           eq(videos.status, 'published'),
           isNull(videos.deletedAt),
-          ne(videos.visibility, 'private'),
+          eq(videos.visibility, 'public'),
         ),
       )
       .orderBy(desc(watchHistories.updatedAt))
@@ -84,7 +84,7 @@ export class MeService {
           eq(favoriteItems.folderId, active),
           eq(videos.status, 'published'),
           isNull(videos.deletedAt),
-          ne(videos.visibility, 'private'),
+          eq(videos.visibility, 'public'),
         ),
       )
       .orderBy(desc(favoriteItems.createdAt))
