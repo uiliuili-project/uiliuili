@@ -21,7 +21,8 @@
     "db:generate": "pnpm --filter @uiliuili/db db:generate",
     "cli": "node apps/cli/dist/index.js",
     "start:api": "node apps/api/dist/main.js",
-    "start:worker": "node apps/worker/dist/main.js"
+    "start:worker": "node apps/worker/dist/main.js",
+    "start:web": "pnpm --filter @uiliuili/web start"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
