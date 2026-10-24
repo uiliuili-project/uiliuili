@@ -44,7 +44,13 @@ export class UsersService {
       this.database.db
         .select({ value: count() })
         .from(videos)
-        .where(and(eq(videos.uploaderId, user.id), eq(videos.status, 'published'))),
+        .where(
+          and(
+            eq(videos.uploaderId, user.id),
+            eq(videos.status, 'published'),
+            eq(videos.visibility, 'public'),
+          ),
+        ),
       this.database.db
         .select({ value: count() })
         .from(follows)

@@ -79,7 +79,7 @@ export class VideosService {
     const offset = decodeCursor(query.cursor);
     const conditions = [
       eq(videos.status, 'published'),
-      ne(videos.visibility, 'private'),
+      eq(videos.visibility, 'public'),
       isNull(videos.deletedAt),
       lte(videos.publishedAt, new Date()),
     ];
@@ -149,7 +149,7 @@ export class VideosService {
         and(
           eq(videos.uploaderId, uploader.id),
           eq(videos.status, 'published'),
-          ne(videos.visibility, 'private'),
+          eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
         ),
@@ -256,7 +256,7 @@ export class VideosService {
     const row = await this.getRow(id);
     const conditions = [
       eq(videos.status, 'published'),
-      ne(videos.visibility, 'private'),
+      eq(videos.visibility, 'public'),
       isNull(videos.deletedAt),
       ne(videos.id, id),
     ];
@@ -280,7 +280,7 @@ export class VideosService {
         .where(
           and(
             eq(videos.status, 'published'),
-            ne(videos.visibility, 'private'),
+            eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
           ),
         )

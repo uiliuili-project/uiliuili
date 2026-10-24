@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { categories, searchQueries, tags, users, videoTags, videos } from '@uiliuili/db';
 import type { VideoCard } from '@uiliuili/shared';
-import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -164,7 +164,7 @@ export class SearchService {
     try {
       const base = config.url.replace(/\/$/, '');
       const index = `${config.indexPrefix}_videos`;
-      const filters = ['status = published', 'visibility != private'];
+      const filters = ['status = published', 'visibility = public'];
       if (query.category) filters.push(`categorySlug = "${query.category.replace(/"/g, '')}"`);
       const response = await fetch(`${base}/indexes/${index}/search`, {
         method: 'POST',
@@ -194,7 +194,7 @@ export class SearchService {
           and(
             inArray(videos.id, ids),
             eq(videos.status, 'published'),
-            ne(videos.visibility, 'private'),
+            eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
           ),
         );
