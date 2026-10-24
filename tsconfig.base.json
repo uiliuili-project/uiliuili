@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+    "baseUrl": ".",
+    "paths": {
+      "@uiliuili/shared": ["packages/shared/src/index.ts"],
+      "@uiliuili/db": ["packages/db/src/index.ts"],
+      "@uiliuili/media": ["packages/media/src/index.ts"],
+      "@uiliuili/installer": ["packages/installer/src/index.ts"],
+      "@uiliuili/danmaku": ["packages/danmaku/src/index.ts"],
+      "@uiliuili/i18n": ["packages/i18n/src/index.ts"],
+      "@uiliuili/sdk": ["packages/sdk/src/index.ts"]
+    }
+  }
+}
