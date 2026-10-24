@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { categories, searchQueries, tags, users, videoTags, videos } from '@uiliuili/db';
 import type { VideoCard } from '@uiliuili/shared';
-import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -63,6 +63,7 @@ export class SearchService {
             eq(videos.status, 'published'),
             eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
+            lte(videos.publishedAt, new Date()),
             ilike(videos.title, needle),
           ),
         )
