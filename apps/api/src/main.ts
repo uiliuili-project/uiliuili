@@ -50,14 +50,20 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .addContentTypeParser(
-      'application/octet-stream',
+  const fastify = app.getHttpAdapter().getInstance();
+  for (const contentType of [
+    'application/octet-stream',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'text/vtt',
+  ]) {
+    fastify.addContentTypeParser(
+      contentType,
       { parseAs: 'buffer', bodyLimit: 32 * 1024 * 1024 },
       (_request, body, done) => done(null, body),
     );
+  }
 
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();

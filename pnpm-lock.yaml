@@ -102,6 +102,9 @@ importers:
       '@socket.io/redis-adapter':
         specifier: ^8.3.0
         version: 8.3.0(socket.io-adapter@2.5.8)
+      '@uiliuili/danmaku':
+        specifier: workspace:*
+        version: link:../../packages/danmaku
       '@uiliuili/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -132,6 +135,9 @@ importers:
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1
+      mime-types:
+        specifier: ^2.1.35
+        version: 2.1.35
       nodemailer:
         specifier: ^6.9.16
         version: 6.10.1
@@ -154,9 +160,37 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@types/mime-types':
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/nodemailer':
         specifier: ^6.4.17
         version: 6.4.24
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
+
+  apps/worker:
+    dependencies:
+      '@uiliuili/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@uiliuili/media':
+        specifier: workspace:*
+        version: link:../../packages/media
+      '@uiliuili/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      drizzle-orm:
+        specifier: ^0.44.0
+        version: 0.44.7(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.5
+        version: 3.4.9
+    devDependencies:
       tsx:
         specifier: ^4.19.2
         version: 4.23.15

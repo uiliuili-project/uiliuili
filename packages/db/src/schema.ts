@@ -610,6 +610,8 @@ export const backgroundJobs = appSchema.table(
 );
 
 export type DbUser = typeof users.$inferSelect;
+export type DbCategory = typeof categories.$inferSelect;
+export type DbTag = typeof tags.$inferSelect;
 export type DbVideo = typeof videos.$inferSelect;
 export type DbDanmaku = typeof danmaku.$inferSelect;
 export type DbComment = typeof comments.$inferSelect;

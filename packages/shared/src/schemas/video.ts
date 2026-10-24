@@ -27,6 +27,24 @@ export const uploadInitSchema = z.object({
 
 export const uploadCompleteSchema = z.object({
   uploadId: z.string().uuid(),
+  parts: z
+    .array(
+      z.object({
+        partNumber: z.number().int().positive(),
+        etag: z.string().min(1),
+      }),
+    )
+    .optional(),
+});
+
+export const presignPartsSchema = z.object({
+  partNumbers: z.array(z.number().int().positive()).min(1).max(1000),
+});
+
+export const recordPartSchema = z.object({
+  partNumber: z.number().int().positive(),
+  etag: z.string().min(1),
+  size: z.number().int().positive().optional(),
 });
 
 export const publishVideoSchema = z.object({

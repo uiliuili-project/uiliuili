@@ -55,6 +55,7 @@ export const VIDEO_STATUSES = [
   'uploading',
   'processing',
   'ready',
+  'pending_review',
   'published',
   'blocked',
   'failed',
