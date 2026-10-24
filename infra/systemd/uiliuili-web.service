@@ -1,0 +1,18 @@
+[Unit]
+Description=uiliuili web (Next.js)
+After=network.target uiliuili-api.service
+
+[Service]
+Type=simple
+User=uiliuili
+Group=uiliuili
+WorkingDirectory=/opt/uiliuili
+EnvironmentFile=-/opt/uiliuili/.env
+ExecStart=/usr/bin/env pnpm --filter @uiliuili/web start
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

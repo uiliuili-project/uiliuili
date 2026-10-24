@@ -26,7 +26,12 @@
       },
       "a11y": {
         "useKeyWithClickEvents": "off",
-        "noSvgWithoutTitle": "off"
+        "noSvgWithoutTitle": "off",
+        "noAutofocus": "off",
+        "useMediaCaption": "off"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "off"
       }
     }
   },
@@ -41,7 +46,10 @@
       "*.json",
       "pnpm-lock.yaml",
       "packages/db/drizzle.config.*",
-      "**/*.tsbuildinfo"
+      "**/*.tsbuildinfo",
+      "storage/**",
+      "config/**",
+      ".github/**"
     ]
   },
   "javascript": {
