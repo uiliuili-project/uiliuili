@@ -1,0 +1,32 @@
+{
+  "name": "@uiliuili/installer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@uiliuili/db": "workspace:*",
+    "@uiliuili/media": "workspace:*",
+    "@uiliuili/shared": "workspace:*",
+    "argon2": "^0.41.1",
+    "nodemailer": "^6.9.16",
+    "postgres": "^3.4.5",
+    "drizzle-orm": "^0.44.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17"
+  }
+}
