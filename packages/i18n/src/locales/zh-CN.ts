@@ -25,6 +25,7 @@ export const zhCN = {
     all: '全部',
     submit: '提交',
     close: '关闭',
+    about: '关于',
   },
   nav: {
     home: '首页',
@@ -38,6 +39,7 @@ export const zhCN = {
     settings: '设置',
     searchPlaceholder: '搜索视频、用户或标签',
     upload: '投稿',
+    space: '个人空间',
     admin: '管理后台',
   },
   auth: {

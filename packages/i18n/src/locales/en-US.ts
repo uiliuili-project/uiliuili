@@ -27,6 +27,7 @@ export const enUS: MessageTree = {
     all: 'All',
     submit: 'Submit',
     close: 'Close',
+    about: 'About',
   },
   nav: {
     home: 'Home',
@@ -40,6 +41,7 @@ export const enUS: MessageTree = {
     settings: 'Settings',
     searchPlaceholder: 'Search videos, users, tags',
     upload: 'Upload',
+    space: 'Profile',
     admin: 'Admin',
   },
   auth: {

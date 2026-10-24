@@ -2,17 +2,20 @@
 
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { createTranslator } from '@uiliuili/i18n';
 import type { AuthUser } from '@uiliuili/shared';
 import { Bell, Home, LogOut, Plus, Search, Settings, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+const t = createTranslator('zh-CN');
+
 const navItems = [
-  { href: '/', label: '首页', icon: Home },
-  { href: '/trending', label: '热门', icon: Users },
-  { href: '/following', label: '关注', icon: Users },
-  { href: '/history', label: '历史', icon: User },
+  { href: '/', label: t('nav.home'), icon: Home },
+  { href: '/trending', label: t('nav.trending'), icon: Users },
+  { href: '/following', label: t('nav.following'), icon: Users },
+  { href: '/history', label: t('nav.history'), icon: User },
 ];
 
 export function Header() {
@@ -84,7 +87,7 @@ export function Header() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索视频、用户或标签"
+            placeholder={t('nav.searchPlaceholder')}
             className="input h-10 rounded-full pl-9 pr-20"
           />
           <button
@@ -100,7 +103,7 @@ export function Header() {
             <>
               <Link href="/studio" className="btn-soft hidden sm:inline-flex">
                 <Plus className="h-4 w-4" />
-                投稿
+                {t('nav.upload')}
               </Link>
               <Link
                 href="/notifications"
@@ -140,7 +143,7 @@ export function Header() {
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
                     >
                       <User className="h-4 w-4" />
-                      个人空间
+                      {t('nav.space')}
                     </Link>
                     <Link
                       href="/settings"
@@ -148,7 +151,7 @@ export function Header() {
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
                     >
                       <Settings className="h-4 w-4" />
-                      账号设置
+                      {t('settings.title')}
                     </Link>
                     <button
                       type="button"
@@ -156,7 +159,7 @@ export function Header() {
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
                     >
                       <LogOut className="h-4 w-4" />
-                      退出登录
+                      {t('common.logout')}
                     </button>
                   </div>
                 )}
@@ -165,10 +168,10 @@ export function Header() {
           ) : (
             <>
               <Link href="/login" className="btn-ghost hidden sm:inline-flex">
-                登录
+                {t('common.login')}
               </Link>
               <Link href="/register" className="btn-primary">
-                注册
+                {t('common.register')}
               </Link>
             </>
           )}
