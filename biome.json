@@ -39,7 +39,9 @@
       "coverage",
       "*.sql",
       "*.json",
-      "pnpm-lock.yaml"
+      "pnpm-lock.yaml",
+      "packages/db/drizzle.config.*",
+      "**/*.tsbuildinfo"
     ]
   },
   "javascript": {
@@ -47,6 +49,9 @@
       "quoteStyle": "single",
       "semicolons": "always",
       "trailingCommas": "all"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
     }
   }
 }
