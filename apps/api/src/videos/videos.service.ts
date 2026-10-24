@@ -267,6 +267,7 @@ export class VideosService {
       eq(videos.status, 'published'),
       eq(videos.visibility, 'public'),
       isNull(videos.deletedAt),
+      lte(videos.publishedAt, new Date()),
       ne(videos.id, id),
     ];
     if (row.video.categoryId) conditions.push(eq(videos.categoryId, row.video.categoryId));
@@ -291,6 +292,7 @@ export class VideosService {
             eq(videos.status, 'published'),
             eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
+            lte(videos.publishedAt, new Date()),
           ),
         )
         .orderBy(desc(videos.viewCount))
