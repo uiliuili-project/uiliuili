@@ -368,7 +368,6 @@ export function InstallWizard() {
             setBusy(false);
           }
         } catch {
-          // The API restarts after a successful install; keep polling briefly.
           setProgress((current) => ({
             running: true,
             installed: current?.installed ?? true,
@@ -392,9 +391,7 @@ export function InstallWizard() {
       if (step === 4) await storageForm.validateFields();
       if (step === 5) await optionalForm.validateFields();
       setStep((current) => Math.min(current + 1, 6));
-    } catch {
-      // Form validation displays its own errors.
-    }
+    } catch {}
   };
 
   const total = useMemo(() => {
@@ -590,8 +587,8 @@ export function InstallWizard() {
                   <Form.Item label="数据库名" name="database" rules={[{ required: true }]}>
                     <Input />
                   </Form.Item>
-                  <Form.Item label="Schema" name="schema" rules={[{ required: true }]}>
-                    <Input />
+                  <Form.Item label="Schema（固定）" name="schema" rules={[{ required: true }]}>
+                    <Input disabled />
                   </Form.Item>
                   <Form.Item label="用户名" name="user" rules={[{ required: true }]}>
                     <Input autoComplete="off" />

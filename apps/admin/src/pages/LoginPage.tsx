@@ -15,6 +15,12 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    void api
+      .get<{ installed: boolean }>('/api/install/status')
+      .then((status) => {
+        if (!status.installed) navigate('/install', { replace: true });
+      })
+      .catch(() => undefined);
     void api.get<{ token: string }>('/api/v1/auth/csrf').catch(() => undefined);
     void api
       .get<{ providers: string[] }>('/api/v1/auth/providers')

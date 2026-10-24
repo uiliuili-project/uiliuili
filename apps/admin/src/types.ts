@@ -193,4 +193,7 @@ export interface SystemInfo {
   cache: string;
   queue: Record<string, number>;
   uptimeSeconds: number;
+  platform: string;
+  hostname: string;
+  memoryUsed: number;
 }
