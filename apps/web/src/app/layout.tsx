@@ -1,5 +1,6 @@
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { MaintenanceGate } from '@/components/MaintenanceGate';
 import { Providers } from '@/components/Providers';
 import type { Metadata } from 'next';
 import './globals.css';
@@ -20,11 +21,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN">
       <body>
         <Providers>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <MaintenanceGate>
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </MaintenanceGate>
         </Providers>
       </body>
     </html>

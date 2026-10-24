@@ -7,14 +7,14 @@ import { useEffect, useState } from 'react';
 
 const t = createTranslator('zh-CN');
 
+type FooterSettings = { site: { name: string; footer?: string; icp?: string } };
+
 export function Footer() {
-  const [settings, setSettings] = useState<{ site: { name: string; footer?: string } }>({
-    site: { name: 'uiliuili' },
-  });
+  const [settings, setSettings] = useState<FooterSettings>({ site: { name: 'uiliuili' } });
 
   useEffect(() => {
     void api
-      .get<{ site: { name: string; footer?: string } }>('/api/v1/settings')
+      .get<FooterSettings>('/api/v1/settings')
       .then(setSettings)
       .catch(() => undefined);
   }, []);
@@ -37,6 +37,7 @@ export function Footer() {
           <a href="/admin/" className="hover:text-brand">
             {t('nav.admin')}
           </a>
+          {settings.site.icp && <span>{settings.site.icp}</span>}
           <span>{settings.site.footer || 'MIT License'}</span>
         </div>
       </div>
