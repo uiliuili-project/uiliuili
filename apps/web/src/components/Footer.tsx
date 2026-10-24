@@ -1,8 +1,11 @@
 'use client';
 
 import { api } from '@/lib/api';
+import { createTranslator } from '@uiliuili/i18n';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+
+const t = createTranslator('zh-CN');
 
 export function Footer() {
   const [settings, setSettings] = useState<{ site: { name: string; footer?: string } }>({
@@ -26,13 +29,13 @@ export function Footer() {
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/about" className="hover:text-brand">
-            关于
+            {t('common.about')}
           </Link>
           <Link href="/settings" className="hover:text-brand">
-            设置
+            {t('nav.settings')}
           </Link>
           <a href="/admin/" className="hover:text-brand">
-            管理后台
+            {t('nav.admin')}
           </a>
           <span>{settings.site.footer || 'MIT License'}</span>
         </div>
