@@ -1,0 +1,29 @@
+{
+  "name": "@uiliuili/cli",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "bin": {
+    "uiliuili": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@uiliuili/db": "workspace:*",
+    "@uiliuili/installer": "workspace:*",
+    "@uiliuili/shared": "workspace:*",
+    "argon2": "^0.41.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "postgres": "^3.4.5",
+    "drizzle-orm": "^0.44.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
