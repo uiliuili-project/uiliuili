@@ -8,6 +8,7 @@ import {
   uploadParts,
   uploadSessions,
   users,
+  videoSubtitles,
   videoTags,
   videos,
 } from '@uiliuili/db';
@@ -389,6 +390,27 @@ export class StudioService {
       .set({ coverUrl: url, updatedAt: new Date() })
       .where(eq(videos.id, id));
     return { coverUrl: url };
+  }
+
+  async setSubtitle(userId: string, id: string, language: string, label: string, content: string) {
+    await this.getOwnVideo(userId, id);
+    if (!/^[a-zA-Z0-9-]{2,16}$/.test(language)) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '字幕语言代码不合法', 400);
+    }
+    if (content.length > 5 * 1024 * 1024) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '字幕文件不能超过 5 MB', 400);
+    }
+    const storageKey = `videos/${id}/subtitles/${language}.vtt`;
+    const provider = await this.storage.provider();
+    await provider.putObject(storageKey, Buffer.from(content, 'utf8'), 'text/vtt');
+    await this.database.db
+      .insert(videoSubtitles)
+      .values({ videoId: id, language, label: label.slice(0, 40), storageKey })
+      .onConflictDoUpdate({
+        target: [videoSubtitles.videoId, videoSubtitles.language],
+        set: { label: label.slice(0, 40), storageKey },
+      });
+    return { ok: true, language, label };
   }
 
   async getOwnVideo(userId: string, id: string): Promise<DbVideo> {
