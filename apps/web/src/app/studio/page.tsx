@@ -217,11 +217,6 @@ export default function StudioPage() {
         description,
         categoryId: categoryId || undefined,
         visibility,
-        tags: tags
-          .split(/[,，\s]+/)
-          .map((tag) => tag.trim())
-          .filter(Boolean)
-          .slice(0, 12),
       });
       setCurrent(updated);
       await loadVideos();
