@@ -21,7 +21,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 feat(api): add danmaku segment endpoint
 fix(web): keep player time in sync after seeking
 docs: document S3 CORS requirements
-chore(deps): update pg-boss
+chore(deps): update postgres client
 ```
 
 Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
