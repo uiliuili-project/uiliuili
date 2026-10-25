@@ -11,6 +11,9 @@ config/instance.json
 config/*.local.json
 storage/
 !storage/.gitkeep
+
+# Local Docker test deployment (secrets, database data, uploads)
+docker-test/
 *.log
 .DS_Store
 .idea/
