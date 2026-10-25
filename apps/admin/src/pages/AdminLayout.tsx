@@ -14,30 +14,18 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, Dropdown, Layout, Menu, Space, Spin, Tag, Typography, notification } from 'antd';
+import { Avatar, Dropdown, Layout, Menu, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { AdminLanguageSwitcher, useT } from '../i18n';
 import type { AuthUser } from '../types';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
-const menuItems = [
-  { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
-  { key: '/users', icon: <TeamOutlined />, label: '用户' },
-  { key: '/videos', icon: <PlayCircleOutlined />, label: '视频' },
-  { key: '/danmaku', icon: <MessageOutlined />, label: '弹幕' },
-  { key: '/comments', icon: <CommentOutlined />, label: '评论' },
-  { key: '/reports', icon: <FlagOutlined />, label: '举报' },
-  { key: '/categories', icon: <AppstoreOutlined />, label: '分区' },
-  { key: '/announcements', icon: <BellOutlined />, label: '公告' },
-  { key: '/settings', icon: <SettingOutlined />, label: '设置' },
-  { key: '/system', icon: <DatabaseOutlined />, label: '系统' },
-  { key: '/audit', icon: <AuditOutlined />, label: '审计日志' },
-];
-
 export function AdminLayout() {
+  const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -65,6 +53,20 @@ export function AdminLayout() {
     );
   }
 
+  const menuItems = [
+    { key: '/', icon: <DashboardOutlined />, label: t('admin.dashboard') },
+    { key: '/users', icon: <TeamOutlined />, label: t('admin.users') },
+    { key: '/videos', icon: <PlayCircleOutlined />, label: t('admin.videos') },
+    { key: '/danmaku', icon: <MessageOutlined />, label: t('admin.danmaku') },
+    { key: '/comments', icon: <CommentOutlined />, label: t('admin.comments') },
+    { key: '/reports', icon: <FlagOutlined />, label: t('admin.reports') },
+    { key: '/categories', icon: <AppstoreOutlined />, label: t('admin.categories') },
+    { key: '/announcements', icon: <BellOutlined />, label: t('admin.announcements') },
+    { key: '/settings', icon: <SettingOutlined />, label: t('admin.settings') },
+    { key: '/system', icon: <DatabaseOutlined />, label: t('admin.system') },
+    { key: '/audit', icon: <AuditOutlined />, label: t('admin.audit') },
+  ];
+
   return (
     <Layout className="admin-layout">
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={220}>
@@ -91,31 +93,36 @@ export function AdminLayout() {
             borderBottom: '1px solid #f0f0f0',
           }}
         >
-          <Text strong>管理控制台</Text>
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'site',
-                  icon: <FileTextOutlined />,
-                  label: '访问站点',
-                  onClick: () => window.open('/', '_blank'),
-                },
-                {
-                  key: 'logout',
-                  icon: <LogoutOutlined />,
-                  label: '退出登录',
-                  onClick: logout,
-                },
-              ],
-            }}
-          >
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar src={user?.avatarUrl} icon={<UserOutlined />} />
-              <span>{user?.displayName || user?.username}</span>
-              {user?.roles.includes('SUPER_ADMIN') && <Tag color="magenta">超级管理员</Tag>}
-            </Space>
-          </Dropdown>
+          <Text strong>{t('admin.console')}</Text>
+          <Space size="large">
+            <AdminLanguageSwitcher />
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'site',
+                    icon: <FileTextOutlined />,
+                    label: t('admin.visitSite'),
+                    onClick: () => window.open('/', '_blank'),
+                  },
+                  {
+                    key: 'logout',
+                    icon: <LogoutOutlined />,
+                    label: t('common.logout'),
+                    onClick: logout,
+                  },
+                ],
+              }}
+            >
+              <Space style={{ cursor: 'pointer' }}>
+                <Avatar src={user?.avatarUrl} icon={<UserOutlined />} />
+                <span>{user?.displayName || user?.username}</span>
+                {user?.roles.includes('SUPER_ADMIN') && (
+                  <Tag color="magenta">{t('admin.superAdmin')}</Tag>
+                )}
+              </Space>
+            </Dropdown>
+          </Space>
         </Header>
         <Content className="admin-content">
           <Outlet />

@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from '@/components/I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -17,6 +18,8 @@ interface SessionItem {
 }
 
 export default function SettingsPage() {
+  const t = useT();
+  const locale = useLocale();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [tab, setTab] = useState<'profile' | 'security' | 'sessions'>('profile');
@@ -40,7 +43,9 @@ export default function SettingsPage() {
         return api.get<{ sessions: SessionItem[] }>('/api/v1/auth/sessions');
       })
       .then((data) => setSessions(data.sessions))
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : '加载失败'))
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : t('加载失败')),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -55,9 +60,9 @@ export default function SettingsPage() {
         avatarUrl,
       });
       setUser(data.user);
-      setMessage('资料已更新');
+      setMessage(t('资料已更新'));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存失败');
+      setError(saveError instanceof Error ? saveError.message : t('保存失败'));
     }
   };
 
@@ -69,9 +74,9 @@ export default function SettingsPage() {
       await api.post('/api/v1/auth/password', { currentPassword, newPassword });
       setCurrentPassword('');
       setNewPassword('');
-      setMessage('密码已修改，其他设备需要重新登录');
+      setMessage(t('密码已修改，其他设备需要重新登录'));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '修改失败');
+      setError(saveError instanceof Error ? saveError.message : t('修改失败'));
     }
   };
 
@@ -83,23 +88,23 @@ export default function SettingsPage() {
   const resend = async () => {
     try {
       await api.post('/api/v1/auth/email/resend');
-      setMessage('验证邮件已发送');
+      setMessage(t('验证邮件已发送'));
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : '发送失败');
+      setError(sendError instanceof Error ? sendError.message : t('发送失败'));
     }
   };
 
   if (loading) {
-    return <div className="container-page py-16 text-sm text-muted">加载中…</div>;
+    return <div className="container-page py-16 text-sm text-muted">{t('加载中…')}</div>;
   }
 
   if (!user) {
     return (
       <div className="container-page py-16">
         <div className="card mx-auto max-w-md p-10 text-center">
-          <h1 className="text-xl font-semibold">请先登录</h1>
+          <h1 className="text-xl font-semibold">{t('请先登录')}</h1>
           <Link href="/login" className="btn-primary mt-6">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </div>
       </div>
@@ -108,13 +113,13 @@ export default function SettingsPage() {
 
   return (
     <div className="container-page py-6">
-      <h1 className="mb-5 text-xl font-semibold">账号设置</h1>
+      <h1 className="mb-5 text-xl font-semibold">{t('账号设置')}</h1>
       <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="card h-fit p-2">
           {[
-            { key: 'profile', label: '个人资料', icon: User },
-            { key: 'security', label: '账号安全', icon: Shield },
-            { key: 'sessions', label: '登录设备', icon: Monitor },
+            { key: 'profile', label: t('个人资料'), icon: User },
+            { key: 'security', label: t('账号安全'), icon: Shield },
+            { key: 'sessions', label: t('登录设备'), icon: Monitor },
           ].map((item) => (
             <button
               key={item.key}
@@ -146,7 +151,7 @@ export default function SettingsPage() {
             <form onSubmit={saveProfile} className="max-w-xl space-y-4">
               <div>
                 <label className="label" htmlFor="displayName">
-                  昵称
+                  {t('昵称')}{' '}
                 </label>
                 <input
                   id="displayName"
@@ -158,7 +163,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="label" htmlFor="avatar">
-                  头像 URL
+                  {t('头像 URL')}{' '}
                 </label>
                 <input
                   id="avatar"
@@ -170,7 +175,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="label" htmlFor="bio">
-                  个人简介
+                  {t('个人简介')}{' '}
                 </label>
                 <textarea
                   id="bio"
@@ -182,7 +187,7 @@ export default function SettingsPage() {
                 />
               </div>
               <button type="submit" className="btn-primary">
-                保存资料
+                {t('保存资料')}{' '}
               </button>
             </form>
           )}
@@ -192,16 +197,16 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-line p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-sm font-medium">邮箱</div>
+                    <div className="text-sm font-medium">{t('邮箱')}</div>
                     <div className="mt-0.5 text-sm text-muted">{user.email}</div>
                   </div>
                   {user.emailVerified ? (
                     <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs text-green-700">
-                      已验证
+                      {t('已验证')}{' '}
                     </span>
                   ) : (
                     <button type="button" onClick={() => void resend()} className="btn-ghost">
-                      发送验证邮件
+                      {t('发送验证邮件')}{' '}
                     </button>
                   )}
                 </div>
@@ -209,7 +214,7 @@ export default function SettingsPage() {
               <form onSubmit={changePassword} className="space-y-4">
                 <div>
                   <label className="label" htmlFor="currentPassword">
-                    当前密码
+                    {t('当前密码')}{' '}
                   </label>
                   <input
                     id="currentPassword"
@@ -220,12 +225,12 @@ export default function SettingsPage() {
                     autoComplete="current-password"
                   />
                   <p className="mt-1 text-xs text-muted">
-                    第三方登录账号如果还没有密码，可以留空当前密码。
+                    {t('第三方登录账号如果还没有密码，可以留空当前密码。')}{' '}
                   </p>
                 </div>
                 <div>
                   <label className="label" htmlFor="newPassword">
-                    新密码
+                    {t('新密码')}{' '}
                   </label>
                   <input
                     id="newPassword"
@@ -238,7 +243,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <button type="submit" className="btn-primary">
-                  修改密码
+                  {t('修改密码')}{' '}
                 </button>
               </form>
             </div>
@@ -253,10 +258,11 @@ export default function SettingsPage() {
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
-                      {session.userAgent || '未知设备'}
+                      {session.userAgent || t('未知设备')}
                     </div>
                     <div className="mt-1 text-xs text-muted">
-                      登录于 {formatDate(session.createdAt)} · 过期 {formatDate(session.expiresAt)}
+                      {t('登录于')} {formatDate(session.createdAt, locale)} {t('· 过期')}{' '}
+                      {formatDate(session.expiresAt, locale)}
                     </div>
                   </div>
                   <button
@@ -264,11 +270,11 @@ export default function SettingsPage() {
                     onClick={() => void revoke(session.id)}
                     className="btn-ghost text-red-500 hover:border-red-200 hover:text-red-600"
                   >
-                    退出
+                    {t('退出')}{' '}
                   </button>
                 </div>
               ))}
-              {sessions.length === 0 && <p className="text-sm text-muted">暂无登录设备</p>}
+              {sessions.length === 0 && <p className="text-sm text-muted">{t('暂无登录设备')}</p>}
             </div>
           )}
         </div>

@@ -18,6 +18,7 @@ import {
 } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 
 const { Title, Text } = Typography;
 
@@ -31,6 +32,7 @@ interface SettingsData {
 }
 
 export function SettingsPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [siteForm] = Form.useForm();
@@ -116,7 +118,7 @@ export function SettingsPage() {
       if (forms) for (const validate of forms) await validate();
       setSaving(true);
       await api.put('/api/v1/admin/settings', { patches });
-      notification.success({ message: '设置已保存' });
+      notification.success({ message: t('设置已保存') });
       await queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
     } catch (error) {
       if (error instanceof Error) notification.error({ message: error.message });
@@ -253,10 +255,10 @@ export function SettingsPage() {
           .split(/\s+/)
           .filter(Boolean),
       });
-      notification.success({ message: '第三方登录已保存' });
+      notification.success({ message: t('第三方登录已保存') });
       await queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
     } catch (error) {
-      notification.error({ message: error instanceof Error ? error.message : '保存失败' });
+      notification.error({ message: error instanceof Error ? error.message : t('保存失败') });
     } finally {
       setSaving(false);
     }
@@ -266,72 +268,72 @@ export function SettingsPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          站点设置
+          {t('站点设置')}{' '}
         </Title>
-        <Text className="muted">公开配置与密钥均会即时生效</Text>
+        <Text className="muted">{t('公开配置与密钥均会即时生效')}</Text>
       </div>
       <Card loading={query.isLoading}>
         <Tabs
           items={[
             {
               key: 'site',
-              label: '站点',
+              label: t('站点'),
               children: (
                 <Form form={siteForm} layout="vertical" style={{ maxWidth: 720 }}>
                   <Row gutter={16}>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="站点名称" name="name">
+                      <Form.Item label={t('站点名称')} name="name">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="站点 URL" name="url">
+                      <Form.Item label={t('站点 URL')} name="url">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24}>
-                      <Form.Item label="描述" name="description">
+                      <Form.Item label={t('描述')} name="description">
                         <Input.TextArea rows={2} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={8}>
-                      <Form.Item label="默认语言" name="locale">
+                      <Form.Item label={t('默认语言')} name="locale">
                         <Select
                           options={[
-                            { value: 'zh-CN', label: '简体中文' },
+                            { value: 'zh-CN', label: t('简体中文') },
                             { value: 'en-US', label: 'English' },
                           ]}
                         />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={8}>
-                      <Form.Item label="时区" name="timezone">
+                      <Form.Item label={t('时区')} name="timezone">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={8}>
-                      <Form.Item label="注册策略" name="registration">
+                      <Form.Item label={t('注册策略')} name="registration">
                         <Select
                           options={[
-                            { value: 'open', label: '开放注册' },
-                            { value: 'invite', label: '仅邀请' },
-                            { value: 'closed', label: '关闭注册' },
+                            { value: 'open', label: t('开放注册') },
+                            { value: 'invite', label: t('仅邀请') },
+                            { value: 'closed', label: t('关闭注册') },
                           ]}
                         />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="ICP 备案号" name="icp">
+                      <Form.Item label={t('ICP 备案号')} name="icp">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="维护模式" name="maintenance" valuePropName="checked">
+                      <Form.Item label={t('维护模式')} name="maintenance" valuePropName="checked">
                         <Switch />
                       </Form.Item>
                     </Col>
                     <Col xs={24}>
-                      <Form.Item label="页脚" name="footer">
+                      <Form.Item label={t('页脚')} name="footer">
                         <Input.TextArea rows={2} />
                       </Form.Item>
                     </Col>
@@ -342,48 +344,48 @@ export function SettingsPage() {
                     loading={saving}
                     onClick={() => void saveSite()}
                   >
-                    保存站点设置
+                    {t('保存站点设置')}{' '}
                   </Button>
                 </Form>
               ),
             },
             {
               key: 'content',
-              label: '内容与播放',
+              label: t('内容与播放'),
               children: (
                 <Row gutter={[24, 24]}>
                   <Col xs={24} lg={12}>
-                    <Card size="small" title="上传">
+                    <Card size="small" title={t('上传')}>
                       <Form form={uploadForm} layout="vertical">
-                        <Form.Item label="最大文件大小（MB）" name="maxBytesMb">
+                        <Form.Item label={t('最大文件大小（MB）')} name="maxBytesMb">
                           <InputNumber min={1} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="最大时长（秒）" name="maxDurationSeconds">
+                        <Form.Item label={t('最大时长（秒）')} name="maxDurationSeconds">
                           <InputNumber min={1} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="最大分辨率" name="maxResolution">
+                        <Form.Item label={t('最大分辨率')} name="maxResolution">
                           <InputNumber min={360} max={2160} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="允许格式（逗号分隔）" name="allowedExtensions">
+                        <Form.Item label={t('允许格式（逗号分隔）')} name="allowedExtensions">
                           <Input />
                         </Form.Item>
                         <Form.Item
-                          label="投稿需要审核"
+                          label={t('投稿需要审核')}
                           name="requireReview"
                           valuePropName="checked"
                         >
                           <Switch />
                         </Form.Item>
                         <Button type="primary" loading={saving} onClick={() => void saveUpload()}>
-                          保存上传设置
+                          {t('保存上传设置')}{' '}
                         </Button>
                       </Form>
                     </Card>
                   </Col>
                   <Col xs={24} lg={12}>
-                    <Card size="small" title="播放">
+                    <Card size="small" title={t('播放')}>
                       <Form form={playbackForm} layout="vertical">
-                        <Form.Item label="默认清晰度" name="defaultQuality">
+                        <Form.Item label={t('默认清晰度')} name="defaultQuality">
                           <Select
                             options={['auto', '360p', '480p', '720p', '1080p'].map((value) => ({
                               value,
@@ -391,46 +393,46 @@ export function SettingsPage() {
                             }))}
                           />
                         </Form.Item>
-                        <Form.Item label="自动播放" name="autoplay" valuePropName="checked">
+                        <Form.Item label={t('自动播放')} name="autoplay" valuePropName="checked">
                           <Switch />
                         </Form.Item>
                         <Form.Item
-                          label="默认开启弹幕"
+                          label={t('默认开启弹幕')}
                           name="danmakuEnabled"
                           valuePropName="checked"
                         >
                           <Switch />
                         </Form.Item>
-                        <Form.Item label="签名 URL 有效期（秒）" name="signedUrlTtlSeconds">
+                        <Form.Item label={t('签名 URL 有效期（秒）')} name="signedUrlTtlSeconds">
                           <InputNumber min={60} style={{ width: '100%' }} />
                         </Form.Item>
                         <Button type="primary" loading={saving} onClick={() => void savePlayback()}>
-                          保存播放设置
+                          {t('保存播放设置')}{' '}
                         </Button>
                       </Form>
                     </Card>
                   </Col>
                   <Col xs={24}>
-                    <Card size="small" title="弹幕">
+                    <Card size="small" title={t('弹幕')}>
                       <Form form={danmakuForm} layout="vertical">
                         <Row gutter={16}>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="启用弹幕" name="enabled" valuePropName="checked">
+                            <Form.Item label={t('启用弹幕')} name="enabled" valuePropName="checked">
                               <Switch />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="最大长度" name="maxLength">
+                            <Form.Item label={t('最大长度')} name="maxLength">
                               <InputNumber min={1} max={200} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="发送间隔（秒）" name="intervalSeconds">
+                            <Form.Item label={t('发送间隔（秒）')} name="intervalSeconds">
                               <InputNumber min={0} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="默认不透明度" name="defaultOpacity">
+                            <Form.Item label={t('默认不透明度')} name="defaultOpacity">
                               <InputNumber
                                 min={0.1}
                                 max={1}
@@ -440,26 +442,26 @@ export function SettingsPage() {
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="默认字号" name="defaultFontSize">
+                            <Form.Item label={t('默认字号')} name="defaultFontSize">
                               <InputNumber min={12} max={48} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="默认速度" name="defaultSpeed">
+                            <Form.Item label={t('默认速度')} name="defaultSpeed">
                               <InputNumber min={1} max={12} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
-                            <Form.Item label="等级门槛" name="levelGate">
+                            <Form.Item label={t('等级门槛')} name="levelGate">
                               <InputNumber min={0} max={6} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
                         </Row>
-                        <Form.Item label="屏蔽词（每行一个）" name="blockedWords">
+                        <Form.Item label={t('屏蔽词（每行一个）')} name="blockedWords">
                           <Input.TextArea rows={4} />
                         </Form.Item>
                         <Button type="primary" loading={saving} onClick={() => void saveDanmaku()}>
-                          保存弹幕设置
+                          {t('保存弹幕设置')}{' '}
                         </Button>
                       </Form>
                     </Card>
@@ -469,34 +471,34 @@ export function SettingsPage() {
             },
             {
               key: 'social',
-              label: '社交与推荐',
+              label: t('社交与推荐'),
               children: (
                 <Row gutter={[24, 24]}>
                   <Col xs={24} lg={12}>
-                    <Card size="small" title="社交">
+                    <Card size="small" title={t('社交')}>
                       <Form form={socialForm} layout="vertical">
-                        <Form.Item label="每日硬币" name="dailyCoins">
+                        <Form.Item label={t('每日硬币')} name="dailyCoins">
                           <InputNumber min={0} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="单视频最多投币" name="maxCoinPerVideo">
+                        <Form.Item label={t('单视频最多投币')} name="maxCoinPerVideo">
                           <InputNumber min={1} max={10} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="收藏夹上限" name="maxFavoriteFolders">
+                        <Form.Item label={t('收藏夹上限')} name="maxFavoriteFolders">
                           <InputNumber min={1} style={{ width: '100%' }} />
                         </Form.Item>
                       </Form>
                     </Card>
                   </Col>
                   <Col xs={24} lg={12}>
-                    <Card size="small" title="推荐">
+                    <Card size="small" title={t('推荐')}>
                       <Form form={recommendForm} layout="vertical">
-                        <Form.Item label="启用推荐" name="enabled" valuePropName="checked">
+                        <Form.Item label={t('启用推荐')} name="enabled" valuePropName="checked">
                           <Switch />
                         </Form.Item>
-                        <Form.Item label="探索比例" name="explorationRatio">
+                        <Form.Item label={t('探索比例')} name="explorationRatio">
                           <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} />
                         </Form.Item>
-                        <Form.Item label="缓存秒数" name="cacheSeconds">
+                        <Form.Item label={t('缓存秒数')} name="cacheSeconds">
                           <InputNumber min={0} style={{ width: '100%' }} />
                         </Form.Item>
                         <Row gutter={12}>
@@ -522,7 +524,7 @@ export function SettingsPage() {
                   </Col>
                   <Col span={24}>
                     <Button type="primary" loading={saving} onClick={() => void saveSocial()}>
-                      保存社交与推荐设置
+                      {t('保存社交与推荐设置')}{' '}
                     </Button>
                   </Col>
                 </Row>
@@ -530,30 +532,30 @@ export function SettingsPage() {
             },
             {
               key: 'storage',
-              label: '存储',
+              label: t('存储'),
               children: (
                 <Form form={storageForm} layout="vertical" style={{ maxWidth: 760 }}>
                   <Alert
                     type="info"
                     showIcon
-                    message="切换存储驱动不会自动迁移已有文件"
+                    message={t('切换存储驱动不会自动迁移已有文件')}
                     style={{ marginBottom: 16 }}
                   />
-                  <Form.Item label="驱动" name="driver">
+                  <Form.Item label={t('驱动')} name="driver">
                     <Select
                       options={[
-                        { value: 'local', label: '本地磁盘' },
-                        { value: 's3', label: 'S3 兼容对象存储' },
+                        { value: 'local', label: t('本地磁盘') },
+                        { value: 's3', label: t('S3 兼容对象存储') },
                       ]}
                     />
                   </Form.Item>
-                  <Form.Item label="本地路径" name="localPath">
+                  <Form.Item label={t('本地路径')} name="localPath">
                     <Input />
                   </Form.Item>
                   <Row gutter={16}>
                     <Col xs={24} sm={12}>
                       <Form.Item label="S3 Endpoint" name="endpoint">
-                        <Input placeholder="AWS 留空" />
+                        <Input placeholder={t('AWS 留空')} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
@@ -567,7 +569,7 @@ export function SettingsPage() {
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="路径前缀" name="prefix">
+                      <Form.Item label={t('路径前缀')} name="prefix">
                         <Input />
                       </Form.Item>
                     </Col>
@@ -582,7 +584,7 @@ export function SettingsPage() {
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="公开访问域名 / CDN" name="publicBaseUrl">
+                      <Form.Item label={t('公开访问域名 / CDN')} name="publicBaseUrl">
                         <Input />
                       </Form.Item>
                     </Col>
@@ -593,25 +595,25 @@ export function SettingsPage() {
                     </Col>
                   </Row>
                   <Button type="primary" loading={saving} onClick={() => void saveStorage()}>
-                    保存存储设置
+                    {t('保存存储设置')}{' '}
                   </Button>
                 </Form>
               ),
             },
             {
               key: 'mail',
-              label: '邮件',
+              label: t('邮件'),
               children: (
                 <Form form={mailForm} layout="vertical" style={{ maxWidth: 760 }}>
                   <Row gutter={16}>
                     <Col xs={24} sm={8}>
-                      <Form.Item label="启用邮件" name="enabled" valuePropName="checked">
+                      <Form.Item label={t('启用邮件')} name="enabled" valuePropName="checked">
                         <Switch />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={16}>
                       <Form.Item
-                        label="新用户必须验证邮箱"
+                        label={t('新用户必须验证邮箱')}
                         name="verificationRequired"
                         valuePropName="checked"
                       >
@@ -619,56 +621,56 @@ export function SettingsPage() {
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={16}>
-                      <Form.Item label="SMTP 主机" name="host">
+                      <Form.Item label={t('SMTP 主机')} name="host">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={8}>
-                      <Form.Item label="端口" name="port">
+                      <Form.Item label={t('端口')} name="port">
                         <InputNumber style={{ width: '100%' }} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="用户名" name="user">
+                      <Form.Item label={t('用户名')} name="user">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="密码" name="password">
+                      <Form.Item label={t('密码')} name="password">
                         <Input.Password />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="发件人名称" name="fromName">
+                      <Form.Item label={t('发件人名称')} name="fromName">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="发件人地址" name="fromAddress">
+                      <Form.Item label={t('发件人地址')} name="fromAddress">
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label="直接 TLS" name="secure" valuePropName="checked">
+                      <Form.Item label={t('直接 TLS')} name="secure" valuePropName="checked">
                         <Switch />
                       </Form.Item>
                     </Col>
                   </Row>
                   <Button type="primary" loading={saving} onClick={() => void saveMail()}>
-                    保存邮件设置
+                    {t('保存邮件设置')}{' '}
                   </Button>
                 </Form>
               ),
             },
             {
               key: 'search',
-              label: '搜索',
+              label: t('搜索'),
               children: (
                 <Form form={searchForm} layout="vertical" style={{ maxWidth: 640 }}>
-                  <Form.Item label="搜索引擎" name="driver">
+                  <Form.Item label={t('搜索引擎')} name="driver">
                     <Select
                       options={[
-                        { value: 'postgres', label: 'PostgreSQL 兜底' },
+                        { value: 'postgres', label: t('PostgreSQL 兜底') },
                         { value: 'meilisearch', label: 'Meilisearch' },
                       ]}
                     />
@@ -679,18 +681,18 @@ export function SettingsPage() {
                   <Form.Item label="Master Key" name="key">
                     <Input.Password />
                   </Form.Item>
-                  <Form.Item label="索引前缀" name="indexPrefix">
+                  <Form.Item label={t('索引前缀')} name="indexPrefix">
                     <Input />
                   </Form.Item>
                   <Button type="primary" loading={saving} onClick={() => void saveSearch()}>
-                    保存搜索设置
+                    {t('保存搜索设置')}{' '}
                   </Button>
                 </Form>
               ),
             },
             {
               key: 'oauth',
-              label: '第三方登录',
+              label: t('第三方登录'),
               children: (
                 <Form form={oauthForms} layout="vertical">
                   {['github', 'google', 'oidc'].map((provider) => (
@@ -703,7 +705,7 @@ export function SettingsPage() {
                       <Row gutter={16}>
                         <Col xs={24} sm={4}>
                           <Form.Item
-                            label="启用"
+                            label={t('启用')}
                             name={[provider, 'enabled']}
                             valuePropName="checked"
                           >
@@ -728,7 +730,7 @@ export function SettingsPage() {
                           </Col>
                         )}
                         <Col xs={24}>
-                          <Form.Item label="Scopes（空格分隔）" name={[provider, 'scopes']}>
+                          <Form.Item label={t('Scopes（空格分隔）')} name={[provider, 'scopes']}>
                             <Input placeholder="openid email profile" />
                           </Form.Item>
                         </Col>
@@ -738,7 +740,7 @@ export function SettingsPage() {
                         loading={saving}
                         onClick={() => void saveOAuth(provider)}
                       >
-                        保存 {provider}
+                        {t('保存')} {provider}
                       </Button>
                     </Card>
                   ))}
@@ -747,17 +749,17 @@ export function SettingsPage() {
             },
             {
               key: 'security',
-              label: '安全',
+              label: t('安全'),
               children: (
                 <Form form={securityForm} layout="vertical" style={{ maxWidth: 640 }}>
-                  <Form.Item label="会话有效期（天）" name="sessionDays">
+                  <Form.Item label={t('会话有效期（天）')} name="sessionDays">
                     <InputNumber min={1} style={{ width: '100%' }} />
                   </Form.Item>
-                  <Form.Item label="登录限流（次/分钟）" name="loginRateLimit">
+                  <Form.Item label={t('登录限流（次/分钟）')} name="loginRateLimit">
                     <InputNumber min={1} style={{ width: '100%' }} />
                   </Form.Item>
                   <Button type="primary" loading={saving} onClick={() => void saveSecurity()}>
-                    保存安全设置
+                    {t('保存安全设置')}{' '}
                   </Button>
                 </Form>
               ),

@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, Input, Space, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { AuditLog } from '../types';
 
 const { Title, Text } = Typography;
 
 export function AuditPage() {
+  const t = useT();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [q, setQ] = useState('');
@@ -24,14 +26,14 @@ export function AuditPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          审计日志
+          {t('审计日志')}{' '}
         </Title>
-        <Text className="muted">管理员操作记录</Text>
+        <Text className="muted">{t('管理员操作记录')}</Text>
       </div>
       <Card>
         <Space style={{ marginBottom: 16 }}>
           <Input.Search
-            placeholder="搜索操作类型"
+            placeholder={t('搜索操作类型')}
             allowClear
             style={{ width: 260 }}
             onSearch={(value) => {
@@ -56,13 +58,17 @@ export function AuditPage() {
             },
           }}
           columns={[
-            { title: '操作', dataIndex: 'action', render: (value: string) => <Tag>{value}</Tag> },
-            { title: '目标类型', dataIndex: 'targetType', width: 130 },
-            { title: '目标 ID', dataIndex: 'targetId', width: 220, ellipsis: true },
-            { title: '操作者', dataIndex: 'actor', width: 140 },
-            { title: 'IP 哈希', dataIndex: 'ipHash', width: 180, ellipsis: true },
             {
-              title: '时间',
+              title: t('操作'),
+              dataIndex: 'action',
+              render: (value: string) => <Tag>{value}</Tag>,
+            },
+            { title: t('目标类型'), dataIndex: 'targetType', width: 130 },
+            { title: t('目标 ID'), dataIndex: 'targetId', width: 220, ellipsis: true },
+            { title: t('操作者'), dataIndex: 'actor', width: 140 },
+            { title: t('IP 哈希'), dataIndex: 'ipHash', width: 180, ellipsis: true },
+            {
+              title: t('时间'),
               dataIndex: 'createdAt',
               width: 180,
               render: (value: string) => new Date(value).toLocaleString(),

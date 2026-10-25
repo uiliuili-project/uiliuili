@@ -26,6 +26,21 @@ export const zhCN = {
     submit: '提交',
     close: '关闭',
     about: '关于',
+    language: '语言',
+    theme: '主题',
+    tagline: '弹幕视频社区',
+    siteDescription: '一个开源、自托管的弹幕视频平台',
+    footerTagline: '开源弹幕视频社区',
+    views: '播放',
+    danmakuCount: '弹幕',
+    likes: '点赞',
+    coins: '投币',
+    favorites: '收藏',
+    followers: '粉丝',
+    following: '关注',
+    videos: '投稿',
+    joinDate: '加入于 {date}',
+    viewAll: '查看全部',
   },
   nav: {
     home: '首页',
@@ -229,6 +244,14 @@ export const zhCN = {
     saved: '配置已保存',
     insecure: '当前通过非 HTTPS 访问安装器，生产环境请启用 HTTPS。',
   },
+  about: {
+    title: '关于 uiliuili',
+    intro:
+      'uiliuili 是一个开源、自托管的弹幕视频社区。它包含视频上传、FFmpeg HLS 转码、Canvas 弹幕播放器、评论、关注、收藏、投币、通知、搜索、推荐和可视化管理后台。',
+    runtime:
+      '项目以 MIT 许可证开源。运行时只需要 Node.js、PostgreSQL 和 FFmpeg；Redis、Meilisearch、S3、SMTP 与 OAuth 都是可选增强。',
+    installer: '安装向导',
+  },
   admin: {
     dashboard: '仪表盘',
     users: '用户',
@@ -262,6 +285,9 @@ export const zhCN = {
     updateAvailable: '发现新版本',
     upToDate: '已是最新',
     permissions: '权限',
+    console: '管理控制台',
+    visitSite: '访问站点',
+    superAdmin: '超级管理员',
   },
 } as const;
 

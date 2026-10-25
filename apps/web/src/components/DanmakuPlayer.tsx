@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from './I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -45,6 +46,8 @@ function timeLabel(seconds: number): string {
 }
 
 export function DanmakuPlayer({ video }: { video: VideoDetail }) {
+  const t = useT();
+  const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -132,7 +135,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         setLevels(hls.levels.map((level, index) => ({ index, height: level.height })));
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) setError('视频加载失败，请稍后重试');
+        if (data.fatal) setError(t('视频加载失败，请稍后重试'));
       });
       return () => {
         hls.destroy();
@@ -161,7 +164,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       if (data.videoId === video.id) setViewers(data.count);
     });
     socket.on('blocked', (data: { message?: string }) => {
-      setMessage(data.message ?? '发送失败');
+      setMessage(data.message ?? t('发送失败'));
     });
     return () => {
       socket.emit('leave');
@@ -316,7 +319,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
               payload,
               (err: Error | null, response: { ok: boolean; error?: string }) => {
                 if (err) return reject(err);
-                if (!response?.ok) return reject(new Error(response?.error ?? '发送失败'));
+                if (!response?.ok) return reject(new Error(response?.error ?? t('发送失败')));
                 resolve();
               },
             );
@@ -332,9 +335,9 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         }
       }
       setSendText('');
-      setMessage('弹幕已发送');
+      setMessage(t('弹幕已发送'));
     } catch (sendError) {
-      setMessage(sendError instanceof Error ? sendError.message : '发送失败');
+      setMessage(sendError instanceof Error ? sendError.message : t('发送失败'));
     } finally {
       setSending(false);
     }
@@ -352,12 +355,12 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
             <p className="text-lg font-semibold">
               {video.status === 'processing' || video.status === 'uploading'
-                ? '视频正在处理中'
+                ? t('视频正在处理中')
                 : video.status === 'failed'
-                  ? '视频处理失败'
-                  : '视频暂不可播放'}
+                  ? t('视频处理失败')
+                  : t('视频暂不可播放')}
             </p>
-            <p className="mt-2 text-sm text-white/65">请稍后刷新页面</p>
+            <p className="mt-2 text-sm text-white/65">{t('请稍后刷新页面')}</p>
           </div>
         </div>
       </div>
@@ -413,7 +416,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 if (el) el.currentTime = Number(event.target.value);
               }}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              aria-label="播放进度"
+              aria-label={t('播放进度')}
             />
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -446,12 +449,16 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 setMuted(false);
               }}
               className="hidden w-20 accent-[#fb7299] sm:block"
-              aria-label="音量"
+              aria-label={t('音量')}
             />
             <span className="tabular-nums text-xs text-white/85">
               {timeLabel(currentTime)} / {timeLabel(duration)}
             </span>
-            {viewers > 0 && <span className="ml-1 text-xs text-white/55">{viewers} 人在看</span>}
+            {viewers > 0 && (
+              <span className="ml-1 text-xs text-white/55">
+                {viewers} {t('人在看')}
+              </span>
+            )}
             <div className="ml-auto flex items-center gap-1">
               <button
                 type="button"
@@ -460,7 +467,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                   'rounded p-1 hover:bg-white/15',
                   danmakuOn ? 'text-brand' : 'text-white/60',
                 )}
-                title="弹幕开关"
+                title={t('弹幕开关')}
               >
                 <MessageSquare className="h-4 w-4" />
               </button>
@@ -468,7 +475,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 type="button"
                 onClick={() => setSettingsOpen((value) => !value)}
                 className="rounded p-1 hover:bg-white/15"
-                title="弹幕设置"
+                title={t('弹幕设置')}
               >
                 <Settings2 className="h-4 w-4" />
               </button>
@@ -481,7 +488,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 }}
                 className="rounded bg-black/40 px-1.5 py-1 text-xs text-white outline-none"
               >
-                <option value={-1}>自动</option>
+                <option value={-1}>{t('自动')}</option>
                 {levels.map((level) => (
                   <option key={level.index} value={level.index}>
                     {level.height}p
@@ -503,7 +510,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 type="button"
                 onClick={() => void toggleFullscreen()}
                 className="rounded p-1 hover:bg-white/15"
-                title="全屏"
+                title={t('全屏')}
               >
                 <Maximize className="h-4 w-4" />
               </button>
@@ -514,18 +521,18 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         {settingsOpen && (
           <div className="absolute right-3 top-3 w-72 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
             <div className="mb-3 flex items-center justify-between">
-              <span className="font-semibold">弹幕设置</span>
+              <span className="font-semibold">{t('弹幕设置')}</span>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(false)}
                 className="text-white/60"
               >
-                关闭
+                {t('关闭')}{' '}
               </button>
             </div>
             <label className="mb-3 block">
               <span className="mb-1 flex justify-between">
-                <span>不透明度</span>
+                <span>{t('不透明度')}</span>
                 <span>{Math.round(options.opacity * 100)}%</span>
               </span>
               <input
@@ -542,7 +549,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
             </label>
             <label className="mb-3 block">
               <span className="mb-1 flex justify-between">
-                <span>字号</span>
+                <span>{t('字号')}</span>
                 <span>{options.fontSize}px</span>
               </span>
               <input
@@ -559,7 +566,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
             </label>
             <label className="mb-3 block">
               <span className="mb-1 flex justify-between">
-                <span>速度</span>
+                <span>{t('速度')}</span>
                 <span>{options.speed}</span>
               </span>
               <input
@@ -576,7 +583,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
             </label>
             <label className="mb-3 block">
               <span className="mb-1 flex justify-between">
-                <span>显示区域</span>
+                <span>{t('显示区域')}</span>
                 <span>{Math.round(options.displayArea * 100)}%</span>
               </span>
               <input
@@ -595,7 +602,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block">屏蔽词（逗号分隔）</span>
+              <span className="mb-1 block">{t('屏蔽词（逗号分隔）')}</span>
               <input
                 value={options.blockedWords.join(',')}
                 onChange={(event) =>
@@ -622,7 +629,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
             if (event.key === 'Enter') void sendDanmaku();
           }}
           maxLength={100}
-          placeholder="发个弹幕见证当下"
+          placeholder={t('发个弹幕见证当下')}
           className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
         />
         <button
@@ -632,7 +639,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
           className="btn-primary h-9 rounded-full px-4"
         >
           <Send className="h-4 w-4" />
-          发送
+          {t('发送')}{' '}
         </button>
       </div>
       {(message || error) && (
@@ -641,7 +648,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         </p>
       )}
       <div className="mt-2 text-xs text-muted">
-        {formatCount(video.danmaku)} 条弹幕 · 当前 {viewers} 人在看
+        {formatCount(video.danmaku, locale)} {t('条弹幕 · 当前')} {viewers} {t('人在看')}{' '}
       </div>
     </div>
   );

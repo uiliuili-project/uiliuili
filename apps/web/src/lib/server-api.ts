@@ -1,5 +1,7 @@
+import { createTranslator } from '@uiliuili/i18n';
 import { cookies } from 'next/headers';
 import { ApiError } from './api';
+import { getLocale } from './i18n-server';
 
 const serverBase = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001';
 
@@ -21,9 +23,10 @@ export async function serverFetch<T>(path: string): Promise<T> {
   }
   if (!response.ok) {
     const body = data as { error?: { message?: string; code?: string } };
+    const t = createTranslator(await getLocale());
     throw new ApiError(
       response.status,
-      body?.error?.message ?? `请求失败（${response.status}）`,
+      body?.error?.message ? t(body.error.message) : t('请求失败（{0}）', { 0: response.status }),
       body?.error?.code,
     );
   }

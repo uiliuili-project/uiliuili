@@ -1,8 +1,16 @@
-export function formatCount(value: number): string {
+import type { Locale } from '@uiliuili/i18n';
+
+export function formatCount(value: number, locale: Locale = 'zh-CN'): string {
   if (!Number.isFinite(value)) return '0';
-  if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}亿`;
-  if (value >= 10_000) return `${(value / 10_000).toFixed(1)}万`;
-  return String(value);
+  if (locale === 'zh-CN') {
+    if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}亿`;
+    if (value >= 10_000) return `${(value / 10_000).toFixed(1)}万`;
+    return String(value);
+  }
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return new Intl.NumberFormat('en-US').format(value);
 }
 
 export function formatDuration(seconds: number): string {
@@ -16,28 +24,40 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
-export function formatDate(value: string | Date | null | undefined): string {
+export function formatDate(
+  value: string | Date | null | undefined,
+  locale: Locale = 'zh-CN',
+): string {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString(locale === 'zh-CN' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   });
 }
 
-export function relativeTime(value: string | Date): string {
+export function relativeTime(value: string | Date, locale: Locale = 'zh-CN'): string {
   const date = value instanceof Date ? value : new Date(value);
   const diff = Date.now() - date.getTime();
   const minutes = Math.floor(diff / 60_000);
+  if (locale === 'en-US') {
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return formatDate(date, locale);
+  }
   if (minutes < 1) return '刚刚';
   if (minutes < 60) return `${minutes} 分钟前`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} 小时前`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days} 天前`;
-  return formatDate(date);
+  return formatDate(date, locale);
 }
 
 export function formatBytes(bytes: number): string {

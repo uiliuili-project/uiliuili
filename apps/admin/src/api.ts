@@ -1,3 +1,14 @@
+import { createTranslator, normalizeLocale } from '@uiliuili/i18n';
+
+const localeStorageKey = 'uiliuili.admin.locale';
+
+function currentLocale() {
+  if (typeof window === 'undefined') return normalizeLocale('zh-CN');
+  return normalizeLocale(
+    window.localStorage.getItem(localeStorageKey) ?? window.navigator.language,
+  );
+}
+
 export interface ApiErrorBody {
   error?: {
     code?: string;
@@ -79,9 +90,10 @@ export async function request<T>(
   }
   if (!response.ok) {
     const body = data as ApiErrorBody;
+    const t = createTranslator(currentLocale());
     throw new ApiError(
       response.status,
-      body?.error?.message ?? `请求失败（${response.status}）`,
+      body?.error?.message ? t(body.error.message) : t('请求失败（{0}）', { 0: response.status }),
       body?.error?.code ?? 'UNKNOWN',
       body?.error?.details,
     );

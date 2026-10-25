@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/components/I18nProvider';
 
 import { VideoCard as VideoCardView } from '@/components/VideoCard';
 import { api } from '@/lib/api';
@@ -23,6 +24,7 @@ interface FavoritesResponse {
 }
 
 export default function FavoritesPage() {
+  const t = useT();
   const [data, setData] = useState<FavoritesResponse | null>(null);
   const [active, setActive] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ export default function FavoritesPage() {
       setActive(result.folderId ?? undefined);
       setError('');
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '加载失败');
+      setError(loadError instanceof Error ? loadError.message : t('加载失败'));
     } finally {
       setLoading(false);
     }
@@ -61,10 +63,10 @@ export default function FavoritesPage() {
   return (
     <div className="container-page py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">我的收藏</h1>
+        <h1 className="text-xl font-semibold">{t('我的收藏')}</h1>
         <button type="button" onClick={() => setCreating((value) => !value)} className="btn-ghost">
           <Plus className="h-4 w-4" />
-          新建收藏夹
+          {t('新建收藏夹')}{' '}
         </button>
       </div>
       {creating && (
@@ -73,11 +75,11 @@ export default function FavoritesPage() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={40}
-            placeholder="收藏夹名称"
+            placeholder={t('收藏夹名称')}
             className="input max-w-xs"
           />
           <button type="button" onClick={() => void createFolder()} className="btn-primary">
-            创建
+            {t('创建')}{' '}
           </button>
         </div>
       )}
@@ -85,7 +87,7 @@ export default function FavoritesPage() {
         <div className="card p-8 text-center">
           <p className="text-sm text-muted">{error}</p>
           <Link href="/login" className="btn-primary mt-4">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </div>
       )}
@@ -104,7 +106,7 @@ export default function FavoritesPage() {
             ))}
           </div>
           {loading ? (
-            <p className="text-sm text-muted">加载中…</p>
+            <p className="text-sm text-muted">{t('加载中…')}</p>
           ) : data.items.length > 0 ? (
             <div className="video-grid">
               {data.items.map((video) => (
@@ -112,7 +114,9 @@ export default function FavoritesPage() {
               ))}
             </div>
           ) : (
-            <div className="card py-16 text-center text-sm text-muted">这个收藏夹还是空的</div>
+            <div className="card py-16 text-center text-sm text-muted">
+              {t('这个收藏夹还是空的')}
+            </div>
           )}
         </>
       )}

@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/components/I18nProvider';
 
 import { AuthShell } from '@/components/AuthShell';
 import { api, ensureCsrf, getMe } from '@/lib/api';
@@ -8,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function RegisterPage() {
+  const t = useT();
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -26,7 +28,7 @@ export default function RegisterPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (password !== confirm) {
-      setError('两次输入的密码不一致');
+      setError(t('两次输入的密码不一致'));
       return;
     }
     setLoading(true);
@@ -36,7 +38,7 @@ export default function RegisterPage() {
       router.push('/');
       router.refresh();
     } catch (registerError) {
-      setError(registerError instanceof Error ? registerError.message : '注册失败');
+      setError(registerError instanceof Error ? registerError.message : t('注册失败'));
     } finally {
       setLoading(false);
     }
@@ -44,13 +46,13 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      title="创建账号"
-      subtitle="加入 uiliuili，开始分享你的视频"
+      title={t('创建账号')}
+      subtitle={t('加入 uiliuili，开始分享你的视频')}
       footer={
         <>
-          已经有账号？{' '}
+          {t('已经有账号？')}{' '}
           <Link href="/login" className="font-medium text-brand">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </>
       }
@@ -63,7 +65,7 @@ export default function RegisterPage() {
         )}
         <div>
           <label className="label" htmlFor="username">
-            用户名
+            {t('用户名')}{' '}
           </label>
           <input
             id="username"
@@ -75,11 +77,13 @@ export default function RegisterPage() {
             maxLength={32}
             required
           />
-          <p className="mt-1 text-xs text-muted">3–32 个字符，只能包含字母、数字、下划线和短横线</p>
+          <p className="mt-1 text-xs text-muted">
+            {t('3–32 个字符，只能包含字母、数字、下划线和短横线')}
+          </p>
         </div>
         <div>
           <label className="label" htmlFor="email">
-            邮箱
+            {t('邮箱')}{' '}
           </label>
           <input
             id="email"
@@ -93,7 +97,7 @@ export default function RegisterPage() {
         </div>
         <div>
           <label className="label" htmlFor="password">
-            密码
+            {t('密码')}{' '}
           </label>
           <input
             id="password"
@@ -105,11 +109,11 @@ export default function RegisterPage() {
             minLength={10}
             required
           />
-          <p className="mt-1 text-xs text-muted">至少 10 个字符，并包含字母和数字</p>
+          <p className="mt-1 text-xs text-muted">{t('至少 10 个字符，并包含字母和数字')}</p>
         </div>
         <div>
           <label className="label" htmlFor="confirm">
-            确认密码
+            {t('确认密码')}{' '}
           </label>
           <input
             id="confirm"
@@ -122,7 +126,7 @@ export default function RegisterPage() {
           />
         </div>
         <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? '创建中…' : '创建账号'}
+          {loading ? t('创建中…') : t('创建账号')}
         </button>
       </form>
     </AuthShell>

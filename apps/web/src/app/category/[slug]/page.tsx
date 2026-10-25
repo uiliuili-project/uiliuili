@@ -1,5 +1,6 @@
 import { SectionHeader } from '@/components/SectionHeader';
 import { VideoCard } from '@/components/VideoCard';
+import { getT } from '@/lib/i18n-server';
 import { serverFetchSafe } from '@/lib/server-api';
 import type { VideoCard as VideoCardType } from '@uiliuili/shared';
 import type { Metadata } from 'next';
@@ -13,11 +14,13 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `${slug} 分区` };
+  const t = await getT();
+  return { title: `${slug} ${t('分区')}` };
 }
 
 export default async function CategoryPage({ params }: PageProps) {
   const { slug } = await params;
+  const t = await getT();
   const [data, categories] = await Promise.all([
     serverFetchSafe<{ items: VideoCardType[] }>(
       `/api/v1/videos?category=${encodeURIComponent(slug)}&sort=hot&limit=24`,
@@ -44,7 +47,7 @@ export default async function CategoryPage({ params }: PageProps) {
           </Link>
         ))}
       </div>
-      <SectionHeader title={current?.name ?? '分区'} description="该分区下最受欢迎的视频" />
+      <SectionHeader title={current?.name ?? t('分区')} description={t('该分区下最受欢迎的视频')} />
       {data.items.length > 0 ? (
         <div className="video-grid">
           {data.items.map((video) => (
@@ -52,7 +55,7 @@ export default async function CategoryPage({ params }: PageProps) {
           ))}
         </div>
       ) : (
-        <div className="card py-16 text-center text-sm text-muted">该分区暂无视频</div>
+        <div className="card py-16 text-center text-sm text-muted">{t('该分区暂无视频')}</div>
       )}
     </div>
   );

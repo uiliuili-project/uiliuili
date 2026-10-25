@@ -2,23 +2,16 @@
 
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { createTranslator } from '@uiliuili/i18n';
 import type { AuthUser } from '@uiliuili/shared';
 import { Bell, Home, LogOut, Plus, Search, Settings, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-const t = createTranslator('zh-CN');
-
-const navItems = [
-  { href: '/', label: t('nav.home'), icon: Home },
-  { href: '/trending', label: t('nav.trending'), icon: Users },
-  { href: '/following', label: t('nav.following'), icon: Users },
-  { href: '/history', label: t('nav.history'), icon: User },
-];
+import { useT } from './I18nProvider';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function Header() {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -26,6 +19,13 @@ export function Header() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState('uiliuili');
+
+  const navItems = [
+    { href: '/', label: t('nav.home'), icon: Home },
+    { href: '/trending', label: t('nav.trending'), icon: Users },
+    { href: '/following', label: t('nav.following'), icon: Users },
+    { href: '/history', label: t('nav.history'), icon: User },
+  ];
 
   useEffect(() => {
     void api
@@ -94,11 +94,12 @@ export function Header() {
             type="submit"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-brand px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-dark"
           >
-            搜索
+            {t('common.search')}
           </button>
         </form>
 
         <div className="flex shrink-0 items-center gap-2">
+          <LanguageSwitcher compact />
           {user ? (
             <>
               <Link href="/studio" className="btn-soft hidden sm:inline-flex">
@@ -108,7 +109,7 @@ export function Header() {
               <Link
                 href="/notifications"
                 className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
-                aria-label="消息"
+                aria-label={t('nav.notifications')}
               >
                 <Bell className="h-5 w-5" />
                 {unread > 0 && (

@@ -3,11 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Input, Select, Space, Table, Tag, Typography, notification } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { AdminComment } from '../types';
 
 const { Title, Text } = Typography;
 
 export function CommentsPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -27,10 +29,10 @@ export function CommentsPage() {
   const moderate = async (id: string, action: string) => {
     try {
       await api.post(`/api/v1/admin/comments/${id}/moderate`, { action });
-      notification.success({ message: '评论状态已更新' });
+      notification.success({ message: t('评论状态已更新') });
       await queryClient.invalidateQueries({ queryKey: ['admin-comments'] });
     } catch (error) {
-      notification.error({ message: error instanceof Error ? error.message : '操作失败' });
+      notification.error({ message: error instanceof Error ? error.message : t('操作失败') });
     }
   };
 
@@ -38,14 +40,14 @@ export function CommentsPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          评论管理
+          {t('评论管理')}{' '}
         </Title>
-        <Text className="muted">审核与管理视频评论</Text>
+        <Text className="muted">{t('审核与管理视频评论')}</Text>
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search
-            placeholder="搜索评论内容"
+            placeholder={t('搜索评论内容')}
             allowClear
             style={{ width: 280 }}
             onSearch={(value) => {
@@ -54,13 +56,13 @@ export function CommentsPage() {
             }}
           />
           <Select
-            placeholder="状态"
+            placeholder={t('状态')}
             allowClear
             style={{ width: 150 }}
             options={[
-              { value: 'visible', label: '正常' },
-              { value: 'hidden', label: '已隐藏' },
-              { value: 'deleted', label: '已删除' },
+              { value: 'visible', label: t('正常') },
+              { value: 'hidden', label: t('已隐藏') },
+              { value: 'deleted', label: t('已删除') },
             ]}
             value={status}
             onChange={(value) => {
@@ -86,12 +88,12 @@ export function CommentsPage() {
           }}
           columns={[
             {
-              title: '评论',
+              title: t('评论'),
               dataIndex: 'content',
               render: (value: string) => <span style={{ whiteSpace: 'pre-wrap' }}>{value}</span>,
             },
             {
-              title: '视频',
+              title: t('视频'),
               dataIndex: 'videoTitle',
               render: (value: string, record) => (
                 <a href={`/video/${record.videoId}`} target="_blank" rel="noreferrer">
@@ -99,10 +101,10 @@ export function CommentsPage() {
                 </a>
               ),
             },
-            { title: '用户', dataIndex: 'username', width: 140 },
-            { title: '点赞', dataIndex: 'likeCount', width: 80 },
+            { title: t('用户'), dataIndex: 'username', width: 140 },
+            { title: t('点赞'), dataIndex: 'likeCount', width: 80 },
             {
-              title: '状态',
+              title: t('状态'),
               dataIndex: 'status',
               width: 100,
               render: (value: string) => (
@@ -112,13 +114,13 @@ export function CommentsPage() {
               ),
             },
             {
-              title: '时间',
+              title: t('时间'),
               dataIndex: 'createdAt',
               width: 170,
               render: (value: string) => new Date(value).toLocaleString(),
             },
             {
-              title: '操作',
+              title: t('操作'),
               width: 190,
               render: (_value, record) => (
                 <Space>

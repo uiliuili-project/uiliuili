@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from '@/components/I18nProvider';
 
 import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -31,6 +32,8 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function StudioPage() {
+  const t = useT();
+  const locale = useLocale();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [videos, setVideos] = useState<StudioVideo[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -69,7 +72,9 @@ export default function StudioPage() {
         setCategories(cats.items);
         setCategoryId(cats.items[0]?.id ?? '');
       })
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : '加载失败'))
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : t('加载失败')),
+      )
       .finally(() => setLoading(false));
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
@@ -95,9 +100,9 @@ export default function StudioPage() {
       });
       setCurrent(video);
       await loadVideos();
-      setMessage('稿件已创建，请选择视频文件上传');
+      setMessage(t('稿件已创建，请选择视频文件上传'));
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : '创建失败');
+      setError(createError instanceof Error ? createError.message : t('创建失败'));
     } finally {
       setCreating(false);
     }
@@ -138,7 +143,7 @@ export default function StudioPage() {
             const body = (await response.json().catch(() => null)) as {
               error?: { message?: string };
             } | null;
-            throw new Error(body?.error?.message ?? `分片 ${index + 1} 上传失败`);
+            throw new Error(body?.error?.message ?? t('分片 {0} 上传失败', { 0: index + 1 }));
           }
           setUploadedBytes(end);
         }
@@ -150,23 +155,23 @@ export default function StudioPage() {
           const end = Math.min(file.size, start + init.partSize);
           const chunk = file.slice(start, end);
           const url = init.parts?.[index]?.url;
-          if (!url) throw new Error('缺少 S3 分片上传地址');
+          if (!url) throw new Error(t('缺少 S3 分片上传地址'));
           const response = await fetch(url, {
             method: 'PUT',
             body: chunk,
           });
-          if (!response.ok) throw new Error(`S3 分片 ${index + 1} 上传失败`);
+          if (!response.ok) throw new Error(t('S3 分片 {0} 上传失败', { 0: index + 1 }));
           parts.push({ partNumber: index + 1, etag: response.headers.get('ETag') ?? '' });
           setUploadedBytes(end);
         }
         await api.post(`/api/v1/studio/uploads/${init.uploadId}/complete`, { parts });
       }
       if (cover) await uploadCover(current.id, cover);
-      setMessage('上传完成，正在转码…');
+      setMessage(t('上传完成，正在转码…'));
       setFile(null);
       await pollStatus(current.id);
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : '上传失败');
+      setError(uploadError instanceof Error ? uploadError.message : t('上传失败'));
     } finally {
       setUploading(false);
     }
@@ -186,7 +191,7 @@ export default function StudioPage() {
       const body = (await response.json().catch(() => null)) as {
         error?: { message?: string };
       } | null;
-      throw new Error(body?.error?.message ?? '封面上传失败');
+      throw new Error(body?.error?.message ?? t('封面上传失败'));
     }
   };
 
@@ -201,7 +206,7 @@ export default function StudioPage() {
           pollRef.current = null;
           await loadVideos();
           setMessage(
-            video.status === 'failed' ? '转码失败，请检查后台队列或重新上传' : '视频处理完成',
+            video.status === 'failed' ? t('转码失败，请检查后台队列或重新上传') : t('视频处理完成'),
           );
         }
       } catch {}
@@ -220,9 +225,9 @@ export default function StudioPage() {
       });
       setCurrent(updated);
       await loadVideos();
-      setMessage('稿件信息已保存');
+      setMessage(t('稿件信息已保存'));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存失败');
+      setError(saveError instanceof Error ? saveError.message : t('保存失败'));
     }
   };
 
@@ -233,31 +238,31 @@ export default function StudioPage() {
       const updated = await api.post<StudioVideo>(`/api/v1/studio/videos/${video.id}/publish`, {});
       setCurrent(updated);
       await loadVideos();
-      setMessage(updated.status === 'pending_review' ? '已提交审核' : '视频已发布');
+      setMessage(updated.status === 'pending_review' ? t('已提交审核') : t('视频已发布'));
     } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : '发布失败');
+      setError(publishError instanceof Error ? publishError.message : t('发布失败'));
     }
   };
 
   const remove = async (video: StudioVideo) => {
-    if (!window.confirm(`确定删除稿件「${video.title}」吗？`)) return;
+    if (!window.confirm(t('确定删除稿件「{0}」吗？', { 0: video.title }))) return;
     await api.delete(`/api/v1/studio/videos/${video.id}`);
     if (current?.id === video.id) setCurrent(null);
     await loadVideos();
   };
 
   if (loading) {
-    return <div className="container-page py-16 text-sm text-muted">加载中…</div>;
+    return <div className="container-page py-16 text-sm text-muted">{t('加载中…')}</div>;
   }
 
   if (!user) {
     return (
       <div className="container-page py-16">
         <div className="card mx-auto max-w-md p-10 text-center">
-          <h1 className="text-xl font-semibold">请先登录</h1>
-          <p className="mt-2 text-sm text-muted">登录后即可上传视频</p>
+          <h1 className="text-xl font-semibold">{t('请先登录')}</h1>
+          <p className="mt-2 text-sm text-muted">{t('登录后即可上传视频')}</p>
           <Link href="/login" className="btn-primary mt-6">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </div>
       </div>
@@ -270,11 +275,11 @@ export default function StudioPage() {
     <div className="container-page py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">创作中心</h1>
-          <p className="mt-1 text-sm text-muted">上传、管理你的视频稿件</p>
+          <h1 className="text-xl font-semibold">{t('创作中心')}</h1>
+          <p className="mt-1 text-sm text-muted">{t('上传、管理你的视频稿件')}</p>
         </div>
         <Link href={`/space/${user.username}`} className="btn-ghost">
-          查看我的空间
+          {t('查看我的空间')}{' '}
         </Link>
       </div>
 
@@ -293,12 +298,12 @@ export default function StudioPage() {
         <section className="card p-5">
           <h2 className="mb-4 flex items-center gap-2 text-base font-semibold">
             <Film className="h-4 w-4 text-brand" />
-            新建稿件
+            {t('新建稿件')}{' '}
           </h2>
           <form onSubmit={createDraft} className="space-y-4">
             <div>
               <label className="label" htmlFor="title">
-                标题
+                {t('标题')}{' '}
               </label>
               <input
                 id="title"
@@ -306,13 +311,13 @@ export default function StudioPage() {
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={120}
                 className="input"
-                placeholder="给视频起个吸引人的标题"
+                placeholder={t('给视频起个吸引人的标题')}
                 required
               />
             </div>
             <div>
               <label className="label" htmlFor="description">
-                简介
+                {t('简介')}{' '}
               </label>
               <textarea
                 id="description"
@@ -326,7 +331,7 @@ export default function StudioPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="label" htmlFor="category">
-                  分区
+                  {t('分区')}{' '}
                 </label>
                 <select
                   id="category"
@@ -334,7 +339,7 @@ export default function StudioPage() {
                   onChange={(event) => setCategoryId(event.target.value)}
                   className="input"
                 >
-                  <option value="">不选择分区</option>
+                  <option value="">{t('不选择分区')}</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
@@ -344,7 +349,7 @@ export default function StudioPage() {
               </div>
               <div>
                 <label className="label" htmlFor="visibility">
-                  可见性
+                  {t('可见性')}{' '}
                 </label>
                 <select
                   id="visibility"
@@ -352,22 +357,22 @@ export default function StudioPage() {
                   onChange={(event) => setVisibility(event.target.value as typeof visibility)}
                   className="input"
                 >
-                  <option value="public">公开</option>
-                  <option value="unlisted">不列出</option>
-                  <option value="private">私密</option>
+                  <option value="public">{t('公开')}</option>
+                  <option value="unlisted">{t('不列出')}</option>
+                  <option value="private">{t('私密')}</option>
                 </select>
               </div>
             </div>
             <div>
               <label className="label" htmlFor="tags">
-                标签
+                {t('标签')}{' '}
               </label>
               <input
                 id="tags"
                 value={tags}
                 onChange={(event) => setTags(event.target.value)}
                 className="input"
-                placeholder="用逗号分隔，最多 12 个"
+                placeholder={t('用逗号分隔，最多 12 个')}
               />
             </div>
 
@@ -375,24 +380,27 @@ export default function StudioPage() {
               <div className="rounded-xl border border-line bg-canvas p-4">
                 <div className="text-sm font-medium">{current.title}</div>
                 <div className="mt-1 text-xs text-muted">
-                  状态：{statusLabels[current.status] ?? current.status}
+                  {t('状态：')}
+                  {t(statusLabels[current.status] ?? current.status)}
                 </div>
               </div>
             ) : (
               <button type="submit" disabled={creating} className="btn-primary w-full">
-                {creating ? '创建中…' : '创建草稿'}
+                {creating ? t('创建中…') : t('创建草稿')}
               </button>
             )}
           </form>
 
           {current && (
             <div className="mt-5 border-t border-line pt-5">
-              <h3 className="mb-3 text-sm font-semibold">上传视频</h3>
+              <h3 className="mb-3 text-sm font-semibold">{t('上传视频')}</h3>
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-canvas px-4 py-8 text-center transition hover:border-brand">
                 <UploadCloud className="mb-2 h-7 w-7 text-brand" />
-                <span className="text-sm font-medium">{file ? file.name : '点击选择视频文件'}</span>
+                <span className="text-sm font-medium">
+                  {file ? file.name : t('点击选择视频文件')}
+                </span>
                 <span className="mt-1 text-xs text-muted">
-                  {file ? formatBytes(file.size) : '支持 MP4、MOV、MKV、WebM 等'}
+                  {file ? formatBytes(file.size) : t('支持 MP4、MOV、MKV、WebM 等')}
                 </span>
                 <input
                   type="file"
@@ -407,12 +415,12 @@ export default function StudioPage() {
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(event) => setCover(event.target.files?.[0] ?? null)}
                 />
-                自定义封面（可选）
+                {t('自定义封面（可选）')}{' '}
               </label>
               {uploading && (
                 <div className="mt-4">
                   <div className="mb-1 flex justify-between text-xs text-muted">
-                    <span>上传中…</span>
+                    <span>{t('上传中…')}</span>
                     <span>{progress}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-line">
@@ -429,7 +437,7 @@ export default function StudioPage() {
                   onClick={() => void saveMetadata(current)}
                   className="btn-ghost"
                 >
-                  保存稿件信息
+                  {t('保存稿件信息')}{' '}
                 </button>
                 <button
                   type="button"
@@ -440,20 +448,20 @@ export default function StudioPage() {
                   {uploading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      上传中
+                      {t('上传中')}{' '}
                     </>
                   ) : (
-                    '开始上传'
+                    t('开始上传')
                   )}
                 </button>
                 {['ready', 'pending_review'].includes(current.status) && (
                   <button type="button" onClick={() => void publish(current)} className="btn-soft">
-                    {current.status === 'pending_review' ? '查看审核状态' : '发布视频'}
+                    {current.status === 'pending_review' ? t('查看审核状态') : t('发布视频')}
                   </button>
                 )}
                 {current.status === 'published' && (
                   <Link href={`/video/${current.id}`} className="btn-ghost">
-                    查看视频
+                    {t('查看视频')}{' '}
                   </Link>
                 )}
                 <button
@@ -468,7 +476,7 @@ export default function StudioPage() {
                   }}
                   className="btn-ghost"
                 >
-                  新建稿件
+                  {t('新建稿件')}{' '}
                 </button>
               </div>
             </div>
@@ -476,7 +484,7 @@ export default function StudioPage() {
         </section>
 
         <section className="card p-5">
-          <h2 className="mb-4 text-base font-semibold">我的稿件</h2>
+          <h2 className="mb-4 text-base font-semibold">{t('我的稿件')}</h2>
           <div className="space-y-3">
             {videos.map((video) => (
               <div
@@ -488,7 +496,7 @@ export default function StudioPage() {
                     <img src={video.coverUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center text-xs text-muted">
-                      无封面
+                      {t('无封面')}{' '}
                     </div>
                   )}
                   <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">
@@ -513,9 +521,9 @@ export default function StudioPage() {
                       ) : (
                         <Clock className="h-3 w-3" />
                       )}
-                      {statusLabels[video.status] ?? video.status}
+                      {t(statusLabels[video.status] ?? video.status)}
                     </span>
-                    <span>{formatDate(video.createdAt)}</span>
+                    <span>{formatDate(video.createdAt, locale)}</span>
                   </div>
                   <div className="mt-2 flex gap-2 text-xs">
                     <button
@@ -529,11 +537,11 @@ export default function StudioPage() {
                       }}
                       className="text-brand hover:underline"
                     >
-                      管理
+                      {t('管理')}{' '}
                     </button>
                     {video.status === 'published' && (
                       <Link href={`/video/${video.id}`} className="text-muted hover:text-brand">
-                        查看
+                        {t('查看')}{' '}
                       </Link>
                     )}
                     <button
@@ -541,14 +549,16 @@ export default function StudioPage() {
                       onClick={() => void remove(video)}
                       className="text-red-500 hover:underline"
                     >
-                      删除
+                      {t('删除')}{' '}
                     </button>
                   </div>
                 </div>
               </div>
             ))}
             {videos.length === 0 && (
-              <p className="py-10 text-center text-sm text-muted">还没有稿件，先创建一个吧</p>
+              <p className="py-10 text-center text-sm text-muted">
+                {t('还没有稿件，先创建一个吧')}
+              </p>
             )}
           </div>
         </section>

@@ -20,7 +20,7 @@ uiliuili is a complete video community: uploads, FFmpeg HLS transcoding, a Canva
 - Search and recommendations with PostgreSQL fallback; optional Meilisearch.
 - Admin panel: users, videos, danmaku, comments, reports, categories, settings, jobs, audit.
 - Local storage or S3-compatible object storage. Single-node mode without Redis.
-- Chinese-first UI with an i18n foundation for English.
+- Complete Chinese and English UI with in-app language switching for both the site and admin console.
 
 ## Quick start (self-hosted)
 

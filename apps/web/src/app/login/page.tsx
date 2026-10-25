@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/components/I18nProvider';
 
 import { AuthShell } from '@/components/AuthShell';
 import { api, ensureCsrf, getMe } from '@/lib/api';
@@ -9,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
+  const t = useT();
   const router = useRouter();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +29,7 @@ export default function LoginPage() {
       .then((data) => setProviders(data.providers))
       .catch(() => undefined);
     const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
-    if (oauthError) setError(`第三方登录失败：${oauthError}`);
+    if (oauthError) setError(t('第三方登录失败：{0}', { 0: oauthError }));
   }, [router]);
 
   const submit = async (event: React.FormEvent) => {
@@ -43,7 +45,7 @@ export default function LoginPage() {
       router.push('/');
       router.refresh();
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : '登录失败');
+      setError(loginError instanceof Error ? loginError.message : t('登录失败'));
     } finally {
       setLoading(false);
     }
@@ -51,13 +53,13 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="登录 uiliuili"
-      subtitle="继续观看、发弹幕、收藏和关注"
+      title={t('登录 uiliuili')}
+      subtitle={t('继续观看、发弹幕、收藏和关注')}
       footer={
         <>
-          还没有账号？{' '}
+          {t('还没有账号？')}{' '}
           <Link href="/register" className="font-medium text-brand">
-            立即注册
+            {t('立即注册')}{' '}
           </Link>
         </>
       }
@@ -70,7 +72,7 @@ export default function LoginPage() {
         )}
         <div>
           <label className="label" htmlFor="identifier">
-            用户名或邮箱
+            {t('用户名或邮箱')}{' '}
           </label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -87,10 +89,10 @@ export default function LoginPage() {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="label mb-0" htmlFor="password">
-              密码
+              {t('密码')}{' '}
             </label>
             <Link href="/forgot-password" className="text-xs text-muted hover:text-brand">
-              忘记密码？
+              {t('忘记密码？')}{' '}
             </Link>
           </div>
           <div className="relative">
@@ -113,10 +115,10 @@ export default function LoginPage() {
             onChange={(event) => setRemember(event.target.checked)}
             className="h-4 w-4 accent-[#fb7299]"
           />
-          记住我
+          {t('记住我')}{' '}
         </label>
         <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? '登录中…' : '登录'}
+          {loading ? t('登录中…') : t('登录')}
         </button>
       </form>
 
@@ -124,8 +126,7 @@ export default function LoginPage() {
         <>
           <div className="my-5 flex items-center gap-3 text-xs text-muted">
             <span className="h-px flex-1 bg-line" />
-            或使用第三方账号
-            <span className="h-px flex-1 bg-line" />
+            {t('或使用第三方账号')} <span className="h-px flex-1 bg-line" />
           </div>
           <div className="space-y-2">
             {providers.includes('github') && (
@@ -141,7 +142,7 @@ export default function LoginPage() {
             )}
             {providers.includes('oidc') && (
               <a href="/api/v1/auth/oauth/oidc" className="btn-ghost w-full">
-                通用 OIDC
+                {t('通用 OIDC')}{' '}
               </a>
             )}
           </div>

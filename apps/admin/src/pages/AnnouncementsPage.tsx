@@ -15,6 +15,7 @@ import {
 } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 
 const { Title, Text } = Typography;
 
@@ -29,6 +30,7 @@ interface Announcement {
 }
 
 export function AnnouncementsPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [creating, setCreating] = useState(false);
@@ -59,7 +61,7 @@ export function AnnouncementsPage() {
       setSaving(true);
       if (editing) await api.patch(`/api/v1/admin/announcements/${editing.id}`, values);
       else await api.post('/api/v1/admin/announcements', values);
-      notification.success({ message: '公告已保存' });
+      notification.success({ message: t('公告已保存') });
       setCreating(false);
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-announcements'] });
@@ -71,7 +73,7 @@ export function AnnouncementsPage() {
   };
 
   const remove = async (item: Announcement) => {
-    if (!window.confirm(`确定删除公告「${item.title}」吗？`)) return;
+    if (!window.confirm(t('确定删除公告「{0}」吗？', { 0: item.title }))) return;
     await api.delete(`/api/v1/admin/announcements/${item.id}`);
     await queryClient.invalidateQueries({ queryKey: ['admin-announcements'] });
   };
@@ -81,12 +83,12 @@ export function AnnouncementsPage() {
       <Card
         title={
           <Title level={3} style={{ margin: 0 }}>
-            公告管理
+            {t('公告管理')}{' '}
           </Title>
         }
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建公告
+            {t('新建公告')}{' '}
           </Button>
         }
       >
@@ -96,28 +98,28 @@ export function AnnouncementsPage() {
           dataSource={query.data?.items ?? []}
           pagination={false}
           columns={[
-            { title: '标题', dataIndex: 'title' },
+            { title: t('标题'), dataIndex: 'title' },
             {
-              title: '状态',
+              title: t('状态'),
               dataIndex: 'active',
               width: 100,
               render: (value: boolean) => (
-                <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag>
+                <Tag color={value ? 'green' : 'default'}>{value ? t('启用') : t('停用')}</Tag>
               ),
             },
             {
-              title: '创建时间',
+              title: t('创建时间'),
               dataIndex: 'createdAt',
               width: 180,
               render: (value: string) => new Date(value).toLocaleString(),
             },
             {
-              title: '操作',
+              title: t('操作'),
               width: 180,
               render: (_value, record) => (
                 <Space>
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                    编辑
+                    {t('编辑')}{' '}
                   </Button>
                   <Button
                     size="small"
@@ -133,7 +135,7 @@ export function AnnouncementsPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑公告' : '新建公告'}
+        title={editing ? t('编辑公告') : t('新建公告')}
         open={creating || Boolean(editing)}
         onCancel={() => {
           setCreating(false);
@@ -141,16 +143,16 @@ export function AnnouncementsPage() {
         }}
         onOk={() => void save()}
         confirmLoading={saving}
-        okText="保存"
+        okText={t('保存')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item label="标题" name="title" rules={[{ required: true }]}>
+          <Form.Item label={t('标题')} name="title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item label="内容" name="content" rules={[{ required: true }]}>
+          <Form.Item label={t('内容')} name="content" rules={[{ required: true }]}>
             <Input.TextArea rows={4} />
           </Form.Item>
-          <Form.Item label="启用" name="active" valuePropName="checked">
+          <Form.Item label={t('启用')} name="active" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
