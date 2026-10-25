@@ -79,14 +79,21 @@ packages/*     Database, installer, media, shared contracts, danmaku, i18n
 
 ## Documentation
 
+Simplified Chinese: [docs/zh-CN](docs/zh-CN/README.md)
+
+English:
+
 - [Architecture](docs/architecture.md)
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
 - [S3 storage](docs/s3.md)
-- [Native deployment](docs/deployment.md)
+- [Native deployment and recommended hardware](docs/deployment.md)
 - [Mail and OAuth](docs/oauth.md)
 - [Upgrade and backup](docs/upgrade.md)
 - [Danmaku](docs/danmaku.md)
+
+中文文档入口：[docs/zh-CN](docs/zh-CN/README.md)，其中包含
+[服务器推荐配置](docs/zh-CN/deployment.md#服务器推荐配置)与完整的安装、配置、升级说明。
 
 ## Contributing
 

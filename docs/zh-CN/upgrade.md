@@ -1,0 +1,41 @@
+# 升级、备份与恢复
+
+> [English](../upgrade.md)
+
+## 升级
+
+1. 备份数据库、`.env`、`config/instance.json` 和本地上传文件。
+2. 用新版本代码替换应用目录。
+3. 运行 `pnpm install && pnpm build`。
+4. 运行 `pnpm cli migrate`。
+5. 重启 API、worker、web 和管理后台。
+
+如果存在待执行的迁移，运行 `pnpm cli migrate`。如果要降级代码，请恢复升级前创建的数据库备份。
+
+## 备份
+
+需要备份：
+
+- PostgreSQL 数据库；
+- `.env`（包含 `APP_KEY` 和数据库凭据）；
+- `config/instance.json`；
+- 使用本地驱动时的本地存储目录；
+- 使用 S3 时的 bucket 内容。
+
+示例：
+
+```bash
+pg_dump "$DATABASE_URL" -Fc -f backup.dump
+tar -czf uiliuili-config.tgz .env config/instance.json
+tar -czf uiliuili-uploads.tgz storage/uploads
+```
+
+## 恢复
+
+1. 停止 API 和 worker。
+2. 使用 `pg_restore` 恢复数据库。
+3. 恢复 `.env`、`config/instance.json` 和上传文件。
+4. 启动服务。
+5. 检查管理后台系统页面，并播放一个示例视频。
+
+请定期演练恢复流程。丢失 `APP_KEY` 后，已加密的 S3、SMTP 和 OAuth 密钥将无法恢复。

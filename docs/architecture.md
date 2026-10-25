@@ -1,5 +1,7 @@
 # Architecture
 
+> [简体中文](zh-CN/architecture.md)
+
 uiliuili is a modular monolith with a separate worker process.
 
 ```text

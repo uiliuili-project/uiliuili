@@ -1,5 +1,7 @@
 # Installation
 
+> [简体中文](zh-CN/installation.md)
+
 ## Requirements
 
 - Node.js 22 or newer

@@ -1,5 +1,7 @@
 # Upgrade, backup, and restore
 
+> [简体中文](zh-CN/upgrade.md)
+
 ## Upgrade
 
 1. Back up the database, `.env`, `config/instance.json`, and local uploads.

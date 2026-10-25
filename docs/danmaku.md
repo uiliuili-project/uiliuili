@@ -1,5 +1,7 @@
 # Danmaku
 
+> [简体中文](zh-CN/danmaku.md)
+
 ## Data model
 
 Danmaku is stored by video and 6-minute segment:

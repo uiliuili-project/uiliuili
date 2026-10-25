@@ -1,5 +1,7 @@
 # Configuration
 
+> [简体中文](zh-CN/configuration.md)
+
 The installer writes two files:
 
 - `.env` — infrastructure and secrets, mode `0600`

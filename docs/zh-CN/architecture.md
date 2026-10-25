@@ -1,0 +1,60 @@
+# 架构
+
+> [English](../architecture.md)
+
+uiliuili 采用模块化单体架构，并将任务处理拆分为独立的 worker 进程。
+
+```text
+浏览器
+  │
+Nginx ── Next.js 公开站
+  │    ├─ 管理后台 SPA
+  │    └─ /api ── NestJS API
+  │                   ├─ PostgreSQL（业务数据 + 任务队列）
+  │                   ├─ 可选 Redis（缓存、限流、发布/订阅）
+  │                   ├─ 可选 Meilisearch
+  │                   └─ 本地磁盘 / S3
+  │
+Worker ── FFmpeg ── HLS ── 存储
+```
+
+硬性依赖为 Node.js 22+、PostgreSQL 16+ 和 FFmpeg 7+。Redis 与 Meilisearch
+为可选项。未启用 Redis 时，API 以单机模式运行，缓存、限流与 WebSocket
+广播都在进程内存中完成。任务保存在 PostgreSQL 中，通过
+`FOR UPDATE SKIP LOCKED` 领取，因此 worker 可以独立横向扩容。
+
+## 应用
+
+| 应用 | 职责 |
+| --- | --- |
+| `apps/api` | REST API、鉴权、安装接口、WebSocket 网关 |
+| `apps/worker` | 转码、封面生成、搜索索引、推荐计算、清理任务 |
+| `apps/web` | Next.js 公开站 |
+| `apps/admin` | React 管理后台与安装向导 |
+| `apps/cli` | 无界面安装与运维命令 |
+
+## 包
+
+| 包 | 职责 |
+| --- | --- |
+| `@uiliuili/db` | Drizzle schema、SQL 迁移、种子数据 |
+| `@uiliuili/installer` | 安装校验、配置生成、迁移执行器 |
+| `@uiliuili/media` | 存储驱动、FFmpeg、HLS、Range 流式传输 |
+| `@uiliuili/shared` | Zod 契约、权限、错误码 |
+| `@uiliuili/danmaku` | Canvas 渲染引擎与 Bilibili XML 转换 |
+| `@uiliuili/i18n` | 中文/英文语言包 |
+
+## 请求链路
+
+- 公开页面由 Next.js 渲染，API 调用使用同源 `/api`。
+- 云存储模式下，上传通过预签名 URL 直传 S3；HLS 播放由 API 代理，以便执行私有和未列出视频的访问检查。公开部署可以在 API 媒体路由前加 CDN。
+- 封面与本地媒体由媒体控制器通过 HTTP Range 提供。
+- 弹幕历史按 6 分钟分片加载。新弹幕写入数据库后通过 Socket.IO 广播。
+- 本地存储使用分片断点续传，S3 使用分片预签名直传。
+
+## 数据完整性
+
+- 点赞、投币、收藏、关注和 OAuth 身份均使用唯一约束。
+- 交互明细表是唯一事实来源；聚合计数在同一个事务中更新。
+- 安装迁移在 PostgreSQL advisory lock 保护下以事务执行。
+- 安装器最后写入 `config/instance.json`；该文件不存在时，API 只运行安装模式。

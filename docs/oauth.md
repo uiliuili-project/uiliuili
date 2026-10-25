@@ -1,5 +1,7 @@
 # Mail and OAuth
 
+> [简体中文](zh-CN/oauth.md)
+
 Both are optional. Local username/email + password login always works.
 
 ## SMTP

@@ -1,5 +1,7 @@
 # API overview
 
+> [简体中文](zh-CN/api.md)
+
 The API is served by NestJS under `/api/v1`. Installer endpoints live under
 `/api/install` and are disabled after installation.
 
