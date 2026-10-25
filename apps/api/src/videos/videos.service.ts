@@ -116,15 +116,15 @@ export class VideosService {
     const weight = (key: string, fallback: number) => Math.max(0, Number(weights[key] ?? fallback));
     const freshness = Math.max(0.1, Number(weights.freshness ?? 1.2));
     const score = sql<number>`(
-      ${videos.viewCount} * ${weight('views', 0.06)} +
-      ${videos.likeCount} * ${weight('likes', 0.24)} +
-      ${videos.coinCount} * ${weight('coins', 0.28)} +
-      ${videos.favoriteCount} * ${weight('favorites', 0.22)} +
-      ${videos.commentCount} * ${weight('comments', 0.12)} +
+      ${videos.viewCount} * ${weight('views', 0.06)}::double precision +
+      ${videos.likeCount} * ${weight('likes', 0.24)}::double precision +
+      ${videos.coinCount} * ${weight('coins', 0.28)}::double precision +
+      ${videos.favoriteCount} * ${weight('favorites', 0.22)}::double precision +
+      ${videos.commentCount} * ${weight('comments', 0.12)}::double precision +
       ${videos.danmakuCount} * 0.04 +
-      ${videos.completionRate} * ${weight('completion', 0.08)} +
+      ${videos.completionRate} * ${weight('completion', 0.08)}::double precision +
       CASE WHEN ${videos.featured} THEN 0.5 ELSE 0 END
-    ) / (1 + EXTRACT(EPOCH FROM (now() - COALESCE(${videos.publishedAt}, ${videos.createdAt}))) / 86400 / ${freshness * 30})`;
+    ) / (1 + EXTRACT(EPOCH FROM (now() - COALESCE(${videos.publishedAt}, ${videos.createdAt}))) / 86400 / ${freshness * 30}::double precision)`;
 
     const rows = await this.database.db
       .select({ video: videos, uploader: users, category: categories })
