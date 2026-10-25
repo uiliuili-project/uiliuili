@@ -14,7 +14,7 @@
     "@uiliuili/db": "workspace:*",
     "@uiliuili/media": "workspace:*",
     "@uiliuili/shared": "workspace:*",
-    "dotenv": "^16.4.7",
+    "dotenv": "^18.0.8",
     "drizzle-orm": "^0.44.0",
     "postgres": "^3.4.5"
   },
