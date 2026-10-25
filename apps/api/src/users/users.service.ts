@@ -1,8 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { follows, notifications, users, videos } from '@uiliuili/db';
-import { and, count, desc, eq, lte, sql } from 'drizzle-orm';
+import {
+  blocks,
+  categories,
+  favoriteFolders,
+  favoriteItems,
+  follows,
+  notifications,
+  tags,
+  users,
+  videoTags,
+  videos,
+} from '@uiliuili/db';
+import { AppError, ERROR_CODES } from '@uiliuili/shared';
+import { and, count, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { badgesForUser } from '../common/experience';
+import { videoCard } from '../videos/video.helpers';
 
 export interface UserProfile {
   id: string;
@@ -12,6 +26,8 @@ export interface UserProfile {
   coverUrl: string | null;
   bio: string;
   level: number;
+  experience: number;
+  badges?: Awaited<ReturnType<typeof badgesForUser>>;
   createdAt: string;
   roles: string[];
 }
@@ -40,7 +56,7 @@ export class UsersService {
   async profile(username: string, viewer?: AuthUser) {
     const user = await this.byUsername(username);
     if (!user) return null;
-    const [videoCount, followerCount, followingCount, following] = await Promise.all([
+    const [videoCount, followerCount, followingCount, following, blocked] = await Promise.all([
       this.database.db
         .select({ value: count() })
         .from(videos)
@@ -67,6 +83,13 @@ export class UsersService {
             .where(and(eq(follows.followerId, viewer.id), eq(follows.followingId, user.id)))
             .limit(1)
         : Promise.resolve([]),
+      viewer
+        ? this.database.db
+            .select({ userId: blocks.userId })
+            .from(blocks)
+            .where(and(eq(blocks.userId, viewer.id), eq(blocks.blockedUserId, user.id)))
+            .limit(1)
+        : Promise.resolve([]),
     ]);
     return {
       user,
@@ -76,6 +99,7 @@ export class UsersService {
         following: Number(followingCount[0]?.value ?? 0),
       },
       following: following.length > 0,
+      blocked: blocked.length > 0,
       isSelf: viewer?.id === user.id,
     };
   }
@@ -172,7 +196,7 @@ export class UsersService {
     return { following: false };
   }
 
-  private toProfile(user: typeof users.$inferSelect): UserProfile {
+  private async toProfile(user: typeof users.$inferSelect): Promise<UserProfile> {
     return {
       id: user.id,
       username: user.username,
@@ -181,8 +205,70 @@ export class UsersService {
       coverUrl: user.coverUrl,
       bio: user.bio,
       level: user.level,
+      experience: user.experience,
+      badges: await badgesForUser(this.database.db, user.id),
       createdAt: user.createdAt.toISOString(),
       roles: user.roles,
+    };
+  }
+
+  async publicFavorites(username: string, folderId?: string) {
+    const rows = await this.database.db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.username}) = ${username.toLowerCase()}`)
+      .limit(1);
+    const owner = rows[0];
+    if (!owner) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
+    const folders = await this.database.db
+      .select({
+        id: favoriteFolders.id,
+        name: favoriteFolders.name,
+        description: favoriteFolders.description,
+        count: count(favoriteItems.videoId),
+      })
+      .from(favoriteFolders)
+      .leftJoin(favoriteItems, eq(favoriteItems.folderId, favoriteFolders.id))
+      .where(and(eq(favoriteFolders.userId, owner.id), eq(favoriteFolders.isPublic, true)))
+      .groupBy(favoriteFolders.id)
+      .orderBy(desc(favoriteFolders.createdAt));
+    const active = folderId ? folders.find((folder) => folder.id === folderId) : folders[0];
+    if (!active) return { folders: [], folderId: null, items: [] };
+    const itemRows = await this.database.db
+      .select({ video: videos, uploader: users, category: categories })
+      .from(favoriteItems)
+      .innerJoin(videos, eq(videos.id, favoriteItems.videoId))
+      .innerJoin(users, eq(users.id, videos.uploaderId))
+      .leftJoin(categories, eq(categories.id, videos.categoryId))
+      .where(
+        and(
+          eq(favoriteItems.folderId, active.id),
+          eq(videos.status, 'published'),
+          eq(videos.visibility, 'public'),
+          isNull(videos.deletedAt),
+          lte(videos.publishedAt, new Date()),
+        ),
+      )
+      .orderBy(desc(favoriteItems.createdAt))
+      .limit(100);
+    const tagsByVideo = new Map<string, string[]>();
+    const ids = itemRows.map((row) => row.video.id);
+    if (ids.length > 0) {
+      const tagRows = await this.database.db
+        .select({ videoId: videoTags.videoId, name: tags.name })
+        .from(videoTags)
+        .innerJoin(tags, eq(tags.id, videoTags.tagId))
+        .where(inArray(videoTags.videoId, ids));
+      for (const row of tagRows) {
+        const list = tagsByVideo.get(row.videoId) ?? [];
+        list.push(row.name);
+        tagsByVideo.set(row.videoId, list);
+      }
+    }
+    return {
+      folders: folders.map((folder) => ({ ...folder, count: Number(folder.count) })),
+      folderId: active.id,
+      items: itemRows.map((row) => videoCard(row, tagsByVideo.get(row.video.id) ?? [])),
     };
   }
 }

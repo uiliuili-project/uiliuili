@@ -21,6 +21,11 @@ import { DanmakuService } from './danmaku.service';
 interface SocketData {
   user?: AuthUser;
   videoId?: string;
+  partId?: string | null;
+}
+
+function roomName(videoId: string, partId?: string | null): string {
+  return `video:${videoId}:${partId ?? 'legacy'}`;
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -59,7 +64,11 @@ export class DanmakuGateway
 
   onModuleInit(): void {
     this.subscription = this.bus.events.subscribe((event) => {
-      this.server?.to(`video:${event.videoId}`).emit('danmaku', event);
+      this.server?.to(roomName(event.videoId, event.partId)).emit('danmaku', {
+        videoId: event.videoId,
+        partId: event.partId ?? null,
+        item: event.item,
+      });
     });
   }
 
@@ -86,23 +95,30 @@ export class DanmakuGateway
   }
 
   @SubscribeMessage('join')
-  async join(@ConnectedSocket() client: Socket, @MessageBody() payload: { videoId?: string }) {
+  async join(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { videoId?: string; partId?: string | null },
+  ) {
     const videoId = String(payload?.videoId ?? '');
     if (!videoId) return { ok: false };
+    const partId = payload?.partId ? String(payload.partId) : null;
     const user = (client.data as SocketData).user;
     try {
       const row = await this.videos.getRow(videoId);
       this.videos.assertCanView(row.video, user);
+      if (partId) await this.videos.getPart(videoId, partId);
     } catch {
       return { ok: false, error: '视频不存在' };
     }
     this.leaveRoom(client);
     (client.data as SocketData).videoId = videoId;
-    await client.join(`video:${videoId}`);
-    const set = this.viewers.get(videoId) ?? new Set<string>();
+    (client.data as SocketData).partId = partId;
+    const room = roomName(videoId, partId);
+    await client.join(room);
+    const set = this.viewers.get(room) ?? new Set<string>();
     set.add(client.id);
-    this.viewers.set(videoId, set);
-    this.server.to(`video:${videoId}`).emit('viewers', { videoId, count: set.size });
+    this.viewers.set(room, set);
+    this.server.to(room).emit('viewers', { videoId, partId, count: set.size });
     return { ok: true, viewers: set.size };
   }
 
@@ -125,13 +141,12 @@ export class DanmakuGateway
       return { ok: false, error: '弹幕格式不正确' };
     }
     const videoId = String(payload.videoId ?? (client.data as SocketData).videoId ?? '');
+    const data = { ...(parsed.data as DanmakuCreateInput) };
+    if (!data.partId && (client.data as SocketData).partId !== undefined) {
+      data.partId = (client.data as SocketData).partId ?? undefined;
+    }
     try {
-      const item = await this.danmaku.send(
-        user,
-        videoId,
-        parsed.data as DanmakuCreateInput,
-        client.handshake.address,
-      );
+      const item = await this.danmaku.send(user, videoId, data, client.handshake.address);
       return { ok: true, item };
     } catch (error) {
       const message = error instanceof Error ? error.message : '发送失败';
@@ -143,13 +158,16 @@ export class DanmakuGateway
   private leaveRoom(client: Socket): void {
     const videoId = (client.data as SocketData).videoId;
     if (!videoId) return;
-    void client.leave(`video:${videoId}`);
-    const set = this.viewers.get(videoId);
+    const partId = (client.data as SocketData).partId ?? null;
+    const room = roomName(videoId, partId);
+    void client.leave(room);
+    const set = this.viewers.get(room);
     if (set) {
       set.delete(client.id);
-      if (set.size === 0) this.viewers.delete(videoId);
-      this.server?.to(`video:${videoId}`).emit('viewers', { videoId, count: set.size });
+      if (set.size === 0) this.viewers.delete(room);
+      this.server?.to(room).emit('viewers', { videoId, partId, count: set.size });
     }
     (client.data as SocketData).videoId = undefined;
+    (client.data as SocketData).partId = undefined;
   }
 }

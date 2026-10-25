@@ -10,6 +10,7 @@ export interface AuthUser {
   roles: UserRole[];
   permissions: string[];
   level: number;
+  experience?: number;
   emailVerified: boolean;
   banned: boolean;
   mutedUntil: Date | null;

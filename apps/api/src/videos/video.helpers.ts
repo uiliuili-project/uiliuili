@@ -8,7 +8,7 @@ export interface VideoJoinRow {
   category: DbCategory | null;
 }
 
-export function publicUser(user: DbUser): PublicUser {
+export function publicUser(user: DbUser, badges?: PublicUser['badges']): PublicUser {
   return {
     id: user.id,
     username: user.username,
@@ -17,6 +17,8 @@ export function publicUser(user: DbUser): PublicUser {
     bio: user.bio,
     roles: user.roles,
     level: user.level,
+    experience: user.experience,
+    badges,
     createdAt: user.createdAt.toISOString(),
   };
 }

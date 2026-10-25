@@ -5,10 +5,12 @@ import {
   coinLedger,
   favoriteFolders,
   favoriteItems,
+  followGroups,
   follows,
   users,
   videos,
   watchHistories,
+  watchLater,
 } from '@uiliuili/db';
 import { AppError, ERROR_CODES } from '@uiliuili/shared';
 import { and, count, desc, eq, isNull, lte, sql } from 'drizzle-orm';
@@ -97,7 +99,10 @@ export class MeService {
     };
   }
 
-  async createFolder(userId: string, name: string) {
+  async createFolder(
+    userId: string,
+    input: { name: string; description?: string; isPublic?: boolean },
+  ) {
     const social = await this.settings.getSocialSettings();
     const [row] = await this.database.db
       .select({ value: count() })
@@ -108,9 +113,133 @@ export class MeService {
     }
     const [created] = await this.database.db
       .insert(favoriteFolders)
-      .values({ userId, name: name.trim().slice(0, 40), isDefault: false })
+      .values({
+        userId,
+        name: input.name.trim().slice(0, 40),
+        description: (input.description ?? '').slice(0, 500),
+        isPublic: input.isPublic ?? false,
+        isDefault: false,
+      })
       .returning();
     return created;
+  }
+
+  async updateFolder(
+    userId: string,
+    folderId: string,
+    input: { name?: string; description?: string; isPublic?: boolean },
+  ) {
+    const rows = await this.database.db
+      .select()
+      .from(favoriteFolders)
+      .where(and(eq(favoriteFolders.id, folderId), eq(favoriteFolders.userId, userId)))
+      .limit(1);
+    if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '收藏夹不存在', 404);
+    const [updated] = await this.database.db
+      .update(favoriteFolders)
+      .set({
+        name: input.name?.trim().slice(0, 40),
+        description: input.description?.slice(0, 500),
+        isPublic: input.isPublic,
+      })
+      .where(eq(favoriteFolders.id, folderId))
+      .returning();
+    return updated;
+  }
+
+  async watchLater(userId: string) {
+    const rows = await this.database.db
+      .select({ video: videos, uploader: users, category: categories })
+      .from(watchLater)
+      .innerJoin(videos, eq(videos.id, watchLater.videoId))
+      .innerJoin(users, eq(users.id, videos.uploaderId))
+      .leftJoin(categories, eq(categories.id, videos.categoryId))
+      .where(
+        and(
+          eq(watchLater.userId, userId),
+          eq(videos.status, 'published'),
+          eq(videos.visibility, 'public'),
+          isNull(videos.deletedAt),
+        ),
+      )
+      .orderBy(desc(watchLater.createdAt))
+      .limit(100);
+    const tagsByVideo = await this.videos.tagsFor(rows.map((row) => row.video.id));
+    return {
+      items: rows.map((row) => videoCard(row, tagsByVideo.get(row.video.id) ?? [])),
+    };
+  }
+
+  async followGroups(userId: string) {
+    const [groups, followRows] = await Promise.all([
+      this.database.db
+        .select()
+        .from(followGroups)
+        .where(eq(followGroups.userId, userId))
+        .orderBy(followGroups.sort, followGroups.createdAt),
+      this.database.db
+        .select({ user: users, groupId: follows.groupId, followedAt: follows.createdAt })
+        .from(follows)
+        .innerJoin(users, eq(users.id, follows.followingId))
+        .where(eq(follows.followerId, userId))
+        .orderBy(desc(follows.createdAt)),
+    ]);
+    const countMap = new Map<string, number>();
+    for (const row of followRows) {
+      if (row.groupId) countMap.set(row.groupId, (countMap.get(row.groupId) ?? 0) + 1);
+    }
+    return {
+      groups: groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        sort: group.sort,
+        count: countMap.get(group.id) ?? 0,
+        createdAt: group.createdAt.toISOString(),
+      })),
+      items: followRows.map((row) => ({
+        user: publicUser(row.user),
+        groupId: row.groupId,
+        followedAt: row.followedAt.toISOString(),
+      })),
+    };
+  }
+
+  async createFollowGroup(userId: string, input: { name: string; sort?: number }) {
+    const [row] = await this.database.db
+      .select({ value: count() })
+      .from(followGroups)
+      .where(eq(followGroups.userId, userId));
+    if (Number(row?.value ?? 0) >= 20) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '分组数量已达上限', 400);
+    }
+    const [created] = await this.database.db
+      .insert(followGroups)
+      .values({ userId, name: input.name.trim().slice(0, 20), sort: input.sort ?? 0 })
+      .returning();
+    return created;
+  }
+
+  async deleteFollowGroup(userId: string, groupId: string) {
+    await this.database.db
+      .delete(followGroups)
+      .where(and(eq(followGroups.id, groupId), eq(followGroups.userId, userId)));
+    return { ok: true };
+  }
+
+  async assignFollowGroup(userId: string, targetId: string, groupId?: string | null) {
+    if (groupId) {
+      const rows = await this.database.db
+        .select({ id: followGroups.id })
+        .from(followGroups)
+        .where(and(eq(followGroups.id, groupId), eq(followGroups.userId, userId)))
+        .limit(1);
+      if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '分组不存在', 404);
+    }
+    await this.database.db
+      .update(follows)
+      .set({ groupId: groupId ?? null })
+      .where(and(eq(follows.followerId, userId), eq(follows.followingId, targetId)));
+    return { ok: true };
   }
 
   async deleteFolder(userId: string, folderId: string) {
@@ -230,6 +359,8 @@ export class MeService {
       .select({
         id: favoriteFolders.id,
         name: favoriteFolders.name,
+        description: favoriteFolders.description,
+        isPublic: favoriteFolders.isPublic,
         isDefault: favoriteFolders.isDefault,
         createdAt: favoriteFolders.createdAt,
       })

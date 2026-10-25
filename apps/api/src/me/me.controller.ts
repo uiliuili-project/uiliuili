@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { followGroupAssignSchema, followGroupSchema } from '@uiliuili/shared';
 import { z } from 'zod';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser } from '../common/decorators';
@@ -10,7 +11,18 @@ const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-const folderSchema = z.object({ name: z.string().min(1).max(40) });
+const folderSchema = z.object({
+  name: z.string().min(1).max(40),
+  description: z.string().max(500).optional(),
+  isPublic: z.boolean().optional(),
+});
+
+const folderUpdateSchema = z.object({
+  name: z.string().min(1).max(40).optional(),
+  description: z.string().max(500).optional(),
+  isPublic: z.boolean().optional(),
+});
+
 const favoriteSchema = z.object({ videoId: z.string().uuid() });
 
 @Controller('api/v1/me')
@@ -35,7 +47,16 @@ export class MeController {
     @CurrentUser() user: AuthUser,
     @Body(zodBody(folderSchema)) body: z.infer<typeof folderSchema>,
   ) {
-    return this.me.createFolder(user.id, body.name);
+    return this.me.createFolder(user.id, body);
+  }
+
+  @Patch('favorites/folders/:folderId')
+  async updateFolder(
+    @CurrentUser() user: AuthUser,
+    @Param('folderId') folderId: string,
+    @Body(zodBody(folderUpdateSchema)) body: z.infer<typeof folderUpdateSchema>,
+  ) {
+    return this.me.updateFolder(user.id, folderId, body);
   }
 
   @Delete('favorites/folders/:folderId')
@@ -79,6 +100,38 @@ export class MeController {
   @Delete('blocks/:userId')
   async unblock(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
     return this.me.unblock(user, userId);
+  }
+
+  @Get('watch-later')
+  async watchLater(@CurrentUser() user: AuthUser) {
+    return this.me.watchLater(user.id);
+  }
+
+  @Get('follow-groups')
+  async followGroups(@CurrentUser() user: AuthUser) {
+    return this.me.followGroups(user.id);
+  }
+
+  @Post('follow-groups')
+  async createFollowGroup(
+    @CurrentUser() user: AuthUser,
+    @Body(zodBody(followGroupSchema)) body: z.infer<typeof followGroupSchema>,
+  ) {
+    return this.me.createFollowGroup(user.id, body);
+  }
+
+  @Delete('follow-groups/:groupId')
+  async deleteFollowGroup(@CurrentUser() user: AuthUser, @Param('groupId') groupId: string) {
+    return this.me.deleteFollowGroup(user.id, groupId);
+  }
+
+  @Post('following/:userId/group')
+  async assignFollowGroup(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+    @Body(zodBody(followGroupAssignSchema)) body: z.infer<typeof followGroupAssignSchema>,
+  ) {
+    return this.me.assignFollowGroup(user.id, userId, body.groupId);
   }
 
   @Get('coins')

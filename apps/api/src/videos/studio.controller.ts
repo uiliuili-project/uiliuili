@@ -16,6 +16,8 @@ import {
   recordPartSchema,
   uploadInitSchema,
   videoCreateSchema,
+  videoPartCreateSchema,
+  videoPartUpdateSchema,
   videoUpdateSchema,
 } from '@uiliuili/shared';
 import { z } from 'zod';
@@ -139,6 +141,65 @@ export class StudioController {
     @Body(zodBody(completeSchema)) body: z.infer<typeof completeSchema>,
   ) {
     return this.studio.completeUpload(user.id, uploadId, body.parts);
+  }
+
+  @Get('videos/:id/parts')
+  @RequirePermissions('video:upload')
+  async listParts(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.listParts(user.id, id);
+  }
+
+  @Post('videos/:id/parts')
+  @RequirePermissions('video:upload')
+  async createPart(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(videoPartCreateSchema)) body: z.infer<typeof videoPartCreateSchema>,
+  ) {
+    return this.studio.createPart(user.id, id, body);
+  }
+
+  @Patch('videos/:id/parts/:partId')
+  @RequirePermissions('video:upload')
+  async updatePart(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('partId') partId: string,
+    @Body(zodBody(videoPartUpdateSchema)) body: z.infer<typeof videoPartUpdateSchema>,
+  ) {
+    return this.studio.updatePart(user.id, id, partId, body);
+  }
+
+  @Delete('videos/:id/parts/:partId')
+  @RequirePermissions('video:upload')
+  async removePart(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('partId') partId: string,
+  ) {
+    return this.studio.removePart(user.id, id, partId);
+  }
+
+  @Get('videos/:id/subtitles')
+  @RequirePermissions('video:upload')
+  async listSubtitles(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.listSubtitles(user.id, id);
+  }
+
+  @Delete('videos/:id/subtitles/:language')
+  @RequirePermissions('video:upload')
+  async removeSubtitle(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('language') language: string,
+  ) {
+    return this.studio.removeSubtitle(user.id, id, language);
+  }
+
+  @Get('videos/:id/stats')
+  @RequirePermissions('video:upload')
+  async stats(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.stats(user.id, id);
   }
 
   @Post('videos/:id/publish')

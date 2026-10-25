@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { CollectionsModule } from './collections/collections.module';
 import { CommentsModule } from './comments/comments.module';
 import { CommonModule } from './common/common.module';
 import { DanmakuModule } from './danmaku/danmaku.module';
@@ -10,6 +11,7 @@ import { MeModule } from './me/me.module';
 import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SearchModule } from './search/search.module';
+import { SocialModule } from './social/social.module';
 import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
 
@@ -22,10 +24,12 @@ import { VideosModule } from './videos/videos.module';
     VideosModule,
     DanmakuModule,
     CommentsModule,
+    CollectionsModule,
     FeedsModule,
     MeModule,
     NotificationsModule,
     SearchModule,
+    SocialModule,
     MediaModule,
   ],
   controllers: [HealthController],

@@ -42,6 +42,12 @@ export class UsersController {
     return this.users.following(username, query.page, query.limit);
   }
 
+  @Public()
+  @Get(':username/favorites')
+  async favorites(@Param('username') username: string, @Query('folderId') folderId?: string) {
+    return this.users.publicFavorites(username, folderId);
+  }
+
   @Post(':id/follow')
   async follow(@CurrentUser() user: AuthUser, @Param('id') targetId: string) {
     try {

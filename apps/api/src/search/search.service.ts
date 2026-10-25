@@ -16,6 +16,8 @@ interface SearchQuery {
   sort: 'new' | 'hot';
   duration?: 'short' | 'medium' | 'long';
   date?: 'week' | 'month' | 'year';
+  author?: string;
+  tag?: string;
 }
 
 @Injectable()
@@ -42,6 +44,8 @@ export class SearchService {
       limit: query.limit,
       category: query.category,
       sort: query.sort,
+      author: query.author,
+      tag: query.tag,
     });
     return {
       type: 'videos' as const,

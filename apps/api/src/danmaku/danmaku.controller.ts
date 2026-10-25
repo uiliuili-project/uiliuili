@@ -10,6 +10,7 @@ import { DanmakuService } from './danmaku.service';
 
 const importSchema = z.object({
   xml: z.string().min(1).max(5_000_000),
+  partId: z.string().uuid().optional(),
 });
 
 @Controller('api/v1/videos')
@@ -24,7 +25,19 @@ export class DanmakuController {
     @Query(zodQuery(danmakuQuerySchema)) query: z.infer<typeof danmakuQuerySchema>,
     @CurrentUser() viewer?: AuthUser,
   ) {
-    return this.danmaku.segment(id, query.segment, viewer);
+    return this.danmaku.segment(id, query.segment, viewer, query.partId);
+  }
+
+  @Public()
+  @OptionalAuth()
+  @Get(':id/danmaku/list')
+  async list(
+    @Param('id') id: string,
+    @Query('partId') partId: string | undefined,
+    @CurrentUser() viewer?: AuthUser,
+  ) {
+    const result = await this.danmaku.list(id, viewer, partId);
+    return { items: result.items };
   }
 
   @Post(':id/danmaku')
@@ -49,11 +62,13 @@ export class DanmakuController {
       id,
       parsed.map((item) => ({
         progressMs: item.progressMs,
+        pool: 'normal' as const,
         mode: item.mode,
         color: item.color,
         fontSize: item.fontSize,
         content: item.content,
       })),
+      body.partId,
     );
   }
 
@@ -62,10 +77,11 @@ export class DanmakuController {
   @Get(':id/danmaku/export')
   async exportXml(
     @Param('id') id: string,
+    @Query('partId') partId: string | undefined,
     @CurrentUser() viewer: AuthUser | undefined,
     @Res() reply: FastifyReply,
   ) {
-    const xml = await this.danmaku.exportXml(id, viewer);
+    const xml = await this.danmaku.exportXml(id, viewer, partId);
     reply.header('Content-Type', 'application/xml; charset=utf-8');
     reply.header('Content-Disposition', `attachment; filename="danmaku-${id}.xml"`);
     return reply.send(xml);

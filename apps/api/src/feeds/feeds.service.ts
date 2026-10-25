@@ -8,7 +8,7 @@ import {
   videos,
   watchHistories,
 } from '@uiliuili/db';
-import { and, desc, eq, isNull, lte } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, lte } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { SettingsService } from '../common/settings.service';
@@ -24,17 +24,18 @@ export class FeedsService {
   ) {}
 
   async home(viewer?: AuthUser) {
-    const [trending, newest, categoryRows] = await Promise.all([
+    const [trending, newest, categoryRows, recommendationSettings] = await Promise.all([
       this.videos.list({ limit: 12, sort: 'hot' }),
       this.videos.list({ limit: 12, sort: 'new' }),
       this.videos.getCategories(),
+      this.settings.getRecommendationSettings(),
     ]);
     let recommended = trending;
     let continueWatching: Awaited<ReturnType<FeedsService['continueWatching']>> = {
       items: [],
     };
     if (viewer) {
-      const [watched, blocked, feedback, latest] = await Promise.all([
+      const [watched, blocked, feedback, interests] = await Promise.all([
         this.database.db
           .select({ videoId: watchHistories.videoId })
           .from(watchHistories)
@@ -50,13 +51,14 @@ export class FeedsService {
           .from(userFeedbacks)
           .where(eq(userFeedbacks.userId, viewer.id)),
         this.database.db
-          .select({ slug: categories.slug })
+          .select({ slug: categories.slug, value: count() })
           .from(watchHistories)
           .innerJoin(videos, eq(videos.id, watchHistories.videoId))
-          .leftJoin(categories, eq(categories.id, videos.categoryId))
+          .innerJoin(categories, eq(categories.id, videos.categoryId))
           .where(eq(watchHistories.userId, viewer.id))
-          .orderBy(desc(watchHistories.updatedAt))
-          .limit(1),
+          .groupBy(categories.slug)
+          .orderBy(desc(count()))
+          .limit(3),
       ]);
       const excluded = [
         ...new Set([
@@ -65,15 +67,48 @@ export class FeedsService {
         ]),
       ];
       const excludeUploaderIds = blocked.map((item) => item.userId);
-      const category = latest[0]?.slug ?? undefined;
-      const personalized = await this.videos.list({
-        limit: 12,
-        sort: 'recommended',
-        category,
+      const slugs = interests.map((item) => item.slug).filter(Boolean);
+      const pools = await Promise.all(
+        slugs.map((slug) =>
+          this.videos.list({
+            limit: 8,
+            sort: 'recommended',
+            category: slug,
+            excludeIds: excluded,
+            excludeUploaderIds,
+          }),
+        ),
+      );
+      const exploration = await this.videos.list({
+        limit: 8,
+        sort: 'hot',
         excludeIds: excluded,
         excludeUploaderIds,
       });
-      if (personalized.items.length > 0) recommended = personalized;
+      const seen = new Set<string>();
+      const blended: typeof recommended.items = [];
+      const take = (items: typeof recommended.items, count = 1) => {
+        let remaining = count;
+        for (const item of items) {
+          if (remaining <= 0) break;
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          blended.push(item);
+          remaining -= 1;
+        }
+      };
+      // Round-robin over per-category pools keeps the feed from collapsing into one topic.
+      for (let round = 0; round < 8; round += 1) {
+        for (const pool of pools) take(pool.items.slice(round, round + 1));
+      }
+      const explorationRatio = Math.min(
+        0.5,
+        Math.max(0, Number(recommendationSettings.explorationRatio ?? 0.15)),
+      );
+      const explorationCount = Math.round(12 * explorationRatio);
+      take(exploration.items, explorationCount);
+      take(exploration.items, Math.max(0, 12 - blended.length));
+      if (blended.length > 0) recommended = { items: blended.slice(0, 12), nextCursor: null };
       continueWatching = await this.continueWatching(viewer.id);
     }
     return {
@@ -84,7 +119,7 @@ export class FeedsService {
         continueWatching,
       },
       categories: categoryRows,
-      explorationRatio: (await this.settings.getRecommendationSettings()).explorationRatio,
+      explorationRatio: recommendationSettings.explorationRatio,
     };
   }
 

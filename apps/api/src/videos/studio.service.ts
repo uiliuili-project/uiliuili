@@ -8,9 +8,11 @@ import {
   uploadParts,
   uploadSessions,
   users,
+  videoParts,
   videoSubtitles,
   videoTags,
   videos,
+  watchEvents,
 } from '@uiliuili/db';
 import {
   AppError,
@@ -18,7 +20,7 @@ import {
   MAX_UPLOAD_CHUNK_BYTES,
   type VideoCreateInput,
 } from '@uiliuili/shared';
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { QueueService } from '../common/queue.service';
@@ -59,7 +61,24 @@ export class StudioService {
   }
 
   async get(userId: string, id: string) {
-    return this.studioPayload(await this.getOwnVideo(userId, id));
+    const video = await this.getOwnVideo(userId, id);
+    const [parts, subtitles] = await Promise.all([
+      this.database.db
+        .select()
+        .from(videoParts)
+        .where(eq(videoParts.videoId, id))
+        .orderBy(videoParts.sort, videoParts.createdAt),
+      this.database.db.select().from(videoSubtitles).where(eq(videoSubtitles.videoId, id)),
+    ]);
+    return {
+      ...this.studioPayload(video),
+      parts: parts.map((part) => this.partPayload(part)),
+      subtitles: subtitles.map((subtitle) => ({
+        language: subtitle.language,
+        label: subtitle.label,
+        createdAt: subtitle.createdAt.toISOString(),
+      })),
+    };
   }
 
   async create(userId: string, input: VideoCreateInput) {
@@ -116,12 +135,13 @@ export class StudioService {
   async initUpload(
     userId: string,
     videoId: string,
-    input: { filename: string; size: number; contentType: string },
+    input: { filename: string; size: number; contentType: string; partId?: string },
   ) {
     const video = await this.getOwnVideo(userId, videoId);
-    if (!['draft', 'uploading', 'failed', 'ready'].includes(video.status)) {
+    if (!['draft', 'uploading', 'failed', 'ready', 'processing'].includes(video.status)) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '当前状态不能重新上传视频', 400);
     }
+    const part = input.partId ? await this.getOwnPart(userId, videoId, input.partId) : null;
     const uploadSettings = await this.settings.getUploadSettings();
     if (input.size > Number(uploadSettings.maxBytes)) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '文件超过站点上传大小限制', 400);
@@ -147,10 +167,13 @@ export class StudioService {
           eq(uploadSessions.videoId, videoId),
           eq(uploadSessions.userId, userId),
           eq(uploadSessions.status, 'uploading'),
+          part ? eq(uploadSessions.partId, part.id) : isNull(uploadSessions.partId),
         ),
       );
 
-    const storageKey = `videos/${videoId}/source/${crypto.randomUUID()}.${extension}`;
+    const storageKey = part
+      ? `videos/${videoId}/parts/${part.id}/source/${crypto.randomUUID()}.${extension}`
+      : `videos/${videoId}/source/${crypto.randomUUID()}.${extension}`;
     const provider = await this.storage.provider();
     const multipart = await provider.initMultipart(storageKey, input.contentType);
     const [session] = await this.database.db
@@ -158,6 +181,7 @@ export class StudioService {
       .values({
         userId,
         videoId,
+        partId: part?.id ?? null,
         filename: input.filename.slice(0, 255),
         size: input.size,
         contentType: input.contentType,
@@ -183,6 +207,18 @@ export class StudioService {
         updatedAt: new Date(),
       })
       .where(eq(videos.id, videoId));
+    if (part) {
+      await this.database.db
+        .update(videoParts)
+        .set({
+          status: 'uploading',
+          sourceFilename: input.filename,
+          sourceSize: input.size,
+          sourceKey: storageKey,
+          updatedAt: new Date(),
+        })
+        .where(eq(videoParts.id, part.id));
+    }
 
     if (provider.driver === 's3') {
       const parts = await Promise.all(
@@ -325,14 +361,30 @@ export class StudioService {
         updatedAt: new Date(),
       })
       .where(eq(videos.id, session.videoId));
+    if (session.partId) {
+      await this.database.db
+        .update(videoParts)
+        .set({
+          status: 'processing',
+          sourceKey: session.storageKey,
+          sourceSize: session.size,
+          sourceFilename: session.filename,
+          updatedAt: new Date(),
+        })
+        .where(eq(videoParts.id, session.partId));
+    }
     await this.queue.enqueue(
       'transcode',
       {
         videoId: session.videoId,
         sourceKey: session.storageKey,
         uploadSessionId: session.id,
+        ...(session.partId ? { partId: session.partId } : {}),
       },
-      { idempotencyKey: `transcode:${session.id}`, maxAttempts: 3 },
+      {
+        idempotencyKey: `transcode:${session.id}`,
+        maxAttempts: 3,
+      },
     );
     return { videoId: session.videoId, status: 'processing' };
   }
@@ -343,6 +395,13 @@ export class StudioService {
       user.permissions.includes('video:manage_any') || user.roles.includes('REVIEWER');
     if (!['ready', 'pending_review', 'published'].includes(video.status)) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未完成处理', 400);
+    }
+    const parts = await this.database.db
+      .select({ id: videoParts.id, status: videoParts.status })
+      .from(videoParts)
+      .where(eq(videoParts.videoId, id));
+    if (parts.some((part) => part.status !== 'ready')) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '仍有分 P 未完成转码', 400);
     }
     const upload = await this.settings.getUploadSettings();
     const reviewRequired = Boolean(upload.requireReview) && !canReview;
@@ -416,6 +475,171 @@ export class StudioService {
         set: { label: label.slice(0, 40), storageKey },
       });
     return { ok: true, language, label };
+  }
+
+  async listParts(userId: string, videoId: string) {
+    await this.getOwnVideo(userId, videoId);
+    const rows = await this.database.db
+      .select()
+      .from(videoParts)
+      .where(eq(videoParts.videoId, videoId))
+      .orderBy(videoParts.sort, videoParts.createdAt);
+    return { items: rows.map((part) => this.partPayload(part)) };
+  }
+
+  async createPart(userId: string, videoId: string, input: { title: string; sort?: number }) {
+    await this.getOwnVideo(userId, videoId);
+    const [maxRow] = await this.database.db
+      .select({ value: sql<number>`COALESCE(MAX(${videoParts.sort}), 0)` })
+      .from(videoParts)
+      .where(eq(videoParts.videoId, videoId));
+    const [created] = await this.database.db
+      .insert(videoParts)
+      .values({
+        videoId,
+        title: input.title.trim().slice(0, 80),
+        sort: input.sort ?? Number(maxRow?.value ?? 0) + 1,
+        status: 'draft',
+      })
+      .returning();
+    if (!created) throw new AppError(ERROR_CODES.INTERNAL_ERROR, '创建分 P 失败', 500);
+    return this.partPayload(created);
+  }
+
+  async updatePart(
+    userId: string,
+    videoId: string,
+    partId: string,
+    input: { title?: string; sort?: number },
+  ) {
+    await this.getOwnPart(userId, videoId, partId);
+    const [updated] = await this.database.db
+      .update(videoParts)
+      .set({
+        title: input.title?.trim().slice(0, 80),
+        sort: input.sort,
+        updatedAt: new Date(),
+      })
+      .where(eq(videoParts.id, partId))
+      .returning();
+    if (!updated) throw new AppError(ERROR_CODES.NOT_FOUND, '分 P 不存在', 404);
+    return this.partPayload(updated);
+  }
+
+  async removePart(userId: string, videoId: string, partId: string) {
+    const part = await this.getOwnPart(userId, videoId, partId);
+    if (part.status === 'processing') {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '分 P 正在转码，暂时不能删除', 400);
+    }
+    await this.database.db.delete(videoParts).where(eq(videoParts.id, partId));
+    return { ok: true };
+  }
+
+  async listSubtitles(userId: string, videoId: string) {
+    await this.getOwnVideo(userId, videoId);
+    const rows = await this.database.db
+      .select()
+      .from(videoSubtitles)
+      .where(eq(videoSubtitles.videoId, videoId));
+    return {
+      items: rows.map((subtitle) => ({
+        language: subtitle.language,
+        label: subtitle.label,
+        createdAt: subtitle.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async removeSubtitle(userId: string, videoId: string, language: string) {
+    await this.getOwnVideo(userId, videoId);
+    const rows = await this.database.db
+      .select()
+      .from(videoSubtitles)
+      .where(and(eq(videoSubtitles.videoId, videoId), eq(videoSubtitles.language, language)))
+      .limit(1);
+    if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '字幕不存在', 404);
+    const provider = await this.storage.provider();
+    await provider.deleteObject(rows[0].storageKey).catch(() => undefined);
+    await this.database.db.delete(videoSubtitles).where(eq(videoSubtitles.id, rows[0].id));
+    return { ok: true };
+  }
+
+  async stats(userId: string, videoId: string) {
+    const video = await this.getOwnVideo(userId, videoId);
+    const since = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    const [daily, viewsTotal, completions] = await Promise.all([
+      this.database.db
+        .select({
+          day: sql<string>`to_char(${watchEvents.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`,
+          value: count(),
+        })
+        .from(watchEvents)
+        .where(
+          and(
+            eq(watchEvents.videoId, videoId),
+            eq(watchEvents.eventType, 'view'),
+            gte(watchEvents.createdAt, since),
+          ),
+        )
+        .groupBy(sql`to_char(${watchEvents.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`)
+        .orderBy(sql`to_char(${watchEvents.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`),
+      this.database.db
+        .select({ value: count() })
+        .from(watchEvents)
+        .where(and(eq(watchEvents.videoId, videoId), eq(watchEvents.eventType, 'view'))),
+      this.database.db
+        .select({ value: count() })
+        .from(watchEvents)
+        .where(and(eq(watchEvents.videoId, videoId), eq(watchEvents.eventType, 'complete'))),
+    ]);
+    const totalViews = Number(viewsTotal[0]?.value ?? 0);
+    return {
+      totals: {
+        views: video.viewCount,
+        likes: video.likeCount,
+        coins: video.coinCount,
+        favorites: video.favoriteCount,
+        comments: video.commentCount,
+        danmaku: video.danmakuCount,
+      },
+      daily: daily.map((row) => ({ day: row.day, views: Number(row.value) })),
+      totalTrackedViews: totalViews,
+      completions: Number(completions[0]?.value ?? 0),
+      completionRate:
+        totalViews > 0
+          ? Number(((Number(completions[0]?.value ?? 0) / totalViews) * 100).toFixed(1))
+          : 0,
+      rangeDays: 30,
+    };
+  }
+
+  private async getOwnPart(userId: string, videoId: string, partId: string) {
+    await this.getOwnVideo(userId, videoId);
+    const rows = await this.database.db
+      .select()
+      .from(videoParts)
+      .where(and(eq(videoParts.id, partId), eq(videoParts.videoId, videoId)))
+      .limit(1);
+    if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '分 P 不存在', 404);
+    return rows[0];
+  }
+
+  private partPayload(part: typeof videoParts.$inferSelect) {
+    return {
+      id: part.id,
+      title: part.title,
+      sort: part.sort,
+      status: part.status,
+      durationSeconds: part.durationSeconds,
+      sourceFilename: part.sourceFilename,
+      sourceSize: part.sourceSize,
+      playlistUrl:
+        part.playlistKey && ['ready', 'published'].includes(part.status)
+          ? `/api/v1/videos/${part.videoId}/parts/${part.id}/hls/master.m3u8`
+          : null,
+      createdAt: part.createdAt.toISOString(),
+      updatedAt: part.updatedAt.toISOString(),
+    };
   }
 
   async getOwnVideo(userId: string, id: string): Promise<DbVideo> {

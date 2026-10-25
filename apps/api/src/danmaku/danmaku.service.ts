@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { danmaku, videos } from '@uiliuili/db';
 import { AppError, type DanmakuCreateInput, type DanmakuItem, ERROR_CODES } from '@uiliuili/shared';
-import { and, asc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { CacheService } from '../common/cache.service';
 import { DatabaseService } from '../common/database.service';
@@ -24,15 +24,19 @@ export class DanmakuService {
     private readonly bus: DanmakuBus,
   ) {}
 
-  async segment(videoId: string, segment: number, viewer?: AuthUser) {
+  async segment(videoId: string, segment: number, viewer?: AuthUser, partId?: string) {
     const row = await this.videos.getRow(videoId);
     this.videos.assertCanView(row.video, viewer);
-    const cacheKey = `danmaku:seg:${videoId}:${segment}:${viewer?.id ?? 'anon'}`;
+    if (partId) await this.videos.getPart(videoId, partId);
+    const cacheKey = `danmaku:seg:${videoId}:${partId ?? 'legacy'}:${segment}:${
+      viewer?.id ?? 'anon'
+    }`;
     const cached = await this.cache.get(cacheKey);
     if (cached) return JSON.parse(cached) as { items: DanmakuItem[]; segment: number };
     const conditions = [
       eq(danmaku.videoId, videoId),
       eq(danmaku.segment, segment),
+      partId ? eq(danmaku.partId, partId) : isNull(danmaku.partId),
       viewer
         ? or(
             eq(danmaku.status, 'visible'),
@@ -52,6 +56,26 @@ export class DanmakuService {
     return payload;
   }
 
+  /** Full danmaku list for the side panel, scoped to a part when present. */
+  async list(videoId: string, viewer?: AuthUser, partId?: string, limit = 2000) {
+    const row = await this.videos.getRow(videoId);
+    this.videos.assertCanView(row.video, viewer);
+    if (partId) await this.videos.getPart(videoId, partId);
+    const rows = await this.database.db
+      .select()
+      .from(danmaku)
+      .where(
+        and(
+          eq(danmaku.videoId, videoId),
+          partId ? eq(danmaku.partId, partId) : isNull(danmaku.partId),
+          eq(danmaku.status, 'visible'),
+        ),
+      )
+      .orderBy(asc(danmaku.progressMs), asc(danmaku.createdAt))
+      .limit(Math.min(limit, 5000));
+    return { items: rows.map((item) => this.toItem(item, viewer)) };
+  }
+
   async send(
     user: AuthUser,
     videoId: string,
@@ -64,6 +88,7 @@ export class DanmakuService {
     }
     const row = await this.videos.getRow(videoId);
     this.videos.assertCanView(row.video, user);
+    if (input.partId) await this.videos.getPart(videoId, input.partId);
     if (row.video.status !== 'published') {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未发布', 400);
     }
@@ -105,6 +130,8 @@ export class DanmakuService {
       .values({
         videoId,
         userId: user.id,
+        partId: input.partId ?? null,
+        pool: input.pool,
         progressMs: input.progressMs,
         segment,
         mode: input.mode,
@@ -125,15 +152,20 @@ export class DanmakuService {
       .set({ danmakuCount: sql`${videos.danmakuCount} + 1` })
       .where(eq(videos.id, videoId));
     await this.cache.del(
-      `danmaku:seg:${videoId}:${segment}:${user.id}`,
-      `danmaku:seg:${videoId}:${segment}:anon`,
+      `danmaku:seg:${videoId}:${input.partId ?? 'legacy'}:${segment}:${user.id}`,
+      `danmaku:seg:${videoId}:${input.partId ?? 'legacy'}:${segment}:anon`,
     );
     const item = this.toItem(created, user);
-    this.bus.publish({ videoId, item });
+    this.bus.publish({ videoId, partId: input.partId ?? null, item });
     return item;
   }
 
-  async importXml(user: AuthUser, videoId: string, items: Array<DanmakuCreateInput>) {
+  async importXml(
+    user: AuthUser,
+    videoId: string,
+    items: Array<DanmakuCreateInput>,
+    partId?: string,
+  ) {
     const video = await this.videos.getRow(videoId);
     if (video.video.uploaderId !== user.id && !user.permissions.includes('video:manage_any')) {
       throw new AppError(ERROR_CODES.FORBIDDEN, '没有权限导入弹幕', 403);
@@ -141,6 +173,8 @@ export class DanmakuService {
     const values = items.slice(0, 10_000).map((item) => ({
       videoId,
       userId: user.id,
+      partId: item.partId ?? partId ?? null,
+      pool: item.pool,
       progressMs: item.progressMs,
       segment: Math.floor(item.progressMs / SEGMENT_MS),
       mode: item.mode,
@@ -162,13 +196,20 @@ export class DanmakuService {
     return { imported: values.length };
   }
 
-  async exportXml(videoId: string, viewer?: AuthUser) {
+  async exportXml(videoId: string, viewer?: AuthUser, partId?: string) {
     const row = await this.videos.getRow(videoId);
     this.videos.assertCanView(row.video, viewer);
+    if (partId) await this.videos.getPart(videoId, partId);
     const rows = await this.database.db
       .select()
       .from(danmaku)
-      .where(and(eq(danmaku.videoId, videoId), eq(danmaku.status, 'visible')))
+      .where(
+        and(
+          eq(danmaku.videoId, videoId),
+          partId ? eq(danmaku.partId, partId) : isNull(danmaku.partId),
+          eq(danmaku.status, 'visible'),
+        ),
+      )
       .orderBy(asc(danmaku.progressMs))
       .limit(20_000);
     const { serializeBilibiliXml } = await import('@uiliuili/danmaku');
@@ -179,6 +220,8 @@ export class DanmakuService {
     return {
       id: item.id,
       progressMs: item.progressMs,
+      partId: item.partId,
+      pool: item.pool,
       mode: item.mode,
       color: item.color,
       fontSize: item.fontSize,

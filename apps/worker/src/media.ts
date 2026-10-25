@@ -3,14 +3,14 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Db } from '@uiliuili/db';
-import { siteSettings, videoRenditions, videos } from '@uiliuili/db';
+import { siteSettings, videoParts, videoRenditions, videos } from '@uiliuili/db';
 import {
   type StorageProvider,
   type TranscodeResult,
   probeVideo,
   transcodeToHls,
 } from '@uiliuili/media';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne } from 'drizzle-orm';
 import { workerConfig } from './config';
 import { getStorage } from './storage';
 
@@ -37,10 +37,21 @@ export async function transcodeVideo(
   sourceKey: string,
   jobId: string,
   onProgress: (progress: number) => Promise<void>,
+  partId?: string | null,
 ): Promise<void> {
   const rows = await db.select().from(videos).where(eq(videos.id, videoId)).limit(1);
   const video = rows[0];
   if (!video) throw new Error(`Video ${videoId} not found`);
+  const part = partId
+    ? (
+        await db
+          .select()
+          .from(videoParts)
+          .where(and(eq(videoParts.id, partId), eq(videoParts.videoId, videoId)))
+          .limit(1)
+      )[0]
+    : undefined;
+  if (partId && !part) throw new Error(`Video part ${partId} not found`);
   const provider = await getStorage(db);
   const tempDir = path.join(workerConfig.tempRoot, jobId);
   const extension = path.extname(sourceKey) || '.mp4';
@@ -83,7 +94,7 @@ export async function transcodeVideo(
       },
     });
 
-    const hlsPrefix = `videos/${videoId}/hls`;
+    const hlsPrefix = partId ? `videos/${videoId}/parts/${partId}/hls` : `videos/${videoId}/hls`;
     const files = await walk(outputDir);
     for (const file of files) {
       const relative = path.relative(outputDir, file).split(path.sep).join('/');
@@ -100,7 +111,9 @@ export async function transcodeVideo(
       await provider.putObject(key, await fsp.readFile(file), contentType);
     }
 
-    const coverKey = `covers/${videoId}/cover.jpg`;
+    const coverKey = partId
+      ? `covers/${videoId}/parts/${partId}.jpg`
+      : `covers/${videoId}/cover.jpg`;
     await provider.putObject(coverKey, await fsp.readFile(result.coverPath), 'image/jpeg');
     const coverUrl = `/media/${coverKey
       .split('/')
@@ -108,10 +121,17 @@ export async function transcodeVideo(
       .join('/')}`;
 
     await db.transaction(async (tx) => {
-      await tx.delete(videoRenditions).where(eq(videoRenditions.videoId, videoId));
+      await tx
+        .delete(videoRenditions)
+        .where(
+          partId
+            ? and(eq(videoRenditions.videoId, videoId), eq(videoRenditions.partId, partId))
+            : and(eq(videoRenditions.videoId, videoId), isNull(videoRenditions.partId)),
+        );
       for (const rendition of result.renditions) {
         await tx.insert(videoRenditions).values({
           videoId,
+          partId: partId ?? null,
           quality: rendition.quality,
           width: rendition.width,
           height: rendition.height,
@@ -119,20 +139,64 @@ export async function transcodeVideo(
           playlistKey: `${hlsPrefix}/${rendition.quality}/index.m3u8`,
         });
       }
-      await tx
-        .update(videos)
-        .set({
-          status: video.publishedAt ? 'published' : 'ready',
-          durationSeconds: probe.durationSeconds,
-          width: probe.width,
-          height: probe.height,
-          playlistKey: `${hlsPrefix}/master.m3u8`,
-          coverUrl: video.coverUrl || coverUrl,
-          spriteKey: result.spritePath ? `${hlsPrefix}/sprite.jpg` : null,
-          previewVttKey: result.previewVttPath ? `${hlsPrefix}/preview.vtt` : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(videos.id, videoId));
+      if (partId) {
+        await tx
+          .update(videoParts)
+          .set({
+            status: 'ready',
+            durationSeconds: probe.durationSeconds,
+            width: probe.width,
+            height: probe.height,
+            playlistKey: `${hlsPrefix}/master.m3u8`,
+            spriteKey: result.spritePath ? `${hlsPrefix}/sprite.jpg` : null,
+            previewVttKey: result.previewVttPath ? `${hlsPrefix}/preview.vtt` : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(videoParts.id, partId));
+      }
+      const firstPart = partId
+        ? (
+            await tx
+              .select({ id: videoParts.id })
+              .from(videoParts)
+              .where(eq(videoParts.videoId, videoId))
+              .orderBy(asc(videoParts.sort), asc(videoParts.createdAt))
+              .limit(1)
+          )[0]
+        : undefined;
+      const isPrimary = !partId || firstPart?.id === partId;
+      if (isPrimary) {
+        await tx
+          .update(videos)
+          .set({
+            durationSeconds: probe.durationSeconds,
+            width: probe.width,
+            height: probe.height,
+            playlistKey: `${hlsPrefix}/master.m3u8`,
+            coverUrl: video.coverUrl || coverUrl,
+            spriteKey: result.spritePath ? `${hlsPrefix}/sprite.jpg` : null,
+            previewVttKey: result.previewVttPath ? `${hlsPrefix}/preview.vtt` : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(videos.id, videoId));
+      }
+      if (!partId) {
+        await tx
+          .update(videos)
+          .set({ status: video.publishedAt ? 'published' : 'ready' })
+          .where(eq(videos.id, videoId));
+      } else {
+        const remaining = await tx
+          .select({ id: videoParts.id })
+          .from(videoParts)
+          .where(and(eq(videoParts.videoId, videoId), ne(videoParts.status, 'ready')));
+        if (remaining.length === 0) {
+          await tx
+            .update(videos)
+            .set({ status: video.publishedAt ? 'published' : 'ready', updatedAt: new Date() })
+            .where(eq(videos.id, videoId));
+        }
+      }
     });
     await onProgress(100);
   } finally {

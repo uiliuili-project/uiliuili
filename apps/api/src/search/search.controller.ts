@@ -13,6 +13,8 @@ const searchSchema = z.object({
   sort: z.enum(['new', 'hot']).default('hot'),
   duration: z.enum(['short', 'medium', 'long']).optional(),
   date: z.enum(['week', 'month', 'year']).optional(),
+  author: z.string().max(40).optional(),
+  tag: z.string().max(24).optional(),
 });
 
 const suggestSchema = z.object({ q: z.string().max(100).default('') });

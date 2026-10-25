@@ -4,6 +4,7 @@ import { type Observable, Subject } from 'rxjs';
 
 export interface DanmakuEvent {
   videoId: string;
+  partId?: string | null;
   item: DanmakuItem;
 }
 

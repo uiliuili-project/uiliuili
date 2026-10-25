@@ -5,6 +5,8 @@ import {
   type DbVideo,
   categories,
   coinLedger,
+  collectionItems,
+  collections,
   favoriteFolders,
   favoriteItems,
   follows,
@@ -15,6 +17,7 @@ import {
   users,
   videoCoins,
   videoLikes,
+  videoParts,
   videoRenditions,
   videoSimilarities,
   videoSubtitles,
@@ -22,6 +25,7 @@ import {
   videos,
   watchEvents,
   watchHistories,
+  watchLater,
 } from '@uiliuili/db';
 import {
   AppError,
@@ -46,6 +50,7 @@ import {
 } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { grantExperience } from '../common/experience';
 import { QueueService } from '../common/queue.service';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
@@ -74,6 +79,7 @@ export class VideosService {
     tag?: string;
     sort: 'new' | 'hot' | 'recommended';
     q?: string;
+    author?: string;
     excludeIds?: string[];
     excludeUploaderIds?: string[];
   }) {
@@ -88,6 +94,9 @@ export class VideosService {
     if (query.q) {
       const needle = `%${query.q}%`;
       conditions.push(or(ilike(videos.title, needle), ilike(videos.description, needle))!);
+    }
+    if (query.author) {
+      conditions.push(sql`lower(${users.username}) = ${query.author.toLowerCase()}`);
     }
     if (query.excludeIds?.length) conditions.push(notInArray(videos.id, query.excludeIds));
     if (query.excludeUploaderIds?.length) {
@@ -183,7 +192,18 @@ export class VideosService {
     this.assertCanView(row.video, viewer);
     const tagsByVideo = await this.tagsFor([id]);
     const tagNames = tagsByVideo.get(id) ?? [];
-    const [liked, coin, favorited, following, history, renditions, subtitles] = await Promise.all([
+    const [
+      liked,
+      coin,
+      favorited,
+      following,
+      history,
+      renditions,
+      subtitles,
+      partRows,
+      collectionRows,
+      laterRows,
+    ] = await Promise.all([
       viewer
         ? this.database.db
             .select({ userId: videoLikes.userId })
@@ -225,9 +245,45 @@ export class VideosService {
       this.database.db
         .select()
         .from(videoRenditions)
-        .where(eq(videoRenditions.videoId, id))
+        .where(and(eq(videoRenditions.videoId, id), isNull(videoRenditions.partId)))
         .orderBy(desc(videoRenditions.height)),
       this.database.db.select().from(videoSubtitles).where(eq(videoSubtitles.videoId, id)),
+      this.database.db
+        .select()
+        .from(videoParts)
+        .where(eq(videoParts.videoId, id))
+        .orderBy(videoParts.sort, videoParts.createdAt),
+      this.database.db
+        .select({
+          id: collections.id,
+          title: collections.title,
+          kind: collections.kind,
+          coverUrl: collections.coverUrl,
+          visibility: collections.visibility,
+          userId: collections.userId,
+          itemCount: sql<number>`(
+            SELECT COUNT(*) FROM ${collectionItems}
+            WHERE ${collectionItems.collectionId} = ${collections.id}
+          )`,
+        })
+        .from(collections)
+        .innerJoin(collectionItems, eq(collectionItems.collectionId, collections.id))
+        .where(
+          and(
+            eq(collectionItems.videoId, id),
+            viewer
+              ? or(eq(collections.visibility, 'public'), eq(collections.userId, viewer.id))!
+              : eq(collections.visibility, 'public'),
+          ),
+        )
+        .limit(12),
+      viewer
+        ? this.database.db
+            .select({ videoId: watchLater.videoId })
+            .from(watchLater)
+            .where(and(eq(watchLater.userId, viewer.id), eq(watchLater.videoId, id)))
+            .limit(1)
+        : Promise.resolve([]),
     ]);
 
     const base = videoCard(row, tagNames);
@@ -239,13 +295,40 @@ export class VideosService {
         url: await this.storage.signedUrl(subtitle.storageKey, 3600),
       })),
     );
+    const parts =
+      partRows.length > 0
+        ? partRows.map((part) => ({
+            id: part.id,
+            title: part.title,
+            sort: part.sort,
+            durationSeconds: part.durationSeconds,
+            status: part.status,
+            playlistUrl:
+              part.playlistKey && ['ready', 'published'].includes(part.status)
+                ? `/api/v1/videos/${id}/parts/${part.id}/hls/master.m3u8`
+                : null,
+          }))
+        : [
+            {
+              id: null,
+              title: '正片',
+              sort: 1,
+              durationSeconds: row.video.durationSeconds,
+              status: row.video.status,
+              playlistUrl:
+                row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null,
+            },
+          ];
+    const playablePart = parts.find((part) => part.playlistUrl);
     return {
       ...base,
       description: row.video.description,
       status: row.video.status,
       visibility: row.video.visibility,
       featured: row.video.featured,
-      playlistUrl: row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null,
+      playlistUrl:
+        playablePart?.playlistUrl ??
+        (row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null),
       renditions: renditions.map((rendition) => ({
         quality: rendition.quality,
         width: rendition.width,
@@ -254,11 +337,21 @@ export class VideosService {
         playlistUrl: `/api/v1/videos/${id}/hls/${rendition.quality}/index.m3u8`,
       })),
       subtitles: subtitlePayload,
+      parts,
+      collections: collectionRows.map((collection) => ({
+        id: collection.id,
+        title: collection.title,
+        kind: collection.kind,
+        coverUrl: collection.coverUrl,
+        itemCount: Number(collection.itemCount),
+      })),
       liked: liked.length > 0,
       coinCount: Number(coin[0]?.amount ?? 0),
       favorited: favorited.length > 0,
       following: following.length > 0,
+      watchLater: laterRows.length > 0,
       progressMs: history[0]?.positionMs ?? 0,
+      progressPartId: history[0]?.partId ?? null,
     };
   }
 
@@ -340,10 +433,12 @@ export class VideosService {
     };
   }
 
-  async playlist(id: string, viewer?: AuthUser) {
+  async playlist(id: string, viewer?: AuthUser, partId?: string) {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
-    if (!row.video.playlistKey) {
+    const part = partId ? await this.getPart(id, partId) : null;
+    const playlistKey = part?.playlistKey ?? row.video.playlistKey;
+    if (!playlistKey) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未完成转码', 400);
     }
     await this.database.db
@@ -359,18 +454,24 @@ export class VideosService {
       this.database.db
         .select()
         .from(videoRenditions)
-        .where(eq(videoRenditions.videoId, id))
+        .where(
+          part
+            ? eq(videoRenditions.partId, part.id)
+            : and(eq(videoRenditions.videoId, id), isNull(videoRenditions.partId)),
+        )
         .orderBy(desc(videoRenditions.height)),
       this.database.db.select().from(videoSubtitles).where(eq(videoSubtitles.videoId, id)),
     ]);
+    const prefix = part ? `/api/v1/videos/${id}/parts/${part.id}/hls` : `/api/v1/videos/${id}/hls`;
     return {
-      playlistUrl: `/api/v1/videos/${id}/hls/master.m3u8`,
+      playlistUrl: `${prefix}/master.m3u8`,
+      partId: part?.id ?? null,
       renditions: renditions.map((rendition) => ({
         quality: rendition.quality,
         width: rendition.width,
         height: rendition.height,
         bitrate: rendition.bitrate,
-        playlistUrl: `/api/v1/videos/${id}/hls/${rendition.quality}/index.m3u8`,
+        playlistUrl: `${prefix}/${rendition.quality}/index.m3u8`,
       })),
       subtitles: await Promise.all(
         subtitles.map(async (subtitle) => ({
@@ -382,18 +483,31 @@ export class VideosService {
     };
   }
 
-  async hlsKey(id: string, filePath: string, viewer?: AuthUser) {
+  async hlsKey(id: string, filePath: string, viewer?: AuthUser, partId?: string) {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
-    if (!row.video.playlistKey) {
+    const part = partId ? await this.getPart(id, partId) : null;
+    const playlistKey = part?.playlistKey ?? row.video.playlistKey;
+    if (!playlistKey) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未完成转码', 400);
     }
-    const base = path.posix.dirname(row.video.playlistKey);
+    const base = path.posix.dirname(playlistKey);
     const normalized = path.posix.normalize(decodeURIComponent(filePath)).replace(/^\/+/, '');
     if (normalized.startsWith('..') || normalized.includes('/../')) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '非法路径', 400);
     }
     return { key: `${base}/${normalized}`, video: row.video };
+  }
+
+  async getPart(videoId: string, partId: string) {
+    const rows = await this.database.db
+      .select()
+      .from(videoParts)
+      .where(and(eq(videoParts.id, partId), eq(videoParts.videoId, videoId)))
+      .limit(1);
+    const part = rows[0];
+    if (!part) throw new AppError(ERROR_CODES.NOT_FOUND, '分 P 不存在', 404);
+    return part;
   }
 
   async toggleLike(id: string, viewer: AuthUser, desired?: boolean) {
@@ -433,6 +547,8 @@ export class VideosService {
         body: row.video.title,
         link: `/video/${row.video.id}`,
       });
+      await grantExperience(this.database.db, row.video.uploaderId, 2);
+      await grantExperience(this.database.db, viewer.id, 1);
     }
     const [countRow] = await this.database.db
       .select({ value: count() })
@@ -495,6 +611,8 @@ export class VideosService {
         body: row.video.title,
         link: `/video/${row.video.id}`,
       });
+      await grantExperience(this.database.db, row.video.uploaderId, amount * 10);
+      await grantExperience(this.database.db, viewer.id, amount * 2);
     }
     return { count: result };
   }
@@ -552,6 +670,8 @@ export class VideosService {
         body: row.video.title,
         link: `/video/${row.video.id}`,
       });
+      await grantExperience(this.database.db, row.video.uploaderId, 1);
+      await grantExperience(this.database.db, viewer.id, 1);
     }
     return { favorited };
   }
@@ -559,15 +679,17 @@ export class VideosService {
   async saveProgress(
     id: string,
     viewer: AuthUser,
-    input: { positionMs: number; durationMs?: number; completed?: boolean },
+    input: { positionMs: number; durationMs?: number; partId?: string; completed?: boolean },
   ) {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
+    if (input.partId) await this.getPart(id, input.partId);
     await this.database.db
       .insert(watchHistories)
       .values({
         userId: viewer.id,
         videoId: id,
+        partId: input.partId ?? null,
         positionMs: input.positionMs,
         durationMs: input.durationMs ?? 0,
         completed: input.completed ?? false,
@@ -575,6 +697,7 @@ export class VideosService {
       .onConflictDoUpdate({
         target: [watchHistories.userId, watchHistories.videoId],
         set: {
+          partId: input.partId ?? null,
           positionMs: input.positionMs,
           durationMs: input.durationMs ?? 0,
           completed: input.completed ?? false,
@@ -609,6 +732,22 @@ export class VideosService {
       detail: input.detail ?? '',
     });
     return { ok: true };
+  }
+
+  async toggleWatchLater(id: string, viewer: AuthUser, desired: boolean) {
+    const row = await this.getRow(id);
+    this.assertCanView(row.video, viewer);
+    if (desired) {
+      await this.database.db
+        .insert(watchLater)
+        .values({ userId: viewer.id, videoId: id })
+        .onConflictDoNothing();
+    } else {
+      await this.database.db
+        .delete(watchLater)
+        .where(and(eq(watchLater.userId, viewer.id), eq(watchLater.videoId, id)));
+    }
+    return { watchLater: desired };
   }
 
   async feedback(viewer: AuthUser, input: { videoId: string; action: string }) {

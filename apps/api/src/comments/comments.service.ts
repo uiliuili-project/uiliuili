@@ -9,11 +9,14 @@ import {
   videos,
 } from '@uiliuili/db';
 import { AppError, type CommentCreateInput, type CommentItem, ERROR_CODES } from '@uiliuili/shared';
-import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { grantExperience } from '../common/experience';
 import { decodeCursor, encodeCursor, publicUser } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
+
+const REPLIES_PREVIEW = 3;
 
 @Injectable()
 export class CommentsService {
@@ -27,8 +30,8 @@ export class CommentsService {
     query: { cursor?: string; limit: number; sort: 'hot' | 'new' },
     viewer?: AuthUser,
   ) {
-    const row = await this.videos.getRow(videoId);
-    this.videos.assertCanView(row.video, viewer);
+    const videoRow = await this.videos.getRow(videoId);
+    this.videos.assertCanView(videoRow.video, viewer);
     const offset = decodeCursor(query.cursor);
     const rows = await this.database.db
       .select({ comment: comments, user: users })
@@ -42,13 +45,14 @@ export class CommentsService {
         ),
       )
       .orderBy(
+        desc(comments.pinned),
         ...(query.sort === 'hot'
           ? [desc(comments.likeCount), desc(comments.createdAt)]
           : [desc(comments.createdAt)]),
       )
       .limit(query.limit)
       .offset(offset);
-    const ids = rows.map((row) => row.comment.id);
+    const ids = rows.map((item) => item.comment.id);
     const [replies, liked, replyCounts] = await Promise.all([
       ids.length
         ? this.database.db
@@ -78,20 +82,82 @@ export class CommentsService {
     for (const reply of replies) {
       if (!reply.comment.parentId) continue;
       const list = replyMap.get(reply.comment.parentId) ?? [];
-      list.push(reply);
+      if (list.length < REPLIES_PREVIEW) list.push(reply);
       replyMap.set(reply.comment.parentId, list);
     }
     const countMap = new Map(replyCounts.map((item) => [item.parentId ?? '', Number(item.value)]));
     return {
-      items: rows.map((row) =>
+      items: rows.map((item) =>
         this.toItem(
-          row.comment,
-          row.user,
-          (replyMap.get(row.comment.id) ?? []).map((reply) =>
-            this.toItem(reply.comment, reply.user, [], likedSet.has(reply.comment.id), 0),
+          item.comment,
+          item.user,
+          videoRow.video.uploaderId,
+          (replyMap.get(item.comment.id) ?? []).map((reply) =>
+            this.toItem(
+              reply.comment,
+              reply.user,
+              videoRow.video.uploaderId,
+              [],
+              likedSet.has(reply.comment.id),
+              0,
+            ),
           ),
-          likedSet.has(row.comment.id),
-          countMap.get(row.comment.id) ?? 0,
+          likedSet.has(item.comment.id),
+          countMap.get(item.comment.id) ?? 0,
+        ),
+      ),
+      nextCursor: rows.length === query.limit ? encodeCursor(offset + query.limit) : null,
+    };
+  }
+
+  async replies(
+    videoId: string,
+    commentId: string,
+    query: { cursor?: string; limit: number },
+    viewer?: AuthUser,
+  ) {
+    const videoRow = await this.videos.getRow(videoId);
+    this.videos.assertCanView(videoRow.video, viewer);
+    const offset = decodeCursor(query.cursor);
+    const rows = await this.database.db
+      .select({ comment: comments, user: users })
+      .from(comments)
+      .innerJoin(users, eq(users.id, comments.userId))
+      .where(
+        and(
+          eq(comments.videoId, videoId),
+          eq(comments.parentId, commentId),
+          eq(comments.status, 'visible'),
+        ),
+      )
+      .orderBy(asc(comments.createdAt))
+      .limit(query.limit)
+      .offset(offset);
+    let likedSet = new Set<string>();
+    if (viewer && rows.length > 0) {
+      const liked = await this.database.db
+        .select({ commentId: commentLikes.commentId })
+        .from(commentLikes)
+        .where(
+          and(
+            eq(commentLikes.userId, viewer.id),
+            inArray(
+              commentLikes.commentId,
+              rows.map((item) => item.comment.id),
+            ),
+          ),
+        );
+      likedSet = new Set(liked.map((item) => item.commentId));
+    }
+    return {
+      items: rows.map((item) =>
+        this.toItem(
+          item.comment,
+          item.user,
+          videoRow.video.uploaderId,
+          [],
+          likedSet.has(item.comment.id),
+          0,
         ),
       ),
       nextCursor: rows.length === query.limit ? encodeCursor(offset + query.limit) : null,
@@ -133,7 +199,9 @@ export class CommentsService {
       .update(videos)
       .set({ commentCount: sql`${videos.commentCount} + 1` })
       .where(eq(videos.id, videoId));
+    const notified = new Set<string>([viewer.id]);
     if (row.video.uploaderId !== viewer.id) {
+      notified.add(row.video.uploaderId);
       await this.database.db.insert(notifications).values({
         userId: row.video.uploaderId,
         actorId: viewer.id,
@@ -144,6 +212,7 @@ export class CommentsService {
       });
     }
     if (parentUserId && parentUserId !== viewer.id && parentUserId !== row.video.uploaderId) {
+      notified.add(parentUserId);
       await this.database.db.insert(notifications).values({
         userId: parentUserId,
         actorId: viewer.id,
@@ -153,13 +222,18 @@ export class CommentsService {
         link: `/video/${videoId}`,
       });
     }
+    await this.notifyMentions(videoId, content, viewer, notified);
+    await grantExperience(this.database.db, viewer.id, 2);
+    if (row.video.uploaderId !== viewer.id) {
+      await grantExperience(this.database.db, row.video.uploaderId, 1);
+    }
     const userRows = await this.database.db
       .select()
       .from(users)
       .where(eq(users.id, viewer.id))
       .limit(1);
     if (!userRows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
-    return this.toItem(created, userRows[0], [], false, 0);
+    return this.toItem(created, userRows[0], row.video.uploaderId, [], false, 0);
   }
 
   async remove(videoId: string, commentId: string, viewer: AuthUser) {
@@ -218,9 +292,84 @@ export class CommentsService {
     return { liked, count: Number(countRow?.value ?? 0) };
   }
 
+  async pin(videoId: string, commentId: string, viewer: AuthUser, pinned: boolean) {
+    const row = await this.videos.getRow(videoId);
+    const canPin =
+      row.video.uploaderId === viewer.id || viewer.permissions.includes('comment:manage');
+    if (!canPin) throw new AppError(ERROR_CODES.FORBIDDEN, '只有 UP 主可以置顶评论', 403);
+    const rows = await this.database.db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.id, commentId), eq(comments.videoId, videoId)))
+      .limit(1);
+    if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '评论不存在', 404);
+    if (pinned) {
+      await this.database.db
+        .update(comments)
+        .set({ pinned: false, pinnedAt: null })
+        .where(and(eq(comments.videoId, videoId), eq(comments.pinned, true)));
+    }
+    await this.database.db
+      .update(comments)
+      .set({ pinned, pinnedAt: pinned ? new Date() : null, updatedAt: new Date() })
+      .where(eq(comments.id, commentId));
+    return { pinned };
+  }
+
+  async toggleUpLike(videoId: string, commentId: string, viewer: AuthUser, desired: boolean) {
+    const row = await this.videos.getRow(videoId);
+    if (row.video.uploaderId !== viewer.id) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '只有 UP 主可以点赞评论', 403);
+    }
+    const rows = await this.database.db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.id, commentId), eq(comments.videoId, videoId)))
+      .limit(1);
+    if (!rows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '评论不存在', 404);
+    await this.database.db
+      .update(comments)
+      .set({ upLiked: desired, updatedAt: new Date() })
+      .where(eq(comments.id, commentId));
+    return { upLiked: desired };
+  }
+
+  private async notifyMentions(
+    videoId: string,
+    content: string,
+    viewer: AuthUser,
+    excluded: Set<string>,
+  ) {
+    const handles = Array.from(
+      new Set(
+        Array.from(content.matchAll(/@([a-zA-Z0-9_\u4e00-\u9fa5-]{2,20})/g)).map((match) =>
+          match[1]!.toLowerCase(),
+        ),
+      ),
+    ).slice(0, 5);
+    if (handles.length === 0) return;
+    const rows = await this.database.db
+      .select({ id: users.id, username: users.username })
+      .from(users)
+      .where(inArray(sql`lower(${users.username})`, handles));
+    for (const target of rows) {
+      if (excluded.has(target.id)) continue;
+      excluded.add(target.id);
+      await this.database.db.insert(notifications).values({
+        userId: target.id,
+        actorId: viewer.id,
+        type: 'mention',
+        title: `${viewer.displayName} 在评论中提到了你`,
+        body: content.slice(0, 120),
+        link: `/video/${videoId}`,
+      });
+    }
+  }
+
   private toItem(
     comment: DbComment,
     user: DbUser,
+    uploaderId: string,
     replies: CommentItem[],
     liked: boolean,
     replyCount: number,
@@ -231,6 +380,9 @@ export class CommentsService {
       createdAt: comment.createdAt.toISOString(),
       likeCount: comment.likeCount,
       liked,
+      pinned: comment.pinned,
+      upLiked: comment.upLiked,
+      isUploader: comment.userId === uploaderId,
       user: publicUser(user),
       replies,
       replyCount,
