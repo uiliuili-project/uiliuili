@@ -395,6 +395,16 @@ export const uiEn: Record<string, string> = {
   '站点 URL': 'Site URL',
   站点与管理员: 'Site & admin',
   站点名称: 'Site name',
+  '站点 Logo': 'Site logo',
+  'Logo 地址': 'Logo URL',
+  '上传 Logo': 'Upload logo',
+  '移除 Logo': 'Remove logo',
+  'Logo 已更新': 'Logo updated',
+  'Logo 上传失败': 'Logo upload failed',
+  'Logo 不能超过 2 MB': 'Logo must be 2 MB or smaller',
+  'Logo 只支持 JPG、PNG 或 WebP 图片': 'Logo must be a JPG, PNG, or WebP image',
+  '上传后立即生效，建议使用正方形 JPG、PNG 或 WebP 图片。':
+    'Takes effect immediately. A square JPG, PNG, or WebP image works best.',
   '站点地址：{0}': 'Site URL: {0}',
   站点描述: 'Site description',
   '站点暂时关闭进行维护。请稍后再来，或联系管理员。':

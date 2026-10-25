@@ -167,6 +167,7 @@ export class SettingsService {
       site: {
         name: site.name,
         description: site.description,
+        logoUrl: site.logoUrl,
         url: site.url,
         locale: site.locale,
         timezone: site.timezone,

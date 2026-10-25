@@ -42,11 +42,13 @@ function readCookie(name: string): string | undefined {
 
 export async function request<T>(
   path: string,
-  options: RequestInit & { body?: unknown } = {},
+  options: RequestInit & { body?: unknown; raw?: boolean } = {},
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  const method = (options.method ?? 'GET').toUpperCase();
-  if (options.body !== undefined && !(options.body instanceof FormData)) {
+  const { raw, ...init } = options;
+  const headers = new Headers(init.headers);
+  const method = (init.method ?? 'GET').toUpperCase();
+  const multipart = init.body instanceof FormData;
+  if (init.body !== undefined && !multipart && !raw) {
     headers.set('Content-Type', 'application/json');
   }
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
@@ -54,12 +56,10 @@ export async function request<T>(
     if (csrf) headers.set('x-csrf-token', csrf);
   }
   const body = (
-    options.body === undefined || options.body instanceof FormData
-      ? options.body
-      : JSON.stringify(options.body)
+    init.body === undefined || multipart || raw ? init.body : JSON.stringify(init.body)
   ) as BodyInit | undefined;
   let response = await fetch(path, {
-    ...options,
+    ...init,
     method,
     headers,
     credentials: 'include',
@@ -73,7 +73,7 @@ export async function request<T>(
     });
     if (refreshed.ok) {
       response = await fetch(path, {
-        ...options,
+        ...init,
         method,
         headers,
         credentials: 'include',
@@ -110,4 +110,11 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body as BodyInit | undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, body: Blob, contentType?: string) =>
+    request<T>(path, {
+      method: 'POST',
+      body,
+      raw: true,
+      headers: contentType ? { 'Content-Type': contentType } : undefined,
+    }),
 };

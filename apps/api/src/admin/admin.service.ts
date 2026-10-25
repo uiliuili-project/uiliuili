@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import os from 'node:os';
 import { Injectable, Logger } from '@nestjs/common';
 import {
@@ -667,6 +668,39 @@ export class AdminService {
       redis: redis ? { url: maskRedisUrl(redis.url) } : null,
       oauth: providers,
     };
+  }
+
+  async uploadLogo(actorId: string, buffer: Buffer, contentType: string) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, 'Logo 只支持 JPEG、PNG 或 WebP', 400);
+    }
+    if (buffer.length === 0) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, 'Logo 文件为空', 400);
+    }
+    if (buffer.length > 2 * 1024 * 1024) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, 'Logo 不能超过 2 MB', 400);
+    }
+    const extension =
+      contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+    const key = `branding/logo-${crypto.randomUUID()}.${extension}`;
+    const provider = await this.storage.provider();
+    await provider.putObject(key, buffer, contentType);
+    const logoUrl = `/media/${key
+      .split('/')
+      .map((part) => encodeURIComponent(part))
+      .join('/')}`;
+    const site = await this.settings.getSite();
+    await this.settings.set('site', { ...site, logoUrl }, false);
+    await this.settings.invalidate();
+    await this.cache.del('settings:public');
+    await this.audit.record({
+      actorId,
+      action: 'admin.settings.logo',
+      targetType: 'setting',
+      targetId: 'site',
+      after: { logoUrl },
+    });
+    return { logoUrl };
   }
 
   async updateSettings(actorId: string, patches: Record<string, unknown>) {

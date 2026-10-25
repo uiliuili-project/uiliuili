@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   adminCommentQuerySchema,
   adminDanmakuQuerySchema,
@@ -173,6 +184,21 @@ export class AdminController {
   @RequirePermissions('settings:manage')
   async settings() {
     return this.admin.getSettings();
+  }
+
+  @Post('site/logo')
+  @RequirePermissions('settings:manage')
+  async uploadLogo(
+    @CurrentUser() actor: AuthUser,
+    @Body() body: Buffer,
+    @Headers('content-type') contentType?: string,
+  ) {
+    const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body ?? []);
+    return this.admin.uploadLogo(
+      actor.id,
+      buffer,
+      (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? '',
+    );
   }
 
   @Put('settings')

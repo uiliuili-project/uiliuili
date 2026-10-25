@@ -147,6 +147,7 @@ export const DEFAULT_SETTINGS = {
   site: {
     name: APP_NAME,
     description: '一个自托管的弹幕视频站',
+    logoUrl: '',
     url: 'http://localhost:3000',
     locale: 'zh-CN',
     timezone: 'Asia/Shanghai',

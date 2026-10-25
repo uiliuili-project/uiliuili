@@ -1,4 +1,4 @@
-import { SaveOutlined } from '@ant-design/icons';
+import { SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -14,6 +14,7 @@ import {
   Switch,
   Tabs,
   Typography,
+  Upload,
   notification,
 } from 'antd';
 import { useEffect, useState } from 'react';
@@ -46,6 +47,7 @@ export function SettingsPage() {
   const [searchForm] = Form.useForm();
   const [securityForm] = Form.useForm();
   const [oauthForms] = Form.useForm();
+  const logoUrl = Form.useWatch('logoUrl', siteForm) as string | undefined;
 
   const query = useQuery({
     queryKey: ['admin-settings'],
@@ -130,6 +132,34 @@ export function SettingsPage() {
   const saveSite = async () => {
     const values = await siteForm.validateFields();
     await save({ site: values });
+  };
+
+  const uploadLogo = async (file: File) => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      notification.error({ message: t('Logo 只支持 JPG、PNG 或 WebP 图片') });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      notification.error({ message: t('Logo 不能超过 2 MB') });
+      return;
+    }
+    try {
+      setSaving(true);
+      const result = await api.upload<{ logoUrl: string }>(
+        '/api/v1/admin/site/logo',
+        file,
+        file.type,
+      );
+      siteForm.setFieldValue('logoUrl', result.logoUrl);
+      notification.success({ message: t('Logo 已更新') });
+      await queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
+    } catch (error) {
+      notification.error({
+        message: error instanceof Error ? error.message : t('Logo 上传失败'),
+      });
+    } finally {
+      setSaving(false);
+    }
   };
   const saveUpload = async () => {
     const values = await uploadForm.validateFields();
@@ -289,6 +319,52 @@ export function SettingsPage() {
                     <Col xs={24} sm={12}>
                       <Form.Item label={t('站点 URL')} name="url">
                         <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24}>
+                      <Form.Item
+                        label={t('站点 Logo')}
+                        extra={t('上传后立即生效，建议使用正方形 JPG、PNG 或 WebP 图片。')}
+                      >
+                        <Space align="center" wrap>
+                          {logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt=""
+                              style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 12,
+                                objectFit: 'cover',
+                                border: '1px solid #f0f0f0',
+                              }}
+                            />
+                          ) : (
+                            <span className="install-brand-mark">u</span>
+                          )}
+                          <Upload
+                            accept="image/jpeg,image/png,image/webp"
+                            showUploadList={false}
+                            beforeUpload={(file) => {
+                              void uploadLogo(file);
+                              return false;
+                            }}
+                          >
+                            <Button icon={<UploadOutlined />} loading={saving}>
+                              {t('上传 Logo')}
+                            </Button>
+                          </Upload>
+                          {logoUrl && (
+                            <Button onClick={() => siteForm.setFieldValue('logoUrl', '')}>
+                              {t('移除 Logo')}
+                            </Button>
+                          )}
+                        </Space>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24}>
+                      <Form.Item label={t('Logo 地址')} name="logoUrl">
+                        <Input placeholder="/media/branding/logo.png" allowClear />
                       </Form.Item>
                     </Col>
                     <Col xs={24}>
