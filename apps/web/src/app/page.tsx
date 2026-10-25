@@ -1,3 +1,4 @@
+import { AdminConsoleLink } from '@/components/AdminConsoleLink';
 import { SectionHeader } from '@/components/SectionHeader';
 import { VideoCard } from '@/components/VideoCard';
 import { formatCount, formatDate, formatDuration } from '@/lib/format';
@@ -74,9 +75,7 @@ export default async function HomePage() {
             <Link href="/studio" className="btn-primary">
               {t('去投稿')}
             </Link>
-            <a href="/admin/" className="btn-ghost">
-              {t('管理后台')}
-            </a>
+            <AdminConsoleLink className="btn-ghost" />
           </div>
         </div>
       ) : (

@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import type { AuthUser } from '@uiliuili/shared';
 import {
   Bell,
+  Clapperboard,
   Clock,
   Home,
   LogOut,
@@ -12,6 +13,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Trophy,
   User,
@@ -32,6 +34,13 @@ export function Header() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState('uiliuili');
+  const [siteLogo, setSiteLogo] = useState('');
+  const isAdmin = Boolean(
+    user &&
+      (user.group === 'ADMIN' ||
+        user.roles.includes('ADMIN') ||
+        user.roles.includes('SUPER_ADMIN')),
+  );
 
   const navItems = [
     { href: '/', label: t('nav.home'), icon: Home },
@@ -44,8 +53,11 @@ export function Header() {
 
   useEffect(() => {
     void api
-      .get<{ site: { name: string } }>('/api/v1/settings')
-      .then((settings) => setSiteName(settings.site.name || 'uiliuili'))
+      .get<{ site: { name: string; logoUrl?: string } }>('/api/v1/settings')
+      .then((settings) => {
+        setSiteName(settings.site.name || 'uiliuili');
+        setSiteLogo(settings.site.logoUrl || '');
+      })
       .catch(() => undefined);
     void getMe().then((current) => {
       setUser(current);
@@ -76,9 +88,13 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
       <div className="container-page flex h-16 items-center gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-[#ff9db5] text-lg font-bold text-white">
-            u
-          </span>
+          {siteLogo ? (
+            <img src={siteLogo} alt={siteName} className="h-9 w-9 rounded-xl object-cover" />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-[#ff9db5] text-lg font-bold text-white">
+              u
+            </span>
+          )}
           <span className="hidden text-lg font-bold tracking-tight sm:block">{siteName}</span>
         </Link>
 
@@ -118,9 +134,15 @@ export function Header() {
           {user ? (
             <>
               <Link href="/studio" className="btn-soft hidden sm:inline-flex">
-                <Plus className="h-4 w-4" />
-                {t('nav.upload')}
+                <Clapperboard className="h-4 w-4" />
+                {t('nav.studio')}
               </Link>
+              {isAdmin && (
+                <a href="/admin/" className="btn-ghost hidden md:inline-flex">
+                  <ShieldCheck className="h-4 w-4" />
+                  {t('nav.admin')}
+                </a>
+              )}
               <Link
                 href="/notifications"
                 className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
@@ -168,6 +190,24 @@ export function Header() {
                       <User className="h-4 w-4" />
                       {t('nav.space')}
                     </Link>
+                    <Link
+                      href="/studio"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                    >
+                      <Clapperboard className="h-4 w-4" />
+                      {t('nav.studio')}
+                    </Link>
+                    {isAdmin && (
+                      <a
+                        href="/admin/"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        {t('nav.admin')}
+                      </a>
+                    )}
                     <Link
                       href="/watch-later"
                       onClick={() => setMenuOpen(false)}

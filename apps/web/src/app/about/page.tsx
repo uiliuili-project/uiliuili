@@ -1,3 +1,4 @@
+import { AdminConsoleLink } from '@/components/AdminConsoleLink';
 import { getT } from '@/lib/i18n-server';
 
 export default async function AboutPage() {
@@ -12,9 +13,7 @@ export default async function AboutPage() {
           <a href="/admin/install" className="btn-ghost">
             {t('about.installer')}
           </a>
-          <a href="/admin/" className="btn-ghost">
-            {t('管理后台')}
-          </a>
+          <AdminConsoleLink className="btn-ghost" />
         </div>
       </div>
     </div>

@@ -118,6 +118,14 @@ a {
   font-weight: 700;
 }
 
+.admin-logo-image {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .admin-content {
   padding: 24px;
   min-height: calc(100vh - 64px);

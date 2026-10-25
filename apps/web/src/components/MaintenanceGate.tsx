@@ -1,4 +1,5 @@
 'use client';
+import { AdminConsoleLink } from './AdminConsoleLink';
 import { useT } from './I18nProvider';
 
 import { api } from '@/lib/api';
@@ -32,9 +33,7 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
           <p className="mt-3 text-sm leading-6 text-muted">
             {t('站点暂时关闭进行维护。请稍后再来，或联系管理员。')}{' '}
           </p>
-          <a href="/admin/" className="btn-ghost mt-6">
-            {t('管理后台')}{' '}
-          </a>
+          <AdminConsoleLink className="btn-ghost mt-6" />
         </div>
       </div>
     );

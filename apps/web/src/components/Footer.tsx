@@ -3,10 +3,13 @@
 import { api } from '@/lib/api';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AdminConsoleLink } from './AdminConsoleLink';
 import { useT } from './I18nProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
-type FooterSettings = { site: { name: string; footer?: string; icp?: string } };
+type FooterSettings = {
+  site: { name: string; logoUrl?: string; footer?: string; icp?: string };
+};
 
 export function Footer() {
   const t = useT();
@@ -22,9 +25,17 @@ export function Footer() {
     <footer className="mt-16 border-t border-line bg-white py-10">
       <div className="container-page flex flex-col gap-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
-            u
-          </span>
+          {settings.site.logoUrl ? (
+            <img
+              src={settings.site.logoUrl}
+              alt={settings.site.name}
+              className="h-7 w-7 rounded-lg object-cover"
+            />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
+              u
+            </span>
+          )}
           <span>
             {settings.site.name || 'uiliuili'} · {t('common.footerTagline')}
           </span>
@@ -36,9 +47,7 @@ export function Footer() {
           <Link href="/settings" className="hover:text-brand">
             {t('nav.settings')}
           </Link>
-          <a href="/admin/" className="hover:text-brand">
-            {t('nav.admin')}
-          </a>
+          <AdminConsoleLink className="hover:text-brand" />
           <LanguageSwitcher compact />
           {settings.site.icp && <span>{settings.site.icp}</span>}
           <span>{settings.site.footer || 'MIT License'}</span>

@@ -6,8 +6,8 @@ import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatBytes, formatDate, formatDuration } from '@/lib/format';
 import type { StudioVideo } from '@/lib/types';
-import type { AuthUser, Category } from '@uiliuili/shared';
-import { CheckCircle2, Clock, Film, Loader2, UploadCloud } from 'lucide-react';
+import { type AuthUser, type Category, isAdminGroup } from '@uiliuili/shared';
+import { CheckCircle2, Clock, Film, Loader2, ShieldCheck, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -279,9 +279,17 @@ export default function StudioPage() {
           <h1 className="text-xl font-semibold">{t('创作中心')}</h1>
           <p className="mt-1 text-sm text-muted">{t('上传、管理你的视频稿件')}</p>
         </div>
-        <Link href={`/space/${user.username}`} className="btn-ghost">
-          {t('查看我的空间')}{' '}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/space/${user.username}`} className="btn-ghost">
+            {t('查看我的空间')}{' '}
+          </Link>
+          {isAdminGroup(user.group) && (
+            <a href="/admin/" className="btn-soft">
+              <ShieldCheck className="h-4 w-4" />
+              {t('管理后台')}
+            </a>
+          )}
+        </div>
       </div>
 
       {(message || error) && (

@@ -2,9 +2,11 @@ import { GithubOutlined, GoogleOutlined, LockOutlined, UserOutlined } from '@ant
 import { Alert, Button, Divider, Form, Input, Space, Typography, notification } from 'antd';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { canAccessAdmin } from '../access';
 import { ApiError, api } from '../api';
 import { AdminLanguageSwitcher, useT } from '../i18n';
 import type { AuthUser } from '../types';
+import { useSiteBrand } from '../useSiteBrand';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -12,6 +14,7 @@ export function LoginPage() {
   const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
+  const brand = useSiteBrand();
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +33,9 @@ export function LoginPage() {
       .catch(() => undefined);
     void api
       .get<{ user: AuthUser }>('/api/v1/auth/me')
-      .then(() => navigate('/', { replace: true }))
+      .then(({ user }) => {
+        if (canAccessAdmin(user)) navigate('/', { replace: true });
+      })
       .catch(() => undefined);
     const params = new URLSearchParams(location.search);
     const oauthError = params.get('oauth_error');
@@ -41,7 +46,11 @@ export function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      await api.post('/api/v1/auth/login', values);
+      const result = await api.post<{ user: AuthUser }>('/api/v1/auth/login', values);
+      if (!canAccessAdmin(result.user)) {
+        setError(t('该账号没有管理后台权限'));
+        return;
+      }
       navigate('/', { replace: true });
     } catch (loginError) {
       const message = loginError instanceof Error ? loginError.message : t('登录失败');
@@ -65,8 +74,12 @@ export function LoginPage() {
           }}
         >
           <div className="install-brand">
-            <span className="install-brand-mark">u</span>
-            uiliuili
+            {brand.logoUrl ? (
+              <img src={brand.logoUrl} alt={brand.name} className="admin-logo-image" />
+            ) : (
+              <span className="install-brand-mark">u</span>
+            )}
+            {brand.name}
           </div>
           <AdminLanguageSwitcher />
         </div>

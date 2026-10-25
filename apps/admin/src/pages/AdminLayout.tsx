@@ -14,12 +14,14 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, Dropdown, Layout, Menu, Space, Spin, Tag, Typography } from 'antd';
+import { Avatar, Button, Dropdown, Layout, Menu, Result, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { canAccessAdmin } from '../access';
 import { api } from '../api';
 import { AdminLanguageSwitcher, useT } from '../i18n';
 import type { AuthUser } from '../types';
+import { useSiteBrand } from '../useSiteBrand';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -28,6 +30,7 @@ export function AdminLayout() {
   const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
+  const brand = useSiteBrand();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -53,6 +56,37 @@ export function AdminLayout() {
     );
   }
 
+  if (!canAccessAdmin(user)) {
+    return (
+      <div className="login-shell">
+        <Result
+          status="403"
+          title={t('无权限访问管理后台')}
+          subTitle={t('请使用管理员账号登录。普通用户请前往创作中心。')}
+          extra={[
+            <Button
+              key="studio"
+              type="primary"
+              onClick={() => {
+                window.location.href = '/studio';
+              }}
+            >
+              {t('前往创作中心')}
+            </Button>,
+            <Button
+              key="site"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+            >
+              {t('返回站点首页')}
+            </Button>,
+          ]}
+        />
+      </div>
+    );
+  }
+
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: t('admin.dashboard') },
     { key: '/users', icon: <TeamOutlined />, label: t('admin.users') },
@@ -71,8 +105,12 @@ export function AdminLayout() {
     <Layout className="admin-layout">
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={220}>
         <div className="admin-logo">
-          <span className="install-brand-mark">u</span>
-          {!collapsed && <span>uiliuili</span>}
+          {brand.logoUrl ? (
+            <img src={brand.logoUrl} alt={brand.name} className="admin-logo-image" />
+          ) : (
+            <span className="install-brand-mark">u</span>
+          )}
+          {!collapsed && <span>{brand.name}</span>}
         </div>
         <Menu
           theme="dark"
@@ -100,6 +138,14 @@ export function AdminLayout() {
               menu={{
                 items: [
                   {
+                    key: 'studio',
+                    icon: <AppstoreOutlined />,
+                    label: t('前往创作中心'),
+                    onClick: () => {
+                      window.location.href = '/studio';
+                    },
+                  },
+                  {
                     key: 'site',
                     icon: <FileTextOutlined />,
                     label: t('admin.visitSite'),
@@ -117,8 +163,10 @@ export function AdminLayout() {
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar src={user?.avatarUrl} icon={<UserOutlined />} />
                 <span>{user?.displayName || user?.username}</span>
-                {user?.roles.includes('SUPER_ADMIN') && (
+                {user?.roles.includes('SUPER_ADMIN') ? (
                   <Tag color="magenta">{t('admin.superAdmin')}</Tag>
+                ) : (
+                  user?.group === 'ADMIN' && <Tag color="magenta">{t('管理员')}</Tag>
                 )}
               </Space>
             </Dropdown>
