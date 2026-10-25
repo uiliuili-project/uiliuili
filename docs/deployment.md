@@ -11,6 +11,8 @@ uiliuili does not require Docker at runtime. A typical deployment uses:
 - Nginx
 - systemd
 
+Looking for containers? See [Docker deployment](docker.md).
+
 ## Recommended hardware
 
 Sizing is driven by three loads: FFmpeg transcoding (CPU), concurrent playback

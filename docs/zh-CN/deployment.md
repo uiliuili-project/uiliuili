@@ -11,6 +11,8 @@ uiliuili 运行时不依赖 Docker。典型部署包括：
 - Nginx
 - systemd
 
+想用容器部署？见 [Docker 部署](docker.md)。
+
 ## 服务器推荐配置
 
 容量主要由三类负载决定：FFmpeg 转码（CPU）、并发播放（带宽）、API 与

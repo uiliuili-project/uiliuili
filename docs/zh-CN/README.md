@@ -5,6 +5,7 @@ uiliuili 是一个开源、自托管的弹幕视频平台。本目录是中文�
 ## 开始使用
 
 - [安装](installation.md) — 环境要求、构建、首次启动与安装向导
+- [Docker 部署](docker.md) — Compose 一键环境、数据卷、升级与备份
 - [部署](deployment.md) — Nginx、systemd、**服务器推荐配置**与扩容
 - [配置](configuration.md) — `.env` 环境变量、安装 JSON、站点设置
 - [升级、备份与恢复](upgrade.md) — 版本升级与数据保护

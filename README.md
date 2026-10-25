@@ -56,6 +56,9 @@ For a headless installation:
 pnpm cli install --config install.json
 ```
 
+For a container-based deployment (PostgreSQL, Redis, API, worker, web and the
+Nginx gateway in one Compose stack), see [Docker deployment](docs/docker.md).
+
 ## Development
 
 ```bash
@@ -85,6 +88,7 @@ English:
 
 - [Architecture](docs/architecture.md)
 - [Installation](docs/installation.md)
+- [Docker deployment](docs/docker.md)
 - [Configuration](docs/configuration.md)
 - [S3 storage](docs/s3.md)
 - [Native deployment and recommended hardware](docs/deployment.md)
