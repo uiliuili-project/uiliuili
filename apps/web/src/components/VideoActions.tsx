@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatCount } from '@/lib/format';
 import type { VideoDetail } from '@uiliuili/shared';
-import { Check, Coins, Flag, Share2, Star, ThumbsUp, UserPlus, X } from 'lucide-react';
+import { Check, Clock, Coins, Flag, Share2, Star, ThumbsUp, UserPlus, X } from 'lucide-react';
 import { useState } from 'react';
 
 const reportReasons = [
@@ -26,6 +26,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
   const [coins, setCoins] = useState(video.coinCount);
   const [favorited, setFavorited] = useState(video.favorited);
   const [favorites, setFavorites] = useState(video.favorites);
+  const [later, setLater] = useState(video.watchLater);
   const [following, setFollowing] = useState(video.following);
   const [message, setMessage] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
@@ -80,6 +81,19 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         await api.post(`/api/v1/videos/${video.id}/favorite`);
         setFavorited(true);
         setFavorites((value) => value + 1);
+      }
+    });
+
+  const toggleWatchLater = () =>
+    run(async () => {
+      if (later) {
+        await api.delete(`/api/v1/videos/${video.id}/watch-later`);
+        setLater(false);
+        setMessage(t('已从稍后再看移除'));
+      } else {
+        await api.post(`/api/v1/videos/${video.id}/watch-later`);
+        setLater(true);
+        setMessage(t('已加入稍后再看'));
       }
     });
 
@@ -155,6 +169,17 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         >
           <Star className={cn('h-4 w-4', favorited && 'fill-current')} />
           {formatCount(favorites, locale)}
+        </button>
+        <button
+          type="button"
+          onClick={toggleWatchLater}
+          className={cn(
+            'btn-ghost h-10 rounded-full',
+            later && 'border-brand bg-brand-light text-brand-dark',
+          )}
+        >
+          <Clock className={cn('h-4 w-4', later && 'fill-current')} />
+          {t('稍后再看')}
         </button>
         <button type="button" onClick={share} className="btn-ghost h-10 rounded-full">
           <Share2 className="h-4 w-4" />

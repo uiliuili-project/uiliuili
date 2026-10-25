@@ -49,6 +49,8 @@ export const enUS = {
     trending: 'Trending',
     categories: 'Categories',
     following: 'Following',
+    dynamics: 'Dynamics',
+    rankings: 'Rankings',
     history: 'History',
     favorites: 'Favorites',
     studio: 'Studio',

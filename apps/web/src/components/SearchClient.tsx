@@ -38,6 +38,8 @@ export function SearchClient() {
   const [category, setCategory] = useState('');
   const [duration, setDuration] = useState('');
   const [date, setDate] = useState('');
+  const [author, setAuthor] = useState('');
+  const [tag, setTag] = useState('');
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [hot, setHot] = useState<Array<{ query: string; count: number }>>([]);
@@ -74,6 +76,8 @@ export function SearchClient() {
       if (category) search.set('category', category);
       if (duration) search.set('duration', duration);
       if (date) search.set('date', date);
+      if (author) search.set('author', author);
+      if (tag) search.set('tag', tag);
     }
     return `/api/v1/search?${search.toString()}`;
   };
@@ -116,11 +120,15 @@ export function SearchClient() {
     category?: string;
     duration?: string;
     date?: string;
+    author?: string;
+    tag?: string;
   }) => {
     if (next.sort !== undefined) setSort(next.sort);
     if (next.category !== undefined) setCategory(next.category);
     if (next.duration !== undefined) setDuration(next.duration);
     if (next.date !== undefined) setDate(next.date);
+    if (next.author !== undefined) setAuthor(next.author);
+    if (next.tag !== undefined) setTag(next.tag);
     const search = new URLSearchParams();
     search.set('q', query);
     search.set('type', 'videos');
@@ -128,9 +136,13 @@ export function SearchClient() {
     const nextCategory = next.category ?? category;
     const nextDuration = next.duration ?? duration;
     const nextDate = next.date ?? date;
+    const nextAuthor = (next.author ?? author).trim();
+    const nextTag = (next.tag ?? tag).trim();
     if (nextCategory) search.set('category', nextCategory);
     if (nextDuration) search.set('duration', nextDuration);
     if (nextDate) search.set('date', nextDate);
+    if (nextAuthor) search.set('author', nextAuthor);
+    if (nextTag) search.set('tag', nextTag);
     setLoading(true);
     void api
       .get<SearchResponse>(`/api/v1/search?${search.toString()}`)
@@ -236,6 +248,31 @@ export function SearchClient() {
             <option value="month">{t('最近一月')}</option>
             <option value="year">{t('最近一年')}</option>
           </select>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyFilter({});
+            }}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <input
+              value={author}
+              onChange={(event) => setAuthor(event.target.value)}
+              maxLength={40}
+              placeholder={t('UP 主用户名')}
+              className="chip w-36 bg-white outline-none"
+            />
+            <input
+              value={tag}
+              onChange={(event) => setTag(event.target.value)}
+              maxLength={24}
+              placeholder={t('标签')}
+              className="chip w-28 bg-white outline-none"
+            />
+            <button type="submit" className="btn-ghost h-8 text-xs">
+              {t('应用筛选')}
+            </button>
+          </form>
         </div>
       )}
 

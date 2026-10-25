@@ -3,7 +3,20 @@
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { AuthUser } from '@uiliuili/shared';
-import { Bell, Home, LogOut, Plus, Search, Settings, User, Users } from 'lucide-react';
+import {
+  Bell,
+  Clock,
+  Home,
+  LogOut,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Trophy,
+  User,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -24,7 +37,9 @@ export function Header() {
     { href: '/', label: t('nav.home'), icon: Home },
     { href: '/trending', label: t('nav.trending'), icon: Users },
     { href: '/following', label: t('nav.following'), icon: Users },
-    { href: '/history', label: t('nav.history'), icon: User },
+    { href: '/dynamics', label: t('nav.dynamics'), icon: Sparkles },
+    { href: '/rankings', label: t('nav.rankings'), icon: Trophy },
+    { href: '/history', label: t('nav.history'), icon: Clock },
   ];
 
   useEffect(() => {
@@ -118,6 +133,13 @@ export function Header() {
                   </span>
                 )}
               </Link>
+              <Link
+                href="/messages"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
+                aria-label={t('私信')}
+              >
+                <MessageSquare className="h-5 w-5" />
+              </Link>
               <div className="relative">
                 <button
                   type="button"
@@ -145,6 +167,22 @@ export function Header() {
                     >
                       <User className="h-4 w-4" />
                       {t('nav.space')}
+                    </Link>
+                    <Link
+                      href="/watch-later"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                    >
+                      <Clock className="h-4 w-4" />
+                      {t('稍后再看')}
+                    </Link>
+                    <Link
+                      href="/favorites"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {t('我的收藏')}
                     </Link>
                     <Link
                       href="/settings"

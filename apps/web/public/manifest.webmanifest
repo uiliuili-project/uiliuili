@@ -1,0 +1,19 @@
+{
+  "name": "uiliuili",
+  "short_name": "uiliuili",
+  "description": "一个自托管的弹幕视频站",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f8",
+  "theme_color": "#fb7299",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

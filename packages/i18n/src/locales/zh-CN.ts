@@ -47,6 +47,8 @@ export const zhCN = {
     trending: '热门',
     categories: '分区',
     following: '关注',
+    dynamics: '动态',
+    rankings: '排行榜',
     history: '历史',
     favorites: '收藏',
     studio: '创作中心',

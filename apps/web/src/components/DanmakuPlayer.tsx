@@ -4,20 +4,28 @@ import { useLocale, useT } from './I18nProvider';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatCount } from '@/lib/format';
-import { DanmakuEngine, type DanmakuItem, type DanmakuOptions } from '@uiliuili/danmaku';
-import type { VideoDetail } from '@uiliuili/shared';
+import { DanmakuEngine, type DanmakuOptions } from '@uiliuili/danmaku';
+import type { DanmakuItem, VideoDetail } from '@uiliuili/shared';
 import Hls from 'hls.js';
 import {
+  ArrowLeftRight,
+  Flag,
+  ListVideo,
   Maximize,
   MessageSquare,
+  Minimize,
   Pause,
+  PictureInPicture2,
   Play,
   Send,
   Settings2,
+  SkipForward,
+  Subtitles,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Socket, io } from 'socket.io-client';
 
 interface SegmentResponse {
@@ -40,9 +48,36 @@ const defaultOptions: DanmakuOptions = {
   blockedUsers: [],
 };
 
+const COLORS = [
+  '#ffffff',
+  '#fe0302',
+  '#ff7204',
+  '#ffaa02',
+  '#ffd302',
+  '#ffff00',
+  '#a0ee00',
+  '#00cd00',
+  '#019899',
+  '#4266be',
+  '#89d5ff',
+  '#cc0273',
+  '#222222',
+];
+
 function timeLabel(seconds: number): string {
   const safe = Math.max(0, Math.floor(seconds));
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function readBlockedUsers(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem('uiliuili:danmaku-blocked-users') ?? '[]');
+    return Array.isArray(raw)
+      ? raw.filter((value): value is string => typeof value === 'string')
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function DanmakuPlayer({ video }: { video: VideoDetail }) {
@@ -56,10 +91,25 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   const socketRef = useRef<Socket | null>(null);
   const rafRef = useRef<number | null>(null);
   const loadedSegments = useRef(new Set<number>());
-  const seenIds = useRef(new Set<string>());
   const lastSaved = useRef(0);
-  const viewed = useRef(false);
+  const viewed = useRef(new Set<string>());
+  const autoPlayNext = useRef(false);
 
+  const playableParts = useMemo(
+    () => video.parts.filter((part) => Boolean(part.playlistUrl)),
+    [video.parts],
+  );
+  const initialPart = useMemo(() => {
+    if (video.progressPartId) {
+      const found = video.parts.find((part) => part.id === video.progressPartId);
+      if (found) return found;
+    }
+    return playableParts[0] ?? null;
+  }, [video.parts, video.progressPartId, playableParts]);
+
+  const [activePartId, setActivePartId] = useState<string | null>(initialPart?.id ?? null);
+  const [items, setItems] = useState<DanmakuItem[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.durationSeconds);
@@ -68,32 +118,37 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   const [speed, setSpeed] = useState(1);
   const [levels, setLevels] = useState<Array<{ index: number; height: number }>>([]);
   const [quality, setQuality] = useState(-1);
+  const [audioTracks, setAudioTracks] = useState<Array<{ id: number; name: string }>>([]);
+  const [audioTrack, setAudioTrack] = useState(0);
   const [danmakuOn, setDanmakuOn] = useState(video.status !== 'failed');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const [options, setOptions] = useState<DanmakuOptions>(defaultOptions);
   const [viewers, setViewers] = useState(0);
   const [message, setMessage] = useState('');
   const [sendText, setSendText] = useState('');
+  const [sendMode, setSendMode] = useState<'scroll' | 'top' | 'bottom'>('scroll');
+  const [sendColor, setSendColor] = useState('#ffffff');
+  const [sendPool, setSendPool] = useState<'normal' | 'subtitle' | 'special'>('normal');
   const [sending, setSending] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [webFullscreen, setWebFullscreen] = useState(false);
+  const [subtitlesOn, setSubtitlesOn] = useState(true);
+  const [autoplay, setAutoplay] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSegment = async (segment: number) => {
-    if (loadedSegments.current.has(segment)) return;
-    loadedSegments.current.add(segment);
-    try {
-      const data = await api.get<SegmentResponse>(
-        `/api/v1/videos/${video.id}/danmaku?segment=${segment}`,
-      );
-      for (const item of data.items) {
-        if (seenIds.current.has(item.id)) continue;
-        seenIds.current.add(item.id);
-        engineRef.current?.add(item);
-      }
-    } catch {
-      loadedSegments.current.delete(segment);
-    }
-  };
+  const activePart = useMemo(
+    () => video.parts.find((part) => part.id === activePartId) ?? initialPart,
+    [video.parts, activePartId, initialPart],
+  );
+  const activeIndex = video.parts.findIndex((part) => part.id === activePart?.id);
+  const nextPart = activeIndex >= 0 ? video.parts[activeIndex + 1] : undefined;
+  const source = activePart?.playlistUrl ?? video.playlistUrl;
+
+  useEffect(() => {
+    setBlockedUsers(readBlockedUsers());
+    setAutoplay(localStorage.getItem('uiliuili:autoplay') !== 'false');
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -105,22 +160,49 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       } catch {}
     }
     setOptions(initial);
-    const engine = new DanmakuEngine(canvasRef.current, {
-      ...initial,
-      opacity: initial.opacity,
-    });
-    engineRef.current = engine;
-    if (!danmakuOn) engine.setOptions({ opacity: 0 });
+    engineRef.current = new DanmakuEngine(canvasRef.current, initial);
     return () => {
-      engine.destroy();
+      engineRef.current?.destroy();
       engineRef.current = null;
     };
   }, []);
 
+  // Push the filtered list into the engine. Blocking a user removes their past danmaku too.
+  useEffect(() => {
+    const filtered = items.filter((item) => !blockedUsers.includes(item.userHash));
+    engineRef.current?.setItems(filtered);
+    engineRef.current?.setTime((videoRef.current?.currentTime ?? 0) * 1000);
+  }, [items, blockedUsers]);
+
+  useEffect(() => {
+    engineRef.current?.setOptions({ ...options, opacity: danmakuOn ? options.opacity : 0 });
+    localStorage.setItem('uiliuili:danmaku-options', JSON.stringify(options));
+  }, [options, danmakuOn]);
+
+  const loadSegment = async (partKey: string | null, segment: number) => {
+    if (loadedSegments.current.has(segment)) return;
+    loadedSegments.current.add(segment);
+    try {
+      const query = new URLSearchParams({ segment: String(segment) });
+      if (partKey) query.set('partId', partKey);
+      const data = await api.get<SegmentResponse>(
+        `/api/v1/videos/${video.id}/danmaku?${query.toString()}`,
+      );
+      setItems((current) => {
+        const seen = new Set(current.map((item) => item.id));
+        return [...current, ...data.items.filter((item) => !seen.has(item.id))];
+      });
+    } catch {
+      loadedSegments.current.delete(segment);
+    }
+  };
+
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (!videoEl || !video.playlistUrl) return;
-    const source = video.playlistUrl;
+    if (!videoEl || !source) return;
+    setError(null);
+    setLevels([]);
+    setAudioTracks([]);
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -133,6 +215,20 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       hls.attachMedia(videoEl);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLevels(hls.levels.map((level, index) => ({ index, height: level.height })));
+        setAudioTracks(
+          hls.audioTracks.map((track, index) => ({
+            id: index,
+            name: track.name || track.lang || `音轨 ${index + 1}`,
+          })),
+        );
+      });
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+        setAudioTracks(
+          hls.audioTracks.map((track, index) => ({
+            id: index,
+            name: track.name || track.lang || `音轨 ${index + 1}`,
+          })),
+        );
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) setError(t('视频加载失败，请稍后重试'));
@@ -144,7 +240,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
     }
     videoEl.src = source;
     return undefined;
-  }, [video.playlistUrl]);
+  }, [source]);
 
   useEffect(() => {
     const socket = io(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/danmaku`, {
@@ -153,14 +249,18 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
-    socket.emit('join', { videoId: video.id });
-    socket.on('danmaku', (event: { videoId: string; item: DanmakuItem }) => {
-      if (event.videoId !== video.id) return;
-      if (seenIds.current.has(event.item.id)) return;
-      seenIds.current.add(event.item.id);
-      engineRef.current?.add(event.item);
-    });
-    socket.on('viewers', (data: { videoId: string; count: number }) => {
+    socket.emit('join', { videoId: video.id, partId: activePartId });
+    socket.on(
+      'danmaku',
+      (event: { videoId: string; partId?: string | null; item: DanmakuItem }) => {
+        if (event.videoId !== video.id) return;
+        if ((event.partId ?? null) !== (activePartId ?? null)) return;
+        setItems((current) =>
+          current.some((item) => item.id === event.item.id) ? current : [...current, event.item],
+        );
+      },
+    );
+    socket.on('viewers', (data: { videoId: string; partId?: string | null; count: number }) => {
       if (data.videoId === video.id) setViewers(data.count);
     });
     socket.on('blocked', (data: { message?: string }) => {
@@ -171,7 +271,27 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [video.id]);
+  }, [video.id, activePartId]);
+
+  // Reset part-scoped state when the active part changes.
+  useEffect(() => {
+    loadedSegments.current = new Set();
+    setItems([]);
+    engineRef.current?.clear();
+    if (activePartId) {
+      void api
+        .get<{ items: DanmakuItem[] }>(
+          `/api/v1/videos/${video.id}/danmaku/list?partId=${encodeURIComponent(activePartId)}`,
+        )
+        .then((data) => setItems(data.items))
+        .catch(() => undefined);
+    } else {
+      void api
+        .get<{ items: DanmakuItem[] }>(`/api/v1/videos/${video.id}/danmaku/list`)
+        .then((data) => setItems(data.items))
+        .catch(() => undefined);
+    }
+  }, [activePartId, video.id]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -184,13 +304,20 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       ) {
         el.currentTime = video.progressMs / 1000;
       }
+      if (autoPlayNext.current) {
+        autoPlayNext.current = false;
+        void el.play().catch(() => undefined);
+      }
+      Array.from(el.textTracks).forEach((track) => {
+        track.mode = subtitlesOn ? 'showing' : 'hidden';
+      });
     };
     const onTime = () => {
       const time = el.currentTime;
       setCurrentTime(time);
       const segment = Math.floor((time * 1000) / (6 * 60 * 1000));
-      void loadSegment(segment);
-      void loadSegment(segment + 1);
+      void loadSegment(activePartId, segment);
+      void loadSegment(activePartId, segment + 1);
       if (Date.now() - lastSaved.current > 10_000) {
         lastSaved.current = Date.now();
         void api
@@ -198,15 +325,17 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
             positionMs: Math.floor(time * 1000),
             durationMs: Math.floor((el.duration || 0) * 1000),
             completed: false,
+            ...(activePartId ? { partId: activePartId } : {}),
           })
           .catch(() => undefined);
       }
     };
     const onPlay = () => {
       setPlaying(true);
-      if (!viewed.current) {
-        viewed.current = true;
-        void api.get(`/api/v1/videos/${video.id}/playlist`).catch(() => undefined);
+      if (!viewed.current.has(activePartId ?? 'legacy')) {
+        viewed.current.add(activePartId ?? 'legacy');
+        const query = activePartId ? `?partId=${encodeURIComponent(activePartId)}` : '';
+        void api.get(`/api/v1/videos/${video.id}/playlist${query}`).catch(() => undefined);
       }
       const tick = () => {
         if (videoRef.current) {
@@ -225,7 +354,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
     const onSeeked = () => {
       engineRef.current?.setTime(el.currentTime * 1000);
       const segment = Math.floor((el.currentTime * 1000) / (6 * 60 * 1000));
-      void loadSegment(segment);
+      void loadSegment(activePartId, segment);
     };
     const onEnded = () => {
       void api
@@ -233,8 +362,10 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
           positionMs: Math.floor(el.duration * 1000),
           durationMs: Math.floor(el.duration * 1000),
           completed: true,
+          ...(activePartId ? { partId: activePartId } : {}),
         })
         .catch(() => undefined);
+      if (autoplay && nextPart?.playlistUrl) switchPart(nextPart.id);
     };
     el.addEventListener('loadedmetadata', onLoaded);
     el.addEventListener('timeupdate', onTime);
@@ -251,12 +382,15 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       el.removeEventListener('ended', onEnded);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [video.id, video.progressMs, video.durationSeconds]);
-
-  useEffect(() => {
-    engineRef.current?.setOptions({ ...options, opacity: danmakuOn ? options.opacity : 0 });
-    localStorage.setItem('uiliuili:danmaku-options', JSON.stringify(options));
-  }, [options, danmakuOn]);
+  }, [
+    video.id,
+    video.progressMs,
+    video.durationSeconds,
+    activePartId,
+    autoplay,
+    nextPart,
+    subtitlesOn,
+  ]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -267,6 +401,14 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   }, [volume, muted, speed]);
 
   useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    Array.from(el.textTracks).forEach((track) => {
+      track.mode = subtitlesOn ? 'showing' : 'hidden';
+    });
+  }, [subtitlesOn, source]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
         return;
@@ -275,11 +417,18 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         void togglePlay();
       }
       if (event.key.toLowerCase() === 'f') void toggleFullscreen();
+      if (event.key.toLowerCase() === 'w') setWebFullscreen((value) => !value);
       if (event.key.toLowerCase() === 'd') setDanmakuOn((value) => !value);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const switchPart = (partId: string | null) => {
+    if (partId === activePartId) return;
+    autoPlayNext.current = true;
+    setActivePartId(partId);
+  };
 
   const togglePlay = async () => {
     const el = videoRef.current;
@@ -295,6 +444,37 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
     else await container.requestFullscreen().catch(() => undefined);
   };
 
+  const togglePictureInPicture = async () => {
+    const el = videoRef.current;
+    if (!el) return;
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await el.requestPictureInPicture();
+    } catch {
+      setMessage(t('当前浏览器不支持画中画'));
+    }
+  };
+
+  const blockUser = (userHash: string) => {
+    const next = [...new Set([...blockedUsers, userHash])];
+    setBlockedUsers(next);
+    localStorage.setItem('uiliuili:danmaku-blocked-users', JSON.stringify(next));
+    setMessage(t('已屏蔽该用户的弹幕'));
+  };
+
+  const reportDanmaku = async (item: DanmakuItem) => {
+    try {
+      await api.post(`/api/v1/videos/${video.id}/report`, {
+        targetType: 'danmaku',
+        targetId: item.id,
+        reason: 'other',
+      });
+      setMessage(t('举报已提交，我们会尽快处理'));
+    } catch (reportError) {
+      setMessage(reportError instanceof Error ? reportError.message : t('操作失败'));
+    }
+  };
+
   const sendDanmaku = async () => {
     const text = sendText.trim();
     if (!text) return;
@@ -304,10 +484,12 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       const payload = {
         videoId: video.id,
         progressMs: Math.floor((videoRef.current?.currentTime ?? 0) * 1000),
-        mode: 'scroll',
-        color: '#ffffff',
+        mode: sendMode,
+        pool: sendPool,
+        color: sendColor,
         fontSize: options.fontSize,
         content: text,
+        ...(activePartId ? { partId: activePartId } : {}),
       };
       const socket = socketRef.current;
       if (socket?.connected) {
@@ -329,10 +511,11 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
           `/api/v1/videos/${video.id}/danmaku`,
           payload,
         );
-        if (!seenIds.current.has(response.item.id)) {
-          seenIds.current.add(response.item.id);
-          engineRef.current?.add(response.item);
-        }
+        setItems((current) =>
+          current.some((item) => item.id === response.item.id)
+            ? current
+            : [...current, response.item],
+        );
       }
       setSendText('');
       setMessage(t('弹幕已发送'));
@@ -344,8 +527,9 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   };
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const visibleItems = items.filter((item) => !blockedUsers.includes(item.userHash));
 
-  if (!video.playlistUrl) {
+  if (!source) {
     return (
       <div className="relative overflow-hidden rounded-xl2 bg-black">
         <div className="aspect-video">
@@ -371,16 +555,20 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
     <div>
       <div
         ref={containerRef}
-        className="player-shell group relative overflow-hidden rounded-xl2 bg-black"
+        className={cn(
+          'player-shell group relative overflow-hidden bg-black',
+          webFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'rounded-xl2',
+        )}
         onMouseEnter={() => setShowControls(true)}
         onMouseLeave={() => playing && setShowControls(false)}
       >
         <video
           ref={videoRef}
-          className="aspect-video w-full bg-black"
+          className={cn('w-full bg-black', webFullscreen ? 'h-full' : 'aspect-video')}
           playsInline
           poster={video.coverUrl ?? undefined}
           onClick={() => void togglePlay()}
+          onDoubleClick={() => void toggleFullscreen()}
         >
           {video.subtitles.map((subtitle) => (
             <track
@@ -473,6 +661,14 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
               </button>
               <button
                 type="button"
+                onClick={() => setListOpen((value) => !value)}
+                className={cn('rounded p-1 hover:bg-white/15', listOpen && 'text-brand')}
+                title={t('弹幕列表')}
+              >
+                <ListVideo className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setSettingsOpen((value) => !value)}
                 className="rounded p-1 hover:bg-white/15"
                 title={t('弹幕设置')}
@@ -495,6 +691,24 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                   </option>
                 ))}
               </select>
+              {audioTracks.length > 1 && (
+                <select
+                  value={audioTrack}
+                  onChange={(event) => {
+                    const index = Number(event.target.value);
+                    setAudioTrack(index);
+                    if (hlsRef.current) hlsRef.current.audioTrack = index;
+                  }}
+                  className="rounded bg-black/40 px-1.5 py-1 text-xs text-white outline-none"
+                  title={t('音轨')}
+                >
+                  {audioTracks.map((track) => (
+                    <option key={track.id} value={track.id}>
+                      {track.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select
                 value={speed}
                 onChange={(event) => setSpeed(Number(event.target.value))}
@@ -508,18 +722,123 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
               </select>
               <button
                 type="button"
+                onClick={() => setSubtitlesOn((value) => !value)}
+                className={cn(
+                  'rounded p-1 hover:bg-white/15',
+                  subtitlesOn ? 'text-brand' : 'text-white/60',
+                )}
+                title={t('字幕')}
+              >
+                <Subtitles className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void togglePictureInPicture()}
+                className="rounded p-1 hover:bg-white/15"
+                title={t('画中画')}
+              >
+                <PictureInPicture2 className="h-4 w-4" />
+              </button>
+              {nextPart?.playlistUrl && (
+                <button
+                  type="button"
+                  onClick={() => switchPart(nextPart.id)}
+                  className="rounded p-1 hover:bg-white/15"
+                  title={t('下一P')}
+                >
+                  <SkipForward className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setWebFullscreen((value) => !value)}
+                className={cn('rounded p-1 hover:bg-white/15', webFullscreen && 'text-brand')}
+                title={t('网页全屏')}
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => void toggleFullscreen()}
                 className="rounded p-1 hover:bg-white/15"
                 title={t('全屏')}
               >
-                <Maximize className="h-4 w-4" />
+                {webFullscreen ? (
+                  <Minimize className="h-4 w-4" />
+                ) : (
+                  <Maximize className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>
         </div>
 
+        {webFullscreen && (
+          <button
+            type="button"
+            onClick={() => setWebFullscreen(false)}
+            className="absolute right-3 top-3 rounded-full bg-black/55 p-2 text-white hover:bg-black/75"
+            title={t('退出网页全屏')}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+
+        {listOpen && (
+          <div className="absolute bottom-20 right-3 top-3 w-72 overflow-hidden rounded-xl bg-black/85 text-xs text-white shadow-float backdrop-blur">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+              <span className="font-semibold">
+                {t('弹幕列表')}（{visibleItems.length}）
+              </span>
+              <button type="button" onClick={() => setListOpen(false)} className="text-white/60">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="scrollbar-thin max-h-[calc(100%-40px)] overflow-y-auto p-1">
+              {visibleItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="group flex items-start gap-2 rounded px-2 py-1.5 hover:bg-white/10"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = videoRef.current;
+                      if (el) el.currentTime = item.progressMs / 1000;
+                    }}
+                    className="shrink-0 tabular-nums text-white/55"
+                  >
+                    {timeLabel(item.progressMs / 1000)}
+                  </button>
+                  <span className="min-w-0 flex-1 break-words" style={{ color: item.color }}>
+                    {item.content}
+                  </span>
+                  <span className="hidden shrink-0 gap-1 group-hover:flex">
+                    <button
+                      type="button"
+                      onClick={() => blockUser(item.userHash)}
+                      className="text-white/55 hover:text-white"
+                      title={t('屏蔽该用户')}
+                    >
+                      <Minimize className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void reportDanmaku(item)}
+                      className="text-white/55 hover:text-white"
+                      title={t('举报')}
+                    >
+                      <Flag className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {settingsOpen && (
-          <div className="absolute right-3 top-3 w-72 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
+          <div className="absolute right-3 top-3 w-80 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-semibold">{t('弹幕设置')}</span>
               <button
@@ -530,6 +849,42 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 {t('关闭')}{' '}
               </button>
             </div>
+            <div className="mb-3 grid grid-cols-3 gap-1">
+              {(['scroll', 'top', 'bottom'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    setOptions((current) => ({
+                      ...current,
+                      scrollEnabled:
+                        mode === 'scroll' ? !current.scrollEnabled : current.scrollEnabled,
+                    }))
+                  }
+                  className={cn(
+                    'rounded border border-white/15 px-2 py-1',
+                    options.scrollEnabled === (mode === 'scroll') ? 'bg-white/20' : '',
+                  )}
+                >
+                  {t(mode === 'scroll' ? '滚动' : mode === 'top' ? '顶部' : '底部')}
+                </button>
+              ))}
+            </div>
+            <label className="mb-3 flex items-center justify-between">
+              <span>{t('自动连播')}</span>
+              <input
+                type="checkbox"
+                checked={autoplay}
+                onChange={(event) => {
+                  setAutoplay(event.target.checked);
+                  localStorage.setItem(
+                    'uiliuili:autoplay',
+                    event.target.checked ? 'true' : 'false',
+                  );
+                }}
+                className="accent-[#fb7299]"
+              />
+            </label>
             <label className="mb-3 block">
               <span className="mb-1 flex justify-between">
                 <span>{t('不透明度')}</span>
@@ -617,30 +972,102 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
                 className="w-full rounded border border-white/20 bg-white/10 px-2 py-1 text-white outline-none"
               />
             </label>
+            {blockedUsers.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBlockedUsers([]);
+                  localStorage.removeItem('uiliuili:danmaku-blocked-users');
+                }}
+                className="mt-3 text-white/60 hover:text-white"
+              >
+                {t('清除已屏蔽用户')}（{blockedUsers.length}）
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-xl2 border border-line bg-white p-2">
-        <input
-          value={sendText}
-          onChange={(event) => setSendText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') void sendDanmaku();
-          }}
-          maxLength={100}
-          placeholder={t('发个弹幕见证当下')}
-          className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => void sendDanmaku()}
-          disabled={sending || !sendText.trim()}
-          className="btn-primary h-9 rounded-full px-4"
-        >
-          <Send className="h-4 w-4" />
-          {t('发送')}{' '}
-        </button>
+      {video.parts.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {video.parts.map((part, index) => (
+            <button
+              key={part.id ?? `legacy-${index}`}
+              type="button"
+              disabled={!part.playlistUrl}
+              onClick={() => switchPart(part.id)}
+              className={cn(
+                'chip',
+                part.id === activePart?.id &&
+                  'chip-active border-brand bg-brand-light text-brand-dark',
+                !part.playlistUrl && 'opacity-50',
+              )}
+            >
+              P{index + 1} {part.title}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 rounded-xl2 border border-line bg-white p-2">
+        <div className="flex flex-wrap items-center gap-2 px-2 pb-2 text-xs text-muted">
+          <select
+            value={sendMode}
+            onChange={(event) => setSendMode(event.target.value as typeof sendMode)}
+            className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
+            title={t('弹幕类型')}
+          >
+            <option value="scroll">{t('滚动')}</option>
+            <option value="top">{t('顶部')}</option>
+            <option value="bottom">{t('底部')}</option>
+          </select>
+          <select
+            value={sendPool}
+            onChange={(event) => setSendPool(event.target.value as typeof sendPool)}
+            className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
+            title={t('弹幕池')}
+          >
+            <option value="normal">{t('普通弹幕')}</option>
+            <option value="subtitle">{t('字幕弹幕')}</option>
+            <option value="special">{t('特殊弹幕')}</option>
+          </select>
+          <div className="flex items-center gap-1">
+            {COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setSendColor(color)}
+                className={cn(
+                  'h-4 w-4 rounded-full border',
+                  sendColor === color ? 'border-brand ring-2 ring-brand/30' : 'border-line',
+                )}
+                style={{ backgroundColor: color }}
+                aria-label={color}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={sendText}
+            onChange={(event) => setSendText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void sendDanmaku();
+            }}
+            maxLength={100}
+            placeholder={t('发个弹幕见证当下')}
+            className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => void sendDanmaku()}
+            disabled={sending || !sendText.trim()}
+            className="btn-primary h-9 rounded-full px-4"
+          >
+            <Send className="h-4 w-4" />
+            {t('发送')}{' '}
+          </button>
+        </div>
       </div>
       {(message || error) && (
         <p className={cn('mt-2 text-xs', error ? 'text-red-500' : 'text-muted')}>

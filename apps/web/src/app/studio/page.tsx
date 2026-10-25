@@ -1,5 +1,6 @@
 'use client';
 import { useLocale, useT } from '@/components/I18nProvider';
+import { StudioManage } from '@/components/StudioManage';
 
 import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -479,6 +480,16 @@ export default function StudioPage() {
                   {t('新建稿件')}{' '}
                 </button>
               </div>
+              <StudioManage
+                video={current}
+                onRefresh={async () => {
+                  await loadVideos();
+                  const refreshed = await api
+                    .get<StudioVideo>(`/api/v1/studio/videos/${current.id}`)
+                    .catch(() => null);
+                  if (refreshed) setCurrent(refreshed);
+                }}
+              />
             </div>
           )}
         </section>

@@ -4,8 +4,9 @@ import { useLocale, useT } from '@/components/I18nProvider';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import type { AuthUser } from '@uiliuili/shared';
-import { Monitor, Shield, User } from 'lucide-react';
+import type { FollowGroup, FollowGroupsResponse } from '@/lib/types';
+import type { AuthUser, PublicUser } from '@uiliuili/shared';
+import { BellRing, Monitor, Shield, ShieldOff, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -22,12 +23,18 @@ export default function SettingsPage() {
   const locale = useLocale();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [tab, setTab] = useState<'profile' | 'security' | 'sessions'>('profile');
+  const [tab, setTab] = useState<
+    'profile' | 'security' | 'sessions' | 'groups' | 'blocked' | 'notifications'
+  >('profile');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [groups, setGroups] = useState<FollowGroupsResponse | null>(null);
+  const [groupName, setGroupName] = useState('');
+  const [blocked, setBlocked] = useState<PublicUser[]>([]);
+  const [notificationState, setNotificationState] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,6 +55,93 @@ export default function SettingsPage() {
       )
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (tab === 'groups') {
+      void api
+        .get<FollowGroupsResponse>('/api/v1/me/follow-groups')
+        .then(setGroups)
+        .catch((error) => setError(error instanceof Error ? error.message : t('加载失败')));
+    }
+    if (tab === 'blocked') {
+      void api
+        .get<{ items: PublicUser[] }>('/api/v1/me/blocked')
+        .then((data) => setBlocked(data.items))
+        .catch((error) => setError(error instanceof Error ? error.message : t('加载失败')));
+    }
+  }, [tab]);
+
+  const createGroup = async () => {
+    if (!groupName.trim()) return;
+    try {
+      await api.post('/api/v1/me/follow-groups', { name: groupName.trim() });
+      setGroupName('');
+      setGroups(await api.get<FollowGroupsResponse>('/api/v1/me/follow-groups'));
+      setMessage(t('分组已创建'));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : t('保存失败'));
+    }
+  };
+
+  const removeGroup = async (group: FollowGroup) => {
+    if (!window.confirm(t('确定删除分组「{0}」吗？', { 0: group.name }))) return;
+    await api.delete(`/api/v1/me/follow-groups/${group.id}`).catch(() => undefined);
+    setGroups(await api.get<FollowGroupsResponse>('/api/v1/me/follow-groups'));
+  };
+
+  const assignGroup = async (userId: string, groupId: string) => {
+    try {
+      await api.post(`/api/v1/me/following/${userId}/group`, {
+        groupId: groupId || null,
+      });
+      setGroups(await api.get<FollowGroupsResponse>('/api/v1/me/follow-groups'));
+      setMessage(t('分组已更新'));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : t('保存失败'));
+    }
+  };
+
+  const unblock = async (userId: string) => {
+    await api.delete(`/api/v1/me/blocks/${userId}`).catch(() => undefined);
+    setBlocked((current) => current.filter((item) => item.id !== userId));
+  };
+
+  const enableNotifications = async () => {
+    setNotificationState('');
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setNotificationState(t('当前浏览器不支持通知'));
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setNotificationState(t('通知权限未开启'));
+        return;
+      }
+      await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.ready;
+      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (key) {
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        });
+        const json = subscription.toJSON() as {
+          endpoint?: string;
+          keys?: { p256dh?: string; auth?: string };
+        };
+        if (json.endpoint && json.keys?.p256dh && json.keys.auth) {
+          await api.post('/api/v1/me/push-subscriptions', {
+            endpoint: json.endpoint,
+            keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+          });
+        }
+      }
+      setNotificationState(t('通知已开启'));
+    } catch (error) {
+      setNotificationState(error instanceof Error ? error.message : t('操作失败'));
+    }
+  };
 
   const saveProfile = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -120,6 +214,9 @@ export default function SettingsPage() {
             { key: 'profile', label: t('个人资料'), icon: User },
             { key: 'security', label: t('账号安全'), icon: Shield },
             { key: 'sessions', label: t('登录设备'), icon: Monitor },
+            { key: 'groups', label: t('关注分组'), icon: Users },
+            { key: 'blocked', label: t('黑名单'), icon: ShieldOff },
+            { key: 'notifications', label: t('通知'), icon: BellRing },
           ].map((item) => (
             <button
               key={item.key}
@@ -277,8 +374,158 @@ export default function SettingsPage() {
               {sessions.length === 0 && <p className="text-sm text-muted">{t('暂无登录设备')}</p>}
             </div>
           )}
+
+          {tab === 'groups' && (
+            <div className="max-w-2xl space-y-5">
+              <div className="flex gap-2">
+                <input
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  maxLength={20}
+                  placeholder={t('分组名称')}
+                  className="input max-w-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => void createGroup()}
+                  disabled={!groupName.trim()}
+                  className="btn-primary shrink-0"
+                >
+                  {t('新建分组')}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {groups?.groups.map((group) => (
+                  <span key={group.id} className="chip">
+                    {group.name}
+                    <span className="ml-1 opacity-70">{group.count}</span>
+                    <button
+                      type="button"
+                      onClick={() => void removeGroup(group)}
+                      className="ml-1 text-muted hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {groups && groups.groups.length === 0 && (
+                  <p className="text-sm text-muted">{t('还没有关注分组')}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                {groups?.items.map((item) => (
+                  <div
+                    key={item.user.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"
+                  >
+                    <Link
+                      href={`/space/${item.user.username}`}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-brand-light text-xs font-semibold text-brand-dark">
+                        {item.user.avatarUrl ? (
+                          <img
+                            src={item.user.avatarUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          item.user.displayName.slice(0, 1).toUpperCase()
+                        )}
+                      </span>
+                      {item.user.displayName}
+                    </Link>
+                    <select
+                      value={item.groupId ?? ''}
+                      onChange={(event) => void assignGroup(item.user.id, event.target.value)}
+                      className="input h-9 w-44"
+                    >
+                      <option value="">{t('默认分组')}</option>
+                      {groups.groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {groups && groups.items.length === 0 && (
+                  <p className="text-sm text-muted">{t('还没有关注任何人')}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'blocked' && (
+            <div className="max-w-2xl space-y-2">
+              {blocked.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-line p-3"
+                >
+                  <Link
+                    href={`/space/${item.username}`}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-brand-light text-xs font-semibold text-brand-dark">
+                      {item.avatarUrl ? (
+                        <img src={item.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        item.displayName.slice(0, 1).toUpperCase()
+                      )}
+                    </span>
+                    {item.displayName}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void unblock(item.id)}
+                    className="btn-ghost h-9 text-red-500 hover:border-red-200 hover:text-red-600"
+                  >
+                    {t('解除屏蔽')}
+                  </button>
+                </div>
+              ))}
+              {blocked.length === 0 && <p className="text-sm text-muted">{t('黑名单是空的')}</p>}
+            </div>
+          )}
+
+          {tab === 'notifications' && (
+            <div className="max-w-xl space-y-4">
+              <div className="rounded-xl border border-line p-4">
+                <div className="text-sm font-medium">{t('浏览器通知')}</div>
+                <p className="mt-1 text-sm text-muted">
+                  {t('开启后可以在浏览器收到回复、关注和系统通知。')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void enableNotifications()}
+                  className="btn-primary mt-3"
+                >
+                  <BellRing className="h-4 w-4" />
+                  {t('开启通知')}
+                </button>
+                {notificationState && (
+                  <p className="mt-2 text-xs text-muted">{notificationState}</p>
+                )}
+              </div>
+              <div className="rounded-xl border border-line p-4 text-sm text-muted">
+                {t('推送订阅保存在服务端，未配置 VAPID 密钥时仅开启本地通知权限。')}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const output = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let index = 0; index < raw.length; index += 1) {
+    output[index] = raw.charCodeAt(index);
+  }
+  return output;
 }

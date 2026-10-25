@@ -1,19 +1,27 @@
 'use client';
 import { useLocale, useT } from './I18nProvider';
 
-import { api } from '@/lib/api';
+import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatCount, relativeTime } from '@/lib/format';
 import type { CommentItem } from '@uiliuili/shared';
-import { Heart, MessageCircle, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Heart, MessageCircle, Pin, Send, Smile, ThumbsUp } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface CommentResponse {
   items: CommentItem[];
   nextCursor: string | null;
 }
 
-export function CommentSection({ videoId }: { videoId: string }) {
+const EMOJIS = ['😀', '😂', '🥰', '😭', '🤔', '😅', '👍', '❤️', '🎉', '🔥', '🌟', '👀'];
+
+export function CommentSection({
+  videoId,
+  uploaderId,
+}: {
+  videoId: string;
+  uploaderId: string;
+}) {
   const t = useT();
   const locale = useLocale();
   const [items, setItems] = useState<CommentItem[]>([]);
@@ -25,6 +33,9 @@ export function CommentSection({ videoId }: { videoId: string }) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [posting, setPosting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = async (cursor?: string, append = false) => {
     setLoading(true);
@@ -44,6 +55,10 @@ export function CommentSection({ videoId }: { videoId: string }) {
   useEffect(() => {
     void load();
   }, [videoId, sort]);
+
+  useEffect(() => {
+    void getMe().then((user) => setIsOwner(Boolean(user && user.id === uploaderId)));
+  }, [uploaderId]);
 
   const submit = async (parentId?: string) => {
     const content = (parentId ? replyText : text).trim();
@@ -67,6 +82,12 @@ export function CommentSection({ videoId }: { videoId: string }) {
     } finally {
       setPosting(false);
     }
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setText((current) => `${current}${emoji}`);
+    setEmojiOpen(false);
+    textareaRef.current?.focus();
   };
 
   const toggleLike = async (comment: CommentItem, replyParentId?: string) => {
@@ -101,6 +122,63 @@ export function CommentSection({ videoId }: { videoId: string }) {
     }
   };
 
+  const togglePin = async (comment: CommentItem) => {
+    try {
+      const data = await api.post<{ pinned: boolean }>(
+        `/api/v1/videos/${videoId}/comments/${comment.id}/pin`,
+        { pinned: !comment.pinned },
+      );
+      setItems((current) =>
+        current.map((item) => {
+          if (item.id === comment.id) return { ...item, pinned: data.pinned };
+          if (data.pinned) return { ...item, pinned: false };
+          return item;
+        }),
+      );
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('操作失败'));
+    }
+  };
+
+  const toggleUpLike = async (comment: CommentItem) => {
+    try {
+      const data = comment.upLiked
+        ? await api.delete<{ upLiked: boolean }>(
+            `/api/v1/videos/${videoId}/comments/${comment.id}/up-like`,
+          )
+        : await api.post<{ upLiked: boolean }>(
+            `/api/v1/videos/${videoId}/comments/${comment.id}/up-like`,
+          );
+      setItems((current) =>
+        current.map((item) => (item.id === comment.id ? { ...item, upLiked: data.upLiked } : item)),
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('操作失败'));
+    }
+  };
+
+  const loadReplies = async (comment: CommentItem) => {
+    try {
+      const data = await api.get<CommentResponse>(
+        `/api/v1/videos/${videoId}/comments/${comment.id}/replies?limit=50`,
+      );
+      setItems((current) =>
+        current.map((item) =>
+          item.id === comment.id
+            ? {
+                ...item,
+                replies: data.items,
+                replyCount: Math.max(item.replyCount, data.items.length),
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('操作失败'));
+    }
+  };
+
   return (
     <section className="mt-8">
       <div className="mb-4 flex items-center justify-between">
@@ -125,6 +203,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
 
       <div className="card p-4">
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(event) => setText(event.target.value)}
           maxLength={1000}
@@ -133,7 +212,33 @@ export function CommentSection({ videoId }: { videoId: string }) {
           className="input resize-none"
         />
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-xs text-muted">{text.length}/1000</span>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setEmojiOpen((open) => !open)}
+                className="inline-flex items-center gap-1 text-xs text-muted hover:text-brand"
+              >
+                <Smile className="h-4 w-4" />
+                {t('表情')}
+              </button>
+              {emojiOpen && (
+                <div className="absolute bottom-8 left-0 z-20 grid w-48 grid-cols-6 gap-1 rounded-xl border border-line bg-white p-2 shadow-float">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => insertEmoji(emoji)}
+                      className="rounded p-1 text-lg hover:bg-canvas"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-xs text-muted">{text.length}/1000</span>
+          </div>
           <button
             type="button"
             onClick={() => void submit()}
@@ -158,11 +263,16 @@ export function CommentSection({ videoId }: { videoId: string }) {
           <CommentRow
             key={comment.id}
             comment={comment}
+            uploaderId={uploaderId}
+            isOwner={isOwner}
             onLike={() => void toggleLike(comment)}
             onReply={() => {
               setReplyTo(comment.id);
               setReplyText('');
             }}
+            onPin={() => void togglePin(comment)}
+            onUpLike={() => void toggleUpLike(comment)}
+            onLoadReplies={() => void loadReplies(comment)}
           >
             {replyTo === comment.id && (
               <div className="mt-3 flex gap-2">
@@ -191,14 +301,11 @@ export function CommentSection({ videoId }: { videoId: string }) {
                 key={reply.id}
                 comment={reply}
                 compact
+                uploaderId={uploaderId}
+                isOwner={false}
                 onLike={() => void toggleLike(reply, comment.id)}
               />
             ))}
-            {comment.replyCount > comment.replies.length && (
-              <p className="mt-2 text-xs text-muted">
-                {t('还有')} {comment.replyCount - comment.replies.length} {t('条回复')}{' '}
-              </p>
-            )}
           </CommentRow>
         ))}
         {nextCursor && (
@@ -218,18 +325,29 @@ export function CommentSection({ videoId }: { videoId: string }) {
 function CommentRow({
   comment,
   compact = false,
+  uploaderId,
+  isOwner,
   onLike,
   onReply,
+  onPin,
+  onUpLike,
+  onLoadReplies,
   children,
 }: {
   comment: CommentItem;
   compact?: boolean;
+  uploaderId: string;
+  isOwner: boolean;
   onLike: () => void;
   onReply?: () => void;
+  onPin?: () => void;
+  onUpLike?: () => void;
+  onLoadReplies?: () => void;
   children?: React.ReactNode;
 }) {
   const t = useT();
   const locale = useLocale();
+  const isUploader = comment.isUploader || comment.user.id === uploaderId;
   return (
     <div className={cn('flex gap-3', compact && 'mt-3 pl-10')}>
       <div
@@ -247,10 +365,27 @@ function CommentRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <span className="font-medium text-ink">{comment.user.displayName}</span>
+          {isUploader && (
+            <span className="rounded bg-brand px-1.5 py-0.5 text-[10px] font-medium text-white">
+              {t('UP 主')}
+            </span>
+          )}
+          {comment.pinned && (
+            <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+              <Pin className="h-2.5 w-2.5" />
+              {t('置顶')}
+            </span>
+          )}
           <span>{relativeTime(comment.createdAt, locale)}</span>
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.content}</p>
-        <div className="mt-1.5 flex items-center gap-4 text-xs text-muted">
+        {comment.upLiked && (
+          <p className="mt-1 inline-flex items-center gap-1 rounded bg-brand-light px-1.5 py-0.5 text-[11px] text-brand-dark">
+            <ThumbsUp className="h-3 w-3 fill-current" />
+            {t('UP 主觉得很赞')}
+          </p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs text-muted">
           <button
             type="button"
             onClick={onLike}
@@ -270,6 +405,37 @@ function CommentRow({
             >
               <MessageCircle className="h-3.5 w-3.5" />
               {t('回复')}{' '}
+            </button>
+          )}
+          {isOwner && !compact && onPin && (
+            <button
+              type="button"
+              onClick={onPin}
+              className={cn(
+                'inline-flex items-center gap-1 hover:text-brand',
+                comment.pinned && 'text-brand',
+              )}
+            >
+              <Pin className="h-3.5 w-3.5" />
+              {comment.pinned ? t('取消置顶') : t('置顶')}
+            </button>
+          )}
+          {isOwner && !compact && onUpLike && (
+            <button
+              type="button"
+              onClick={onUpLike}
+              className={cn(
+                'inline-flex items-center gap-1 hover:text-brand',
+                comment.upLiked && 'text-brand',
+              )}
+            >
+              <ThumbsUp className={cn('h-3.5 w-3.5', comment.upLiked && 'fill-current')} />
+              {t('UP 主点赞')}
+            </button>
+          )}
+          {!compact && comment.replyCount > comment.replies.length && onLoadReplies && (
+            <button type="button" onClick={onLoadReplies} className="text-brand hover:underline">
+              {t('查看全部 {0} 条回复', { 0: comment.replyCount })}
             </button>
           )}
         </div>

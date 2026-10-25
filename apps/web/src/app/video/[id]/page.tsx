@@ -1,3 +1,4 @@
+import { AddToCollection } from '@/components/AddToCollection';
 import { CommentSection } from '@/components/CommentSection';
 import { DanmakuPlayer } from '@/components/DanmakuPlayer';
 import { VideoActions } from '@/components/VideoActions';
@@ -6,7 +7,7 @@ import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
 import type { SpaceProfile } from '@/lib/types';
 import type { VideoCard, VideoDetail } from '@uiliuili/shared';
-import { Calendar, Eye, MessageSquare } from 'lucide-react';
+import { Calendar, Eye, Layers, MessageSquare } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -101,6 +102,9 @@ export default async function VideoPage({ params }: PageProps) {
           </div>
 
           <VideoActions video={video} />
+          <div className="mt-3">
+            <AddToCollection videoId={video.id} />
+          </div>
 
           <div className="mt-5 flex items-center justify-between gap-4 rounded-xl2 border border-line bg-white p-4">
             <Link
@@ -121,6 +125,9 @@ export default async function VideoPage({ params }: PageProps) {
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{video.uploader.displayName}</div>
                 <div className="truncate text-xs text-muted">
+                  <span className="mr-1 rounded bg-brand-light px-1 text-[10px] text-brand-dark">
+                    Lv.{video.uploader.level}
+                  </span>
                   @{video.uploader.username}
                   {profile ? ` · ${formatCount(profile.stats.followers, locale)} ${t('粉丝')}` : ''}
                 </div>
@@ -130,6 +137,25 @@ export default async function VideoPage({ params }: PageProps) {
               {t('进入空间')}
             </Link>
           </div>
+
+          {video.collections.length > 0 && (
+            <div className="mt-4 rounded-xl2 border border-line bg-white p-4">
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+                <Layers className="h-4 w-4 text-brand" />
+                {t('所属合集')}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {video.collections.map((collection) => (
+                  <Link key={collection.id} href={`/collection/${collection.id}`} className="chip">
+                    {collection.title}
+                    <span className="ml-1 text-[10px] text-muted">
+                      {collection.itemCount} {t('个视频')}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {video.description && (
             <div className="mt-4 rounded-xl2 border border-line bg-white p-4">
@@ -150,7 +176,7 @@ export default async function VideoPage({ params }: PageProps) {
             </div>
           )}
 
-          <CommentSection videoId={video.id} />
+          <CommentSection videoId={video.id} uploaderId={video.uploader.id} />
         </div>
 
         <aside className="min-w-0">

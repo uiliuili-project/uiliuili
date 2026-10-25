@@ -27,11 +27,14 @@ export interface SpaceProfile {
     coverUrl: string | null;
     bio: string;
     level: number;
+    experience?: number;
+    badges?: Array<{ code: string; label: string; description: string; awardedAt?: string }>;
     createdAt: string;
     roles: string[];
   };
   stats: { videos: number; followers: number; following: number };
   following: boolean;
+  blocked?: boolean;
   isSelf: boolean;
 }
 
@@ -62,6 +65,84 @@ export interface StudioVideo {
   createdAt: string;
   updatedAt: string;
   playlistUrl: string | null;
+}
+
+export interface FavoriteFolder {
+  id: string;
+  name: string;
+  description?: string;
+  isPublic?: boolean;
+  isDefault: boolean;
+  count: number;
+  createdAt: string;
+}
+
+export interface FavoritesResponse {
+  folders: FavoriteFolder[];
+  folderId: string | null;
+  items: VideoCard[];
+}
+
+export interface WatchLaterResponse {
+  items: VideoCard[];
+}
+
+export interface FollowGroup {
+  id: string;
+  name: string;
+  sort: number;
+  count: number;
+  createdAt: string;
+}
+
+export interface FollowGroupsResponse {
+  groups: FollowGroup[];
+  items: Array<{
+    user: {
+      id: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string | null;
+      level: number;
+    };
+    groupId: string | null;
+    followedAt: string;
+  }>;
+}
+
+export interface StudioPart {
+  id: string;
+  title: string;
+  sort: number;
+  status: string;
+  durationSeconds: number;
+  sourceFilename: string | null;
+  sourceSize: number;
+  playlistUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudioSubtitle {
+  language: string;
+  label: string;
+  createdAt: string;
+}
+
+export interface StudioStats {
+  totals: {
+    views: number;
+    likes: number;
+    coins: number;
+    favorites: number;
+    comments: number;
+    danmaku: number;
+  };
+  daily: Array<{ day: string; views: number }>;
+  totalTrackedViews: number;
+  completions: number;
+  completionRate: number;
+  rangeDays: number;
 }
 
 export interface NotificationItem {
