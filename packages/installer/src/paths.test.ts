@@ -5,13 +5,13 @@ import { resolveInstallerPaths, runtimeRoot } from './paths';
 const originalRoot = process.env.UILIUILI_ROOT;
 
 afterEach(() => {
-  if (originalRoot === undefined) delete process.env.UILIUILI_ROOT;
+  if (originalRoot === undefined) Reflect.deleteProperty(process.env, 'UILIUILI_ROOT');
   else process.env.UILIUILI_ROOT = originalRoot;
 });
 
 describe('runtimeRoot', () => {
   it('falls back to the process working directory', () => {
-    delete process.env.UILIUILI_ROOT;
+    Reflect.deleteProperty(process.env, 'UILIUILI_ROOT');
     expect(runtimeRoot()).toBe(path.resolve(process.cwd()));
   });
 

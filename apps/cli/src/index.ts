@@ -12,6 +12,7 @@ import {
 } from '@uiliuili/db';
 import {
   type InstallProgress,
+  buildInstallConfigFromEnv,
   checkEnvironment,
   instanceExists,
   readInstance,
@@ -20,7 +21,7 @@ import {
   runInstall,
   runtimeRoot,
 } from '@uiliuili/installer';
-import { APP_VERSION, installConfigSchema } from '@uiliuili/shared';
+import { APP_VERSION, type InstallConfig, installConfigSchema } from '@uiliuili/shared';
 import argon2 from 'argon2';
 import { Command } from 'commander';
 import { eq, sql } from 'drizzle-orm';
@@ -44,46 +45,104 @@ function logProgress(progress: InstallProgress): void {
   console.log(`${bar} ${String(progress.percent).padStart(3)}%  ${progress.message}`);
 }
 
+function readInstallConfigFile(file: string): InstallConfig {
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+  const parsed = installConfigSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error('安装配置校验失败：');
+    console.error(JSON.stringify(parsed.error.flatten(), null, 2));
+    process.exit(1);
+  }
+  return parsed.data;
+}
+
+async function stampInstanceVersion(url: string): Promise<void> {
+  const { client, db } = createDb(url, { max: 1 });
+  try {
+    await db.execute(
+      sql`UPDATE "uiliuili"."app_instance" SET version = ${APP_VERSION}, updated_at = now()`,
+    );
+  } finally {
+    await client.end({ timeout: 5 });
+  }
+}
+
+async function migrateToLatest(): Promise<string[]> {
+  const url = requireDatabaseUrl();
+  const applied = await runMigrations(url);
+  await stampInstanceVersion(url);
+  return applied;
+}
+
+async function runInstallCommand(config: InstallConfig): Promise<void> {
+  const root = runtimeRoot();
+  if (instanceExists(root)) {
+    console.error('uiliuili 已经安装。如需重装请先执行 reset --force。');
+    process.exit(1);
+  }
+  try {
+    const result = await runInstall(config, {
+      root,
+      production: process.env.NODE_ENV === 'production' || config.site.url.startsWith('https://'),
+      onProgress: logProgress,
+    });
+    console.log('');
+    console.log('安装完成。');
+    console.log(`实例 ID：${result.instance.instanceId}`);
+    console.log(`管理员：${config.admin.username} <${config.admin.email}>`);
+    if (result.warnings.length) {
+      console.log('警告：');
+      for (const warning of result.warnings) console.log(`  - ${warning}`);
+    }
+    console.log('请启动 API、Worker、Web 与 Admin 进程。');
+  } catch (error) {
+    console.error('安装失败：', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
+
 program.name('uiliuili').description('uiliuili 安装与运维命令行工具').version(APP_VERSION);
 
 program
   .command('install')
-  .description('使用 JSON 配置文件执行无人值守安装')
-  .requiredOption('-c, --config <path>', '安装配置文件路径')
+  .description('执行无人值守安装（JSON 配置或环境变量）')
+  .option('-c, --config <path>', '安装配置文件路径')
+  .option('--from-env', '从环境变量读取安装配置（容器与自动化部署）')
   .option('--no-restart', '不做任何服务重启提示（CLI 默认为此行为）')
-  .action(async (options: { config: string }) => {
+  .action(async (options: { config?: string; fromEnv?: boolean }) => {
+    if (options.fromEnv && options.config) {
+      console.error('--config 与 --from-env 不能同时使用。');
+      process.exit(1);
+    }
+    if (options.fromEnv) {
+      await runInstallCommand(buildInstallConfigFromEnv());
+      return;
+    }
+    if (!options.config) {
+      console.error('请提供 -c/--config <path> 或 --from-env。');
+      process.exit(1);
+    }
+    await runInstallCommand(readInstallConfigFile(options.config));
+  });
+
+program
+  .command('bootstrap')
+  .description('容器引导：未安装时按环境变量安装，已安装时执行迁移')
+  .action(async () => {
     const root = runtimeRoot();
-    if (instanceExists(root)) {
-      console.error('uiliuili 已经安装。如需重装请先执行 reset --force。');
-      process.exit(1);
+    if (!instanceExists(root)) {
+      console.log('未检测到安装标记，开始按环境变量安装…');
+      await runInstallCommand(buildInstallConfigFromEnv());
+      return;
     }
-    const raw = JSON.parse(fs.readFileSync(options.config, 'utf8')) as unknown;
-    const parsed = installConfigSchema.safeParse(raw);
-    if (!parsed.success) {
-      console.error('安装配置校验失败：');
-      console.error(JSON.stringify(parsed.error.flatten(), null, 2));
-      process.exit(1);
+    const applied = await migrateToLatest();
+    if (applied.length === 0) {
+      console.log('实例已安装，数据库已是最新版本。');
+    } else {
+      for (const name of applied) console.log(`✓ ${name}`);
+      console.log(`已应用 ${applied.length} 个迁移。`);
     }
-    try {
-      const result = await runInstall(parsed.data, {
-        root,
-        production:
-          process.env.NODE_ENV === 'production' || parsed.data.site.url.startsWith('https://'),
-        onProgress: logProgress,
-      });
-      console.log('');
-      console.log('安装完成。');
-      console.log(`实例 ID：${result.instance.instanceId}`);
-      console.log(`管理员：${parsed.data.admin.username} <${parsed.data.admin.email}>`);
-      if (result.warnings.length) {
-        console.log('警告：');
-        for (const warning of result.warnings) console.log(`  - ${warning}`);
-      }
-      console.log('请启动 API、Worker、Web 与 Admin 进程。');
-    } catch (error) {
-      console.error('安装失败：', error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
+    console.log('引导完成。');
   });
 
 program
@@ -139,21 +198,12 @@ program
   .command('migrate')
   .description('执行待应用的数据库迁移')
   .action(async () => {
-    const url = requireDatabaseUrl();
-    const applied = await runMigrations(url);
+    const applied = await migrateToLatest();
     if (applied.length === 0) {
       console.log('数据库已是最新版本。');
     } else {
       for (const name of applied) console.log(`✓ ${name}`);
       console.log(`已应用 ${applied.length} 个迁移。`);
-    }
-    const { client, db } = createDb(url, { max: 1 });
-    try {
-      await db.execute(
-        sql`UPDATE "uiliuili"."app_instance" SET version = ${APP_VERSION}, updated_at = now()`,
-      );
-    } finally {
-      await client.end({ timeout: 5 });
     }
   });
 

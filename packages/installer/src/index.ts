@@ -2,6 +2,7 @@ export * from './paths';
 export * from './instance';
 export * from './token';
 export * from './env';
+export * from './from-env';
 export * from './environment';
 export * from './database';
 export * from './mail';

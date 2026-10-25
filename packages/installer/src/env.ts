@@ -20,13 +20,14 @@ export function buildDatabaseUrl(
 export interface EnvFileOptions {
   production: boolean;
   appKey: string;
+  apiInternalUrl?: string;
 }
 
 export function buildEnvFile(config: InstallConfig, options: EnvFileOptions): string {
   const values: Array<[string, string | undefined]> = [
     ['NODE_ENV', options.production ? 'production' : 'development'],
     ['APP_URL', config.site.url],
-    ['API_INTERNAL_URL', 'http://127.0.0.1:3001'],
+    ['API_INTERNAL_URL', options.apiInternalUrl ?? 'http://127.0.0.1:3001'],
     ['NEXT_PUBLIC_API_URL', ''],
     ['DATABASE_URL', buildDatabaseUrl(config.database)],
     ['DB_SCHEMA', config.database.schema],

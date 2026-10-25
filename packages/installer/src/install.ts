@@ -103,6 +103,7 @@ export async function runInstall(
       options.production ??
       (process.env.NODE_ENV === 'production' || config.site.url.startsWith('https://')),
     appKey,
+    apiInternalUrl: process.env.API_INTERNAL_URL,
   });
   writeEnvFile(paths.envFile, envContent);
 
