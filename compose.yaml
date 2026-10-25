@@ -53,6 +53,7 @@ services:
       target: cli
     image: uiliuili-cli:local
     restart: "no"
+    command: ["node", "dist/index.js", "bootstrap"]
     environment:
       <<: *app-environment
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
