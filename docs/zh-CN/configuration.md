@@ -16,6 +16,7 @@
 | `DATABASE_URL` | PostgreSQL 连接串 |
 | `DB_SCHEMA` | 应用 schema（本版本固定为 `uiliuili`） |
 | `APP_KEY` | 32 字节十六进制密钥，用于加密第三方密钥 |
+| `UILIUILI_ROOT` | 保存 `.env`、`config/` 与 `storage/` 的目录，默认为工作目录（容器使用 `/data`） |
 | `APP_URL` | 公开站点 URL |
 | `API_INTERNAL_URL` | Next.js SSR 使用的内部 API 地址 |
 | `NEXT_PUBLIC_API_URL` | 公开 API 前缀，同源部署时通常留空 |
