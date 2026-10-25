@@ -5,4 +5,5 @@ export * from './types';
 export * from './schemas/install';
 export * from './schemas/auth';
 export * from './schemas/video';
+export * from './schemas/social';
 export * from './schemas/admin';

@@ -6,8 +6,17 @@ export interface PublicUser {
   bio?: string | null;
   roles: string[];
   level: number;
+  experience?: number;
+  badges?: UserBadge[];
   banned?: boolean;
   createdAt: string;
+}
+
+export interface UserBadge {
+  code: string;
+  label: string;
+  description: string;
+  awardedAt?: string;
 }
 
 export interface AuthUser extends PublicUser {
@@ -56,16 +65,108 @@ export interface VideoDetail extends VideoCard {
     playlistUrl: string;
   }>;
   subtitles: Array<{ language: string; label: string; url: string }>;
+  parts: VideoPart[];
+  collections: CollectionSummary[];
   liked: boolean;
   coinCount: number;
   favorited: boolean;
   following: boolean;
+  watchLater: boolean;
   progressMs: number;
+  progressPartId: string | null;
+}
+
+export interface VideoPart {
+  id: string | null;
+  title: string;
+  sort: number;
+  durationSeconds: number;
+  status: string;
+  playlistUrl: string | null;
+}
+
+export interface DynamicItem {
+  id: string;
+  content: string;
+  images: string[];
+  createdAt: string;
+  likeCount: number;
+  liked: boolean;
+  user: PublicUser;
+  video: VideoCard | null;
+  topic: TopicInfo | null;
+}
+
+export interface TopicInfo {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  coverUrl: string | null;
+  kind: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  dynamicCount?: number;
+}
+
+export interface ConversationItem {
+  id: string;
+  user: PublicUser;
+  lastMessage: string;
+  lastMessageAt: string;
+  unread: number;
+}
+
+export interface DirectMessageItem {
+  id: string;
+  content: string;
+  mine: boolean;
+  readAt: string | null;
+  createdAt: string;
+  sender: PublicUser;
+}
+
+export interface RankingItem {
+  video: VideoCard;
+  score: number;
+  periodViews: number;
+  rank?: number;
+}
+
+export interface CollectionSummary {
+  id: string;
+  title: string;
+  kind: string;
+  coverUrl: string | null;
+  itemCount: number;
+}
+
+export interface CollectionInfo extends CollectionSummary {
+  description: string;
+  visibility: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  owner: PublicUser;
+}
+
+export interface CollectionDetail extends CollectionInfo {
+  items: VideoCard[];
+}
+
+export interface PlaylistItem {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  durationSeconds: number;
+  uploader: PublicUser;
 }
 
 export interface DanmakuItem {
   id: string;
   progressMs: number;
+  partId?: string | null;
+  pool?: string;
   mode: string;
   color: string;
   fontSize: number;
@@ -81,6 +182,9 @@ export interface CommentItem {
   createdAt: string;
   likeCount: number;
   liked: boolean;
+  pinned: boolean;
+  upLiked: boolean;
+  isUploader: boolean;
   user: PublicUser;
   replies: CommentItem[];
   replyCount: number;

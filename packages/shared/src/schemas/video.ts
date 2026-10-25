@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DANMAKU_MODES, VIDEO_VISIBILITIES } from '../constants';
+import { DANMAKU_MODES, DANMAKU_POOLS, VIDEO_VISIBILITIES } from '../constants';
 
 export const paginationSchema = z.object({
   cursor: z.string().optional(),
@@ -23,6 +23,46 @@ export const uploadInitSchema = z.object({
   size: z.number().int().positive(),
   contentType: z.string().min(1).max(100),
   chunks: z.number().int().positive().optional(),
+  partId: z.string().uuid().optional(),
+});
+
+export const videoPartCreateSchema = z.object({
+  title: z.string().min(1).max(80).default('正片'),
+  sort: z.number().int().min(0).max(999).optional(),
+});
+
+export const videoPartUpdateSchema = z.object({
+  title: z.string().min(1).max(80).optional(),
+  sort: z.number().int().min(0).max(999).optional(),
+});
+
+export const collectionCreateSchema = z.object({
+  title: z.string().min(1).max(80),
+  description: z.string().max(2000).default(''),
+  kind: z.enum(['collection', 'series']).default('collection'),
+  visibility: z.enum(VIDEO_VISIBILITIES).default('public'),
+});
+
+export const collectionUpdateSchema = collectionCreateSchema.partial().extend({
+  coverUrl: z.string().max(500).nullable().optional(),
+});
+
+export const collectionItemSchema = z.object({
+  videoId: z.string().uuid(),
+  sort: z.number().int().min(0).max(9999).optional(),
+});
+
+export const followGroupSchema = z.object({
+  name: z.string().min(1).max(20),
+  sort: z.number().int().min(0).max(999).optional(),
+});
+
+export const followGroupAssignSchema = z.object({
+  groupId: z.string().uuid().nullable().optional(),
+});
+
+export const pinCommentSchema = z.object({
+  pinned: z.boolean(),
 });
 
 export const uploadCompleteSchema = z.object({
@@ -54,6 +94,7 @@ export const publishVideoSchema = z.object({
 export const videoListQuerySchema = paginationSchema.extend({
   category: z.string().optional(),
   tag: z.string().optional(),
+  author: z.string().max(40).optional(),
   sort: z.enum(['new', 'hot', 'recommended']).default('new'),
   q: z.string().max(100).optional(),
 });
@@ -73,6 +114,8 @@ export const danmakuCreateSchema = z.object({
     .int()
     .min(0)
     .max(24 * 60 * 60 * 1000),
+  partId: z.string().uuid().optional(),
+  pool: z.enum(DANMAKU_POOLS).default('normal'),
   mode: z.enum(DANMAKU_MODES).default('scroll'),
   color: z
     .string()
@@ -84,11 +127,13 @@ export const danmakuCreateSchema = z.object({
 
 export const danmakuQuerySchema = z.object({
   segment: z.coerce.number().int().min(0).default(0),
+  partId: z.string().uuid().optional(),
 });
 
 export const progressSchema = z.object({
   positionMs: z.number().int().min(0),
   durationMs: z.number().int().min(0).optional(),
+  partId: z.string().uuid().optional(),
   completed: z.boolean().optional().default(false),
 });
 

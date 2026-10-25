@@ -69,6 +69,35 @@ export type VideoVisibility = (typeof VIDEO_VISIBILITIES)[number];
 export const DANMAKU_MODES = ['scroll', 'top', 'bottom'] as const;
 export type DanmakuMode = (typeof DANMAKU_MODES)[number];
 
+export const DANMAKU_POOLS = ['normal', 'subtitle', 'special'] as const;
+export type DanmakuPool = (typeof DANMAKU_POOLS)[number];
+
+export const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500] as const;
+
+export function levelForExperience(experience: number): number {
+  let level = 0;
+  for (let index = 0; index < LEVEL_THRESHOLDS.length; index += 1) {
+    if (experience >= LEVEL_THRESHOLDS[index]!) level = index;
+  }
+  return level;
+}
+
+export function experienceForLevel(level: number): number {
+  return LEVEL_THRESHOLDS[Math.max(0, Math.min(LEVEL_THRESHOLDS.length - 1, level))]!;
+}
+
+export const BADGES = [
+  { code: 'early_adopter', label: '元老', description: '在站点早期加入的用户' },
+  { code: 'creator', label: 'UP 主', description: '发布了第一支视频' },
+  { code: 'popular', label: '人气之星', description: '有视频获得广泛播放' },
+  { code: 'danmaku_star', label: '弹幕之星', description: '发送了大量弹幕' },
+  { code: 'commenter', label: '评论家', description: '留下了大量优质评论' },
+  { code: 'collector', label: '收藏家', description: '收藏了很多视频' },
+  { code: 'level_5', label: 'Lv.5', description: '等级达到 5 级' },
+  { code: 'level_6', label: 'Lv.6', description: '等级达到 6 级' },
+] as const;
+export type BadgeCode = (typeof BADGES)[number]['code'];
+
 export const NOTIFICATION_TYPES = [
   'comment',
   'reply',

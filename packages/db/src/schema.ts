@@ -43,6 +43,7 @@ export const users = appSchema.table(
     emailVerified: boolean('email_verified').default(false).notNull(),
     roles: text('roles').array().default(sql`ARRAY['USER']::text[]`).notNull(),
     level: integer('level').default(0).notNull(),
+    experience: integer('experience').default(0).notNull(),
     banned: boolean('banned').default(false).notNull(),
     mutedUntil: timestamp('muted_until', { withTimezone: true }),
     coinBalance: integer('coin_balance').default(0).notNull(),
@@ -115,6 +116,20 @@ export const verificationTokens = appSchema.table(
   (table) => [index('verification_tokens_user_type_idx').on(table.userId, table.type)],
 );
 
+export const followGroups = appSchema.table(
+  'follow_groups',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    sort: integer('sort').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('follow_groups_user_name_idx').on(table.userId, table.name)],
+);
+
 export const follows = appSchema.table(
   'follows',
   {
@@ -124,12 +139,26 @@ export const follows = appSchema.table(
     followingId: uuid('following_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    groupId: uuid('group_id').references(() => followGroups.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.followerId, table.followingId] }),
     index('follows_following_idx').on(table.followingId),
+    index('follows_group_idx').on(table.groupId),
   ],
+);
+
+export const userBadges = appSchema.table(
+  'user_badges',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    awardedAt: timestamp('awarded_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.code] })],
 );
 
 export const blocks = appSchema.table(
@@ -210,6 +239,207 @@ export const videos = appSchema.table(
   ],
 );
 
+export const videoParts = appSchema.table(
+  'video_parts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    title: text('title').default('正片').notNull(),
+    sort: integer('sort').default(0).notNull(),
+    status: text('status').default('draft').notNull(),
+    sourceKey: text('source_key'),
+    sourceSize: integer('source_size').default(0).notNull(),
+    sourceFilename: text('source_filename'),
+    durationSeconds: integer('duration_seconds').default(0).notNull(),
+    width: integer('width').default(0).notNull(),
+    height: integer('height').default(0).notNull(),
+    playlistKey: text('playlist_key'),
+    spriteKey: text('sprite_key'),
+    previewVttKey: text('preview_vtt_key'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('video_parts_video_sort_idx').on(table.videoId, table.sort),
+    index('video_parts_status_idx').on(table.status),
+  ],
+);
+
+export const collections = appSchema.table(
+  'collections',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description').default('').notNull(),
+    coverUrl: text('cover_url'),
+    kind: text('kind').default('collection').notNull(),
+    visibility: text('visibility').default('public').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('collections_user_idx').on(table.userId, table.createdAt),
+    index('collections_visibility_idx').on(table.visibility, table.createdAt),
+  ],
+);
+
+export const collectionItems = appSchema.table(
+  'collection_items',
+  {
+    collectionId: uuid('collection_id')
+      .notNull()
+      .references(() => collections.id, { onDelete: 'cascade' }),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    sort: integer('sort').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.collectionId, table.videoId] }),
+    index('collection_items_sort_idx').on(table.collectionId, table.sort),
+  ],
+);
+
+export const watchLater = appSchema.table(
+  'watch_later',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.videoId] }),
+    index('watch_later_user_idx').on(table.userId, table.createdAt),
+  ],
+);
+
+export const topics = appSchema.table(
+  'topics',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    slug: text('slug').notNull().unique(),
+    title: text('title').notNull(),
+    description: text('description').default('').notNull(),
+    coverUrl: text('cover_url'),
+    kind: text('kind').default('topic').notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('topics_kind_idx').on(table.kind, table.createdAt)],
+);
+
+export const dynamics = appSchema.table(
+  'dynamics',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    content: text('content').default('').notNull(),
+    images: jsonb('images').$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    videoId: uuid('video_id').references(() => videos.id, { onDelete: 'set null' }),
+    topicId: uuid('topic_id').references(() => topics.id, { onDelete: 'set null' }),
+    visibility: text('visibility').default('public').notNull(),
+    likeCount: integer('like_count').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('dynamics_created_idx').on(table.createdAt),
+    index('dynamics_user_idx').on(table.userId, table.createdAt),
+    index('dynamics_topic_idx').on(table.topicId, table.createdAt),
+  ],
+);
+
+export const dynamicLikes = appSchema.table(
+  'dynamic_likes',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    dynamicId: uuid('dynamic_id')
+      .notNull()
+      .references(() => dynamics.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.dynamicId] })],
+);
+
+export const videoTopics = appSchema.table(
+  'video_topics',
+  {
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => topics.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.videoId, table.topicId] })],
+);
+
+export const conversations = appSchema.table(
+  'conversations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userAId: uuid('user_a_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userBId: uuid('user_b_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('conversations_pair_idx').on(table.userAId, table.userBId),
+    index('conversations_last_idx').on(table.lastMessageAt),
+  ],
+);
+
+export const directMessages = appSchema.table(
+  'direct_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    senderId: uuid('sender_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('direct_messages_conversation_idx').on(table.conversationId, table.createdAt)],
+);
+
+export const pushSubscriptions = appSchema.table(
+  'push_subscriptions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    endpoint: text('endpoint').notNull().unique(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('push_subscriptions_user_idx').on(table.userId)],
+);
+
 export const videoTags = appSchema.table(
   'video_tags',
   {
@@ -230,6 +460,7 @@ export const videoRenditions = appSchema.table(
     videoId: uuid('video_id')
       .notNull()
       .references(() => videos.id, { onDelete: 'cascade' }),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'cascade' }),
     quality: text('quality').notNull(),
     width: integer('width').notNull(),
     height: integer('height').notNull(),
@@ -237,7 +468,9 @@ export const videoRenditions = appSchema.table(
     playlistKey: text('playlist_key').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [uniqueIndex('video_renditions_video_quality_idx').on(table.videoId, table.quality)],
+  (table) => [
+    index('video_renditions_video_quality_idx').on(table.videoId, table.partId, table.quality),
+  ],
 );
 
 export const videoSubtitles = appSchema.table(
@@ -265,6 +498,7 @@ export const uploadSessions = appSchema.table(
     videoId: uuid('video_id')
       .notNull()
       .references(() => videos.id, { onDelete: 'cascade' }),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'cascade' }),
     filename: text('filename').notNull(),
     size: integer('size').notNull(),
     contentType: text('content_type').notNull(),
@@ -307,6 +541,8 @@ export const danmaku = appSchema.table(
       .references(() => users.id, { onDelete: 'cascade' }),
     progressMs: integer('progress_ms').notNull(),
     segment: integer('segment').notNull(),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'cascade' }),
+    pool: text('pool').default('normal').notNull(),
     mode: text('mode').default('scroll').notNull(),
     color: text('color').default('#ffffff').notNull(),
     fontSize: integer('font_size').default(25).notNull(),
@@ -317,6 +553,7 @@ export const danmaku = appSchema.table(
   },
   (table) => [
     index('danmaku_video_segment_idx').on(table.videoId, table.segment, table.progressMs),
+    index('danmaku_part_segment_idx').on(table.partId, table.segment, table.progressMs),
     index('danmaku_status_idx').on(table.status),
     index('danmaku_user_idx').on(table.userId, table.createdAt),
   ],
@@ -335,6 +572,9 @@ export const comments = appSchema.table(
     parentId: uuid('parent_id'),
     content: text('content').notNull(),
     likeCount: integer('like_count').default(0).notNull(),
+    pinned: boolean('pinned').default(false).notNull(),
+    pinnedAt: timestamp('pinned_at', { withTimezone: true }),
+    upLiked: boolean('up_liked').default(false).notNull(),
     status: text('status').default('visible').notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps,
@@ -411,6 +651,8 @@ export const favoriteFolders = appSchema.table(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    description: text('description').default('').notNull(),
+    isPublic: boolean('is_public').default(false).notNull(),
     isDefault: boolean('is_default').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -440,6 +682,7 @@ export const watchHistories = appSchema.table(
     videoId: uuid('video_id')
       .notNull()
       .references(() => videos.id, { onDelete: 'cascade' }),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'set null' }),
     positionMs: integer('position_ms').default(0).notNull(),
     durationMs: integer('duration_ms').default(0).notNull(),
     completed: boolean('completed').default(false).notNull(),
@@ -613,6 +856,11 @@ export type DbUser = typeof users.$inferSelect;
 export type DbCategory = typeof categories.$inferSelect;
 export type DbTag = typeof tags.$inferSelect;
 export type DbVideo = typeof videos.$inferSelect;
+export type DbVideoPart = typeof videoParts.$inferSelect;
+export type DbCollection = typeof collections.$inferSelect;
+export type DbTopic = typeof topics.$inferSelect;
+export type DbDynamic = typeof dynamics.$inferSelect;
+export type DbConversation = typeof conversations.$inferSelect;
 export type DbDanmaku = typeof danmaku.$inferSelect;
 export type DbComment = typeof comments.$inferSelect;
 export type DbJob = typeof backgroundJobs.$inferSelect;

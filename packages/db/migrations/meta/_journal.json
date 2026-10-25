@@ -8,6 +8,13 @@
       "when": 1792869116509,
       "tag": "0000_breezy_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792906921178,
+      "tag": "0001_modern_maelstrom",
+      "breakpoints": true
     }
   ]
 }
