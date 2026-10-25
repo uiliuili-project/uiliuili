@@ -7,6 +7,14 @@ export const INSTALL_TOKEN_FILE = 'install-token';
 export const USER_ROLES = ['USER', 'UPLOADER', 'REVIEWER', 'ADMIN', 'SUPER_ADMIN'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+/**
+ * Coarse user group stored on the user record. Roles remain the source of
+ * truth for permissions; the group is a stable marker used by the interface to
+ * separate the creator center from the administration console.
+ */
+export const USER_GROUPS = ['USER', 'CREATOR', 'ADMIN'] as const;
+export type UserGroup = (typeof USER_GROUPS)[number];
+
 export const PERMISSIONS = [
   'video:read',
   'video:upload',

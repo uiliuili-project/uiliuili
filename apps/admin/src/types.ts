@@ -46,6 +46,7 @@ export interface AuthUser {
   displayName: string;
   avatarUrl: string | null;
   roles: string[];
+  group: 'USER' | 'CREATOR' | 'ADMIN';
   permissions: string[];
   level: number;
   emailVerified: boolean;
@@ -95,6 +96,7 @@ export interface AdminUser {
   email: string;
   displayName: string;
   roles: string[];
+  group: 'USER' | 'CREATOR' | 'ADMIN';
   level: number;
   banned: boolean;
   mutedUntil: string | null;

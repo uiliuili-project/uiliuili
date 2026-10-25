@@ -1,3 +1,5 @@
+import type { UserGroup } from './constants';
+
 export interface PublicUser {
   id: string;
   username: string;
@@ -23,6 +25,8 @@ export interface AuthUser extends PublicUser {
   email: string;
   emailVerified: boolean;
   permissions: string[];
+  /** Persisted user-group marker, kept in sync with the user's roles. */
+  group: UserGroup;
 }
 
 export interface Category {

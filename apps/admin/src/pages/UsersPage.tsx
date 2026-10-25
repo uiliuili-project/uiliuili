@@ -27,6 +27,18 @@ const roleOptions = ['USER', 'UPLOADER', 'REVIEWER', 'ADMIN', 'SUPER_ADMIN'].map
   label: value,
 }));
 
+const groupColors: Record<string, string> = {
+  USER: 'default',
+  CREATOR: 'blue',
+  ADMIN: 'magenta',
+};
+
+const groupLabels: Record<string, string> = {
+  USER: '普通用户',
+  CREATOR: '创作者',
+  ADMIN: '管理员',
+};
+
 export function UsersPage() {
   const t = useT();
   const queryClient = useQueryClient();
@@ -162,6 +174,14 @@ export function UsersPage() {
             },
             { title: t('邮箱'), dataIndex: 'email' },
             {
+              title: t('用户组'),
+              dataIndex: 'group',
+              width: 110,
+              render: (group: string) => (
+                <Tag color={groupColors[group]}>{t(groupLabels[group] ?? group)}</Tag>
+              ),
+            },
+            {
               title: t('角色'),
               dataIndex: 'roles',
               render: (roles: string[]) => (
@@ -227,7 +247,12 @@ export function UsersPage() {
         okText={t('保存')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item label={t('角色')} name="role" rules={[{ required: true }]}>
+          <Form.Item
+            label={t('角色')}
+            name="role"
+            rules={[{ required: true }]}
+            extra={t('用户组会根据角色自动同步')}
+          >
             <Select options={roleOptions} />
           </Form.Item>
           <Form.Item label={t('等级')} name="level">

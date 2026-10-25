@@ -416,6 +416,10 @@ export const uiEn: Record<string, string> = {
   管理后台: 'Admin',
   管理后台登录: 'Admin login',
   管理员: 'Administrator',
+  普通用户: 'User',
+  创作者: 'Creator',
+  用户组: 'User group',
+  用户组会根据角色自动同步: 'The user group is synced from the role automatically.',
   管理员操作记录: 'Administrator action log',
   管理员账号: 'Administrator account',
   '管理员账号已创建。服务重启后即可登录管理后台。':
@@ -506,6 +510,11 @@ export const uiEn: Record<string, string> = {
   返回登录: 'Back to login',
   返回站点首页: 'Back to site',
   返回首页: 'Back to home',
+  前往创作中心: 'Go to creator center',
+  无权限访问管理后台: 'No access to the admin console',
+  '请使用管理员账号登录。普通用户请前往创作中心。':
+    'Sign in with an administrator account. Regular users can go to the creator center.',
+  该账号没有管理后台权限: 'This account does not have admin console access.',
   还有: 'More',
   '还没有稿件，先创建一个吧': 'No videos yet. Create your first draft.',
   还没有观看记录: 'No watch history yet',

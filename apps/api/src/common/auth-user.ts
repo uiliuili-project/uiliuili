@@ -1,4 +1,4 @@
-import type { UserRole } from '@uiliuili/shared';
+import type { UserGroup, UserRole } from '@uiliuili/shared';
 
 export interface AuthUser {
   id: string;
@@ -8,6 +8,7 @@ export interface AuthUser {
   avatarUrl: string | null;
   bio: string;
   roles: UserRole[];
+  group: UserGroup;
   permissions: string[];
   level: number;
   experience?: number;

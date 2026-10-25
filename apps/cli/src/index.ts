@@ -238,7 +238,7 @@ program
       if (existing.length > 0) {
         await db
           .update(users)
-          .set({ roles: ['SUPER_ADMIN'], banned: false, passwordHash })
+          .set({ roles: ['SUPER_ADMIN'], userGroup: 'ADMIN', banned: false, passwordHash })
           .where(eq(users.id, existing[0]!.id));
         console.log(`已提升用户 ${username} 为超级管理员。`);
       } else {
@@ -251,6 +251,7 @@ program
             passwordHash,
             emailVerified: true,
             roles: ['SUPER_ADMIN'],
+            userGroup: 'ADMIN',
             level: 6,
           })
           .returning();

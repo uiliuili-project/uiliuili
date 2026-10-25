@@ -56,6 +56,7 @@ export async function seedInstance(db: Db, options: SeedOptions): Promise<void> 
       displayName: options.admin.username,
       emailVerified: true,
       roles: ['SUPER_ADMIN'],
+      userGroup: 'ADMIN',
       level: 6,
       coinBalance: settings.social.dailyCoins,
     })

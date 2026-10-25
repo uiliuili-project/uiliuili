@@ -42,6 +42,7 @@ export const users = appSchema.table(
     coverUrl: text('cover_url'),
     emailVerified: boolean('email_verified').default(false).notNull(),
     roles: text('roles').array().default(sql`ARRAY['USER']::text[]`).notNull(),
+    userGroup: text('user_group').default('USER').notNull(),
     level: integer('level').default(0).notNull(),
     experience: integer('experience').default(0).notNull(),
     banned: boolean('banned').default(false).notNull(),
@@ -54,6 +55,7 @@ export const users = appSchema.table(
     uniqueIndex('users_username_lower_idx').on(sql`lower(${table.username})`),
     uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`),
     index('users_created_at_idx').on(table.createdAt),
+    index('users_group_idx').on(table.userGroup),
   ],
 );
 

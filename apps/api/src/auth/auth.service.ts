@@ -14,8 +14,10 @@ import {
   ACCESS_TOKEN_TTL_SECONDS,
   type Permission,
   REFRESH_TOKEN_TTL_DAYS,
+  type UserGroup,
   type UserRole,
   permissionsForRoles,
+  userGroupForRoles,
 } from '@uiliuili/shared';
 import argon2 from 'argon2';
 import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
@@ -467,6 +469,7 @@ export class AuthService {
 
   toAuthUser(user: DbUser): AuthUser {
     const roles = (user.roles ?? ['USER']) as UserRole[];
+    const group = (user.userGroup as UserGroup | undefined) ?? userGroupForRoles(roles);
     return {
       id: user.id,
       username: user.username,
@@ -475,6 +478,7 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       bio: user.bio,
       roles,
+      group,
       permissions: permissionsForRoles(roles) satisfies Permission[],
       level: user.level,
       emailVerified: user.emailVerified,

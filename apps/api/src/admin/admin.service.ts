@@ -26,6 +26,7 @@ import {
   mailConfigSchema,
   searchConfigSchema,
   storageConfigSchema,
+  userGroupForRoles,
 } from '@uiliuili/shared';
 import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -175,6 +176,7 @@ export class AdminService {
         email: user.email,
         displayName: user.displayName,
         roles: user.roles,
+        group: user.userGroup,
         level: user.level,
         banned: user.banned,
         mutedUntil: user.mutedUntil?.toISOString() ?? null,
@@ -208,6 +210,9 @@ export class AdminService {
       .update(users)
       .set({
         roles: input.role ? [input.role] : undefined,
+        userGroup: input.role
+          ? userGroupForRoles([input.role])
+          : userGroupForRoles(user.roles as UserRole[]),
         banned: input.banned,
         mutedUntil:
           input.mutedUntil === undefined
@@ -233,6 +238,7 @@ export class AdminService {
           id: updated.id,
           username: updated.username,
           roles: updated.roles,
+          group: updated.userGroup,
           banned: updated.banned,
           level: updated.level,
         }
