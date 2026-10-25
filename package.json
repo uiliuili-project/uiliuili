@@ -2,7 +2,7 @@
   "name": "uiliuili",
   "version": "0.1.0",
   "private": true,
-  "description": "A self-hosted danmaku video platform with a WordPress-style installer.",
+  "description": "A self-hosted danmaku video platform.",
   "license": "MIT",
   "packageManager": "pnpm@9.15.9",
   "engines": {

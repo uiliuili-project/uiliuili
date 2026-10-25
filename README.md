@@ -1,6 +1,6 @@
 # uiliuili
 
-> An open-source, self-hosted danmaku video platform with a WordPress-style installer.
+> An open-source, self-hosted danmaku video platform.
 
 uiliuili is a complete video community: uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin panel.
 

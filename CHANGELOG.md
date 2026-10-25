@@ -9,6 +9,6 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Initial monorepo foundation.
-- Self-hosted WordPress-style installer.
+- Self-hosted first-run web installer.
 - Video upload, FFmpeg HLS transcoding, danmaku, social features, search,
   recommendations, and admin panel.
