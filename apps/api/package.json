@@ -28,7 +28,7 @@
     "@uiliuili/installer": "workspace:*",
     "@uiliuili/media": "workspace:*",
     "@uiliuili/shared": "workspace:*",
-    "argon2": "^0.41.1",
+    "argon2": "^0.45.1",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.0",
     "fastify": "^4.29.0",
