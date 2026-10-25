@@ -23,6 +23,8 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 
 鉴权使用 HttpOnly 的 access/refresh Cookie。使用 Cookie 鉴权的写请求必须携带与 `ul_csrf` Cookie 匹配的 `x-csrf-token` 请求头。
 
+`GET /api/v1/auth/me` 以及登录、注册响应会在 `roles`、`permissions` 之外返回持久化的 `group` 字段（`USER`、`CREATOR` 或 `ADMIN`）。权限仍以角色为准；用户组只决定用户进入创作中心还是管理后台。
+
 ## 内容
 
 - `GET /api/v1/videos`
@@ -76,6 +78,7 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
 - `GET|PUT /api/v1/admin/settings`
+- `POST /api/v1/admin/site/logo`（请求体为 JPEG/PNG/WebP 原始字节，最大 2 MB）
 - `GET /api/v1/admin/system`
 - `GET /api/v1/admin/jobs`
 - `GET /api/v1/admin/audit`

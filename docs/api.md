@@ -25,6 +25,11 @@ The API is served by NestJS under `/api/v1`. Installer endpoints live under
 Authentication uses HttpOnly access/refresh cookies. Mutating cookie-authenticated
 requests require the `x-csrf-token` header matching the `ul_csrf` cookie.
 
+`GET /api/v1/auth/me` and the login/register responses include the persisted
+`group` field (`USER`, `CREATOR`, or `ADMIN`) next to `roles` and `permissions`.
+Roles remain the source of truth for permissions; the group only decides which
+interface a user enters (creator center or admin console).
+
 ## Content
 
 - `GET /api/v1/videos`
@@ -79,6 +84,7 @@ All admin routes require the corresponding permission and are listed in
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
 - `GET|PUT /api/v1/admin/settings`
+- `POST /api/v1/admin/site/logo` (raw JPEG/PNG/WebP body, max 2 MB)
 - `GET /api/v1/admin/system`
 - `GET /api/v1/admin/jobs`
 - `GET /api/v1/admin/audit`
