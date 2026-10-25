@@ -30,7 +30,7 @@
     "@uiliuili/shared": "workspace:*",
     "argon2": "^0.41.1",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.4",
     "fastify": "^4.29.0",
     "ioredis": "^5.4.2",
     "mime-types": "^2.1.35",
