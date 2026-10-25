@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from './I18nProvider';
 
 import { VideoCard as VideoCardView } from '@/components/VideoCard';
 import { api } from '@/lib/api';
@@ -26,6 +27,8 @@ interface TagResult {
 }
 
 export function SearchClient() {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const params = useSearchParams();
   const initialQuery = params.get('q') ?? '';
@@ -92,7 +95,7 @@ export function SearchClient() {
         .then((result) => setHistory(result.items))
         .catch(() => undefined);
     } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : '搜索失败');
+      setError(searchError instanceof Error ? searchError.message : t('搜索失败'));
     } finally {
       setLoading(false);
     }
@@ -132,7 +135,7 @@ export function SearchClient() {
     void api
       .get<SearchResponse>(`/api/v1/search?${search.toString()}`)
       .then(setResponse)
-      .catch(() => setError('搜索失败'))
+      .catch(() => setError(t('搜索失败')))
       .finally(() => setLoading(false));
   };
 
@@ -152,21 +155,21 @@ export function SearchClient() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索视频、用户或标签"
+          placeholder={t('搜索视频、用户或标签')}
           className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none"
           autoFocus
         />
         <button type="submit" className="btn-primary">
-          搜索
+          {t('搜索')}{' '}
         </button>
       </form>
 
       <div className="mt-5 flex items-center gap-2 border-b border-line">
         {(
           [
-            ['videos', '视频'],
-            ['users', '用户'],
-            ['tags', '标签'],
+            ['videos', t('视频')],
+            ['users', t('用户')],
+            ['tags', t('标签')],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -184,7 +187,10 @@ export function SearchClient() {
           </button>
         ))}
         {response?.engine && (
-          <span className="ml-auto text-xs text-muted">搜索：{response.engine}</span>
+          <span className="ml-auto text-xs text-muted">
+            {t('搜索：')}
+            {response.engine}
+          </span>
         )}
       </div>
 
@@ -195,15 +201,15 @@ export function SearchClient() {
             onChange={(event) => applyFilter({ sort: event.target.value as 'hot' | 'new' })}
             className="chip bg-white"
           >
-            <option value="hot">最热</option>
-            <option value="new">最新</option>
+            <option value="hot">{t('最热')}</option>
+            <option value="new">{t('最新')}</option>
           </select>
           <select
             value={category}
             onChange={(event) => applyFilter({ category: event.target.value })}
             className="chip bg-white"
           >
-            <option value="">全部分区</option>
+            <option value="">{t('全部分区')}</option>
             {categories.map((item) => (
               <option key={item.id} value={item.slug}>
                 {item.name}
@@ -215,20 +221,20 @@ export function SearchClient() {
             onChange={(event) => applyFilter({ duration: event.target.value })}
             className="chip bg-white"
           >
-            <option value="">全部时长</option>
-            <option value="short">1 分钟以下</option>
-            <option value="medium">1–10 分钟</option>
-            <option value="long">10 分钟以上</option>
+            <option value="">{t('全部时长')}</option>
+            <option value="short">{t('1 分钟以下')}</option>
+            <option value="medium">{t('1–10 分钟')}</option>
+            <option value="long">{t('10 分钟以上')}</option>
           </select>
           <select
             value={date}
             onChange={(event) => applyFilter({ date: event.target.value })}
             className="chip bg-white"
           >
-            <option value="">全部时间</option>
-            <option value="week">最近一周</option>
-            <option value="month">最近一月</option>
-            <option value="year">最近一年</option>
+            <option value="">{t('全部时间')}</option>
+            <option value="week">{t('最近一周')}</option>
+            <option value="month">{t('最近一月')}</option>
+            <option value="year">{t('最近一年')}</option>
           </select>
         </div>
       )}
@@ -238,7 +244,7 @@ export function SearchClient() {
       {!query.trim() && (
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <section className="card p-5">
-            <h2 className="mb-3 text-sm font-semibold">热门搜索</h2>
+            <h2 className="mb-3 text-sm font-semibold">{t('热门搜索')}</h2>
             <div className="flex flex-wrap gap-2">
               {hot.map((item, index) => (
                 <button
@@ -253,19 +259,19 @@ export function SearchClient() {
                   {index + 1}. {item.query} <span className="text-muted">{item.count}</span>
                 </button>
               ))}
-              {hot.length === 0 && <p className="text-sm text-muted">暂无热门搜索</p>}
+              {hot.length === 0 && <p className="text-sm text-muted">{t('暂无热门搜索')}</p>}
             </div>
           </section>
           <section className="card p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">搜索历史</h2>
+              <h2 className="text-sm font-semibold">{t('搜索历史')}</h2>
               <button
                 type="button"
                 onClick={() => void clearHistory()}
                 className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-500"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                清空
+                {t('清空')}{' '}
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -282,13 +288,13 @@ export function SearchClient() {
                   {item.query}
                 </button>
               ))}
-              {history.length === 0 && <p className="text-sm text-muted">暂无搜索历史</p>}
+              {history.length === 0 && <p className="text-sm text-muted">{t('暂无搜索历史')}</p>}
             </div>
           </section>
         </div>
       )}
 
-      {loading && <p className="mt-8 text-sm text-muted">搜索中…</p>}
+      {loading && <p className="mt-8 text-sm text-muted">{t('搜索中…')}</p>}
 
       {!loading && response && (
         <div className="mt-6">
@@ -317,7 +323,9 @@ export function SearchClient() {
                   <div className="min-w-0">
                     <div className="truncate font-medium">{user.displayName}</div>
                     <div className="truncate text-xs text-muted">@{user.username}</div>
-                    <div className="truncate text-xs text-muted">{user.bio || '这个人很懒…'}</div>
+                    <div className="truncate text-xs text-muted">
+                      {user.bio || t('这个人很懒…')}
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -336,22 +344,23 @@ export function SearchClient() {
                   className="card px-4 py-3 text-sm hover:border-brand"
                 >
                   #{tag.name}{' '}
-                  <span className="ml-2 text-xs text-muted">{formatCount(tag.count)}</span>
+                  <span className="ml-2 text-xs text-muted">{formatCount(tag.count, locale)}</span>
                 </button>
               ))}
             </div>
           )}
           {response.items.length === 0 && (
-            <div className="card py-16 text-center text-sm text-muted">没有找到相关内容</div>
+            <div className="card py-16 text-center text-sm text-muted">{t('没有找到相关内容')}</div>
           )}
           {response.engine === 'postgres' && type === 'videos' && (
             <p className="mt-4 text-xs text-muted">
-              当前未启用 Meilisearch，使用 PostgreSQL 模糊搜索。
+              {t('当前未启用 Meilisearch，使用 PostgreSQL 模糊搜索。')}{' '}
             </p>
           )}
           {history[0] && (
             <p className="mt-4 text-xs text-muted">
-              最近搜索：{history[0].query} · {relativeTime(history[0].createdAt)}
+              {t('最近搜索：')}
+              {history[0].query} · {relativeTime(history[0].createdAt, locale)}
             </p>
           )}
         </div>

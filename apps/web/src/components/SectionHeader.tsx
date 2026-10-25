@@ -1,3 +1,6 @@
+'use client';
+
+import { useT } from '@/components/I18nProvider';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -10,6 +13,7 @@ export function SectionHeader({
   description?: string;
   href?: string;
 }) {
+  const t = useT();
   return (
     <div className="section-title mb-4">
       <div>
@@ -21,7 +25,7 @@ export function SectionHeader({
           href={href}
           className="inline-flex items-center gap-1 text-sm font-normal text-muted hover:text-brand"
         >
-          查看全部
+          {t('查看全部')}
           <ArrowRight className="h-4 w-4" />
         </Link>
       )}

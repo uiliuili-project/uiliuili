@@ -32,6 +32,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.11
         version: 5.104.5(@types/react@19.3.0)(react@19.3.1)
+      '@uiliuili/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@uiliuili/shared':
         specifier: workspace:*
         version: link:../../packages/shared

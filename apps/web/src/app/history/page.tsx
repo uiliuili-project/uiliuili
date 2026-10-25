@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from '@/components/I18nProvider';
 
 import { api } from '@/lib/api';
 import { formatCount, formatDuration, relativeTime } from '@/lib/format';
@@ -15,6 +16,8 @@ interface HistoryItem {
 }
 
 export default function HistoryPage() {
+  const t = useT();
+  const locale = useLocale();
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,24 +26,26 @@ export default function HistoryPage() {
     api
       .get<{ items: HistoryItem[] }>('/api/v1/me/history?limit=40')
       .then((data) => setItems(data.items))
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : '加载失败'))
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : t('加载失败')),
+      )
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <div className="container-page py-6">
-      <h1 className="mb-5 text-xl font-semibold">观看历史</h1>
-      {loading && <p className="text-sm text-muted">加载中…</p>}
+      <h1 className="mb-5 text-xl font-semibold">{t('观看历史')}</h1>
+      {loading && <p className="text-sm text-muted">{t('加载中…')}</p>}
       {error && (
         <div className="card p-8 text-center">
           <p className="text-sm text-muted">{error}</p>
           <Link href="/login" className="btn-primary mt-4">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </div>
       )}
       {!loading && !error && items.length === 0 && (
-        <div className="card py-16 text-center text-sm text-muted">还没有观看记录</div>
+        <div className="card py-16 text-center text-sm text-muted">{t('还没有观看记录')}</div>
       )}
       <div className="space-y-3">
         {items.map((item) => {
@@ -68,13 +73,17 @@ export default function HistoryPage() {
                   {item.video.title}
                 </h2>
                 <p className="mt-1 text-xs text-muted">
-                  {item.video.uploader.displayName} · {formatCount(item.video.views)} 播放
+                  {item.video.uploader.displayName} · {formatCount(item.video.views, locale)}{' '}
+                  {t('播放')}{' '}
                 </p>
                 <p className="mt-1 text-xs text-muted">
                   {item.completed
-                    ? '已看完'
-                    : `看到 ${Math.floor(item.progressMs / 1000 / 60)} 分 ${Math.floor((item.progressMs / 1000) % 60)} 秒`}{' '}
-                  · {relativeTime(item.watchedAt)}
+                    ? t('已看完')
+                    : t('看到 {0} 分 {1} 秒', {
+                        0: Math.floor(item.progressMs / 1000 / 60),
+                        1: Math.floor((item.progressMs / 1000) % 60),
+                      })}{' '}
+                  · {relativeTime(item.watchedAt, locale)}
                 </p>
               </div>
             </Link>

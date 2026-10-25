@@ -2,6 +2,7 @@ import { CommentSection } from '@/components/CommentSection';
 import { DanmakuPlayer } from '@/components/DanmakuPlayer';
 import { VideoActions } from '@/components/VideoActions';
 import { formatCount, formatDate, relativeTime } from '@/lib/format';
+import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
 import type { SpaceProfile } from '@/lib/types';
 import type { VideoCard, VideoDetail } from '@uiliuili/shared';
@@ -17,6 +18,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+  const t = await getT();
   try {
     const video = await serverFetch<VideoDetail>(`/api/v1/videos/${id}`);
     return {
@@ -24,12 +26,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: video.description.slice(0, 160),
     };
   } catch {
-    return { title: '视频' };
+    return { title: t('视频') };
   }
 }
 
 export default async function VideoPage({ params }: PageProps) {
   const { id } = await params;
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   let video: VideoDetail;
   try {
     video = await serverFetch<VideoDetail>(`/api/v1/videos/${id}`);
@@ -37,12 +40,12 @@ export default async function VideoPage({ params }: PageProps) {
     return (
       <div className="container-page py-16">
         <div className="card mx-auto max-w-xl p-10 text-center">
-          <h1 className="text-xl font-semibold">视频不可用</h1>
+          <h1 className="text-xl font-semibold">{t('视频不可用')}</h1>
           <p className="mt-2 text-sm text-muted">
-            {error instanceof Error ? error.message : '视频不存在或暂时无法访问'}
+            {error instanceof Error ? t(error.message) : t('视频不存在或暂时无法访问')}
           </p>
           <Link href="/" className="btn-primary mt-6">
-            返回首页
+            {t('返回首页')}
           </Link>
         </div>
       </div>
@@ -58,7 +61,7 @@ export default async function VideoPage({ params }: PageProps) {
     <div className="container-page py-5">
       <nav className="mb-3 flex items-center gap-2 text-xs text-muted">
         <Link href="/" className="hover:text-brand">
-          首页
+          {t('首页')}
         </Link>
         <span>/</span>
         {video.category && (
@@ -80,18 +83,20 @@ export default async function VideoPage({ params }: PageProps) {
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
             <span className="inline-flex items-center gap-1">
               <Eye className="h-3.5 w-3.5" />
-              {formatCount(video.views)} 播放
+              {formatCount(video.views, locale)} {t('播放')}
             </span>
             <span className="inline-flex items-center gap-1">
               <MessageSquare className="h-3.5 w-3.5" />
-              {formatCount(video.danmaku)} 弹幕
+              {formatCount(video.danmaku, locale)} {t('弹幕')}
             </span>
             <span className="inline-flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              {formatDate(video.publishedAt ?? video.createdAt)}
+              {formatDate(video.publishedAt ?? video.createdAt, locale)}
             </span>
             {video.featured && (
-              <span className="rounded bg-brand-light px-2 py-0.5 text-brand-dark">推荐</span>
+              <span className="rounded bg-brand-light px-2 py-0.5 text-brand-dark">
+                {t('推荐')}
+              </span>
             )}
           </div>
 
@@ -117,18 +122,18 @@ export default async function VideoPage({ params }: PageProps) {
                 <div className="truncate text-sm font-semibold">{video.uploader.displayName}</div>
                 <div className="truncate text-xs text-muted">
                   @{video.uploader.username}
-                  {profile ? ` · ${formatCount(profile.stats.followers)} 粉丝` : ''}
+                  {profile ? ` · ${formatCount(profile.stats.followers, locale)} ${t('粉丝')}` : ''}
                 </div>
               </div>
             </Link>
             <Link href={`/space/${video.uploader.username}`} className="btn-ghost shrink-0">
-              进入空间
+              {t('进入空间')}
             </Link>
           </div>
 
           {video.description && (
             <div className="mt-4 rounded-xl2 border border-line bg-white p-4">
-              <h2 className="mb-2 text-sm font-semibold">简介</h2>
+              <h2 className="mb-2 text-sm font-semibold">{t('简介')}</h2>
               <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted">
                 {video.description}
               </p>
@@ -150,7 +155,7 @@ export default async function VideoPage({ params }: PageProps) {
 
         <aside className="min-w-0">
           <section className="card p-4">
-            <h2 className="mb-3 text-sm font-semibold">相关推荐</h2>
+            <h2 className="mb-3 text-sm font-semibold">{t('相关推荐')}</h2>
             <div className="space-y-3">
               {related.items.map((item) => (
                 <Link
@@ -169,18 +174,20 @@ export default async function VideoPage({ params }: PageProps) {
                     </div>
                     <div className="mt-1 text-xs text-muted">{item.uploader.displayName}</div>
                     <div className="mt-0.5 text-xs text-muted">
-                      {formatCount(item.views)} 播放 ·{' '}
-                      {relativeTime(item.publishedAt ?? item.createdAt)}
+                      {formatCount(item.views, locale)} {t('播放')} ·{' '}
+                      {relativeTime(item.publishedAt ?? item.createdAt, locale)}
                     </div>
                   </div>
                 </Link>
               ))}
-              {related.items.length === 0 && <p className="text-sm text-muted">暂无相关推荐</p>}
+              {related.items.length === 0 && (
+                <p className="text-sm text-muted">{t('暂无相关推荐')}</p>
+              )}
             </div>
           </section>
 
           <section className="card mt-4 p-4">
-            <h2 className="mb-3 text-sm font-semibold">UP 主</h2>
+            <h2 className="mb-3 text-sm font-semibold">{t('UP 主')}</h2>
             <Link
               href={`/space/${video.uploader.username}`}
               className="flex items-center gap-3 rounded-lg p-1 hover:bg-canvas"
@@ -200,7 +207,10 @@ export default async function VideoPage({ params }: PageProps) {
                 <div className="truncate text-sm font-medium">{video.uploader.displayName}</div>
                 <div className="text-xs text-muted">
                   {profile
-                    ? `${formatCount(profile.stats.videos)} 投稿 · ${formatCount(profile.stats.followers)} 粉丝`
+                    ? `${formatCount(profile.stats.videos, locale)} ${t('投稿')} · ${formatCount(
+                        profile.stats.followers,
+                        locale,
+                      )} ${t('粉丝')}`
                     : `Lv.${video.uploader.level}`}
                 </div>
               </div>

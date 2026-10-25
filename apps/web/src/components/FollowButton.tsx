@@ -1,4 +1,5 @@
 'use client';
+import { useT } from './I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -14,6 +15,7 @@ export function FollowButton({
   initialFollowing: boolean;
   isSelf?: boolean;
 }) {
+  const t = useT();
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -28,7 +30,7 @@ export function FollowButton({
       else await api.post(`/api/v1/users/${userId}/follow`);
       setFollowing((value) => !value);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作失败');
+      setMessage(error instanceof Error ? error.message : t('操作失败'));
     } finally {
       setLoading(false);
     }
@@ -50,12 +52,12 @@ export function FollowButton({
         {following ? (
           <>
             <Check className="mr-1 inline h-4 w-4" />
-            已关注
+            {t('已关注')}{' '}
           </>
         ) : (
           <>
             <UserPlus className="mr-1 inline h-4 w-4" />
-            关注
+            {t('关注')}{' '}
           </>
         )}
       </button>

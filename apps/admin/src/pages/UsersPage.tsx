@@ -17,6 +17,7 @@ import {
 } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { AdminUser } from '../types';
 
 const { Title, Text } = Typography;
@@ -27,6 +28,7 @@ const roleOptions = ['USER', 'UPLOADER', 'REVIEWER', 'ADMIN', 'SUPER_ADMIN'].map
 }));
 
 export function UsersPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -63,7 +65,7 @@ export function UsersPage() {
       const values = await form.validateFields();
       setSaving(true);
       await api.patch(`/api/v1/admin/users/${editing.id}`, values);
-      notification.success({ message: '用户已更新' });
+      notification.success({ message: t('用户已更新') });
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     } catch (error) {
@@ -78,11 +80,11 @@ export function UsersPage() {
       await api.patch(`/api/v1/admin/users/${user.id}`, {
         mutedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
-      notification.success({ message: '已禁言 24 小时' });
+      notification.success({ message: t('已禁言 24 小时') });
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     } catch (error) {
       notification.error({
-        message: error instanceof Error ? error.message : '操作失败',
+        message: error instanceof Error ? error.message : t('操作失败'),
       });
     }
   };
@@ -91,14 +93,14 @@ export function UsersPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          用户管理
+          {t('用户管理')}{' '}
         </Title>
-        <Text className="muted">管理账号角色、封禁与禁言</Text>
+        <Text className="muted">{t('管理账号角色、封禁与禁言')}</Text>
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search
-            placeholder="搜索用户名、邮箱或昵称"
+            placeholder={t('搜索用户名、邮箱或昵称')}
             allowClear
             style={{ width: 280 }}
             onSearch={(value) => {
@@ -107,7 +109,7 @@ export function UsersPage() {
             }}
           />
           <Select
-            placeholder="角色"
+            placeholder={t('角色')}
             allowClear
             style={{ width: 150 }}
             options={roleOptions}
@@ -118,12 +120,12 @@ export function UsersPage() {
             }}
           />
           <Select
-            placeholder="状态"
+            placeholder={t('状态')}
             allowClear
             style={{ width: 130 }}
             options={[
-              { value: 'false', label: '正常' },
-              { value: 'true', label: '已封禁' },
+              { value: 'false', label: t('正常') },
+              { value: 'true', label: t('已封禁') },
             ]}
             value={banned === undefined ? undefined : String(banned)}
             onChange={(value) => {
@@ -149,7 +151,7 @@ export function UsersPage() {
           scroll={{ x: 900 }}
           columns={[
             {
-              title: '用户',
+              title: t('用户'),
               dataIndex: 'username',
               render: (_value, record) => (
                 <div>
@@ -158,9 +160,9 @@ export function UsersPage() {
                 </div>
               ),
             },
-            { title: '邮箱', dataIndex: 'email' },
+            { title: t('邮箱'), dataIndex: 'email' },
             {
-              title: '角色',
+              title: t('角色'),
               dataIndex: 'roles',
               render: (roles: string[]) => (
                 <Space wrap>
@@ -172,34 +174,34 @@ export function UsersPage() {
                 </Space>
               ),
             },
-            { title: '等级', dataIndex: 'level', width: 80 },
-            { title: '硬币', dataIndex: 'coinBalance', width: 80 },
+            { title: t('等级'), dataIndex: 'level', width: 80 },
+            { title: t('硬币'), dataIndex: 'coinBalance', width: 80 },
             {
-              title: '状态',
+              title: t('状态'),
               dataIndex: 'banned',
               width: 100,
               render: (value: boolean, record) =>
                 value ? (
-                  <Tag color="red">已封禁</Tag>
+                  <Tag color="red">{t('已封禁')}</Tag>
                 ) : record.mutedUntil ? (
-                  <Tag color="orange">禁言中</Tag>
+                  <Tag color="orange">{t('禁言中')}</Tag>
                 ) : (
-                  <Tag color="green">正常</Tag>
+                  <Tag color="green">{t('正常')}</Tag>
                 ),
             },
             {
-              title: '注册时间',
+              title: t('注册时间'),
               dataIndex: 'createdAt',
               width: 180,
               render: (value: string) => new Date(value).toLocaleString(),
             },
             {
-              title: '操作',
+              title: t('操作'),
               width: 180,
               render: (_value, record) => (
                 <Space>
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                    编辑
+                    {t('编辑')}{' '}
                   </Button>
                   <Button
                     size="small"
@@ -207,7 +209,7 @@ export function UsersPage() {
                     icon={<StopOutlined />}
                     onClick={() => void mute(record)}
                   >
-                    禁言
+                    {t('禁言')}{' '}
                   </Button>
                 </Space>
               ),
@@ -217,21 +219,21 @@ export function UsersPage() {
       </Card>
 
       <Modal
-        title={`编辑用户 · ${editing?.username ?? ''}`}
+        title={t('编辑用户 · {0}', { 0: editing?.username ?? '' })}
         open={Boolean(editing)}
         onCancel={() => setEditing(null)}
         onOk={() => void save()}
         confirmLoading={saving}
-        okText="保存"
+        okText={t('保存')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item label="角色" name="role" rules={[{ required: true }]}>
+          <Form.Item label={t('角色')} name="role" rules={[{ required: true }]}>
             <Select options={roleOptions} />
           </Form.Item>
-          <Form.Item label="等级" name="level">
+          <Form.Item label={t('等级')} name="level">
             <InputNumber min={0} max={6} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="封禁账号" name="banned" valuePropName="checked">
+          <Form.Item label={t('封禁账号')} name="banned" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

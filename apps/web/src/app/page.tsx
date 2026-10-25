@@ -1,6 +1,7 @@
 import { SectionHeader } from '@/components/SectionHeader';
 import { VideoCard } from '@/components/VideoCard';
 import { formatCount, formatDate, formatDuration } from '@/lib/format';
+import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetchSafe } from '@/lib/server-api';
 import type { Announcement, HomeFeed } from '@/lib/types';
 import { Play, Sparkles, TrendingUp } from 'lucide-react';
@@ -20,7 +21,9 @@ const emptyFeed: HomeFeed = {
 };
 
 export default async function HomePage() {
-  const [feed, announcements] = await Promise.all([
+  const [t, locale, feed, announcements] = await Promise.all([
+    getT(),
+    getLocale(),
     serverFetchSafe<HomeFeed>('/api/v1/feed/home', emptyFeed),
     serverFetchSafe<{ items: Announcement[] }>('/api/v1/announcements', { items: [] }),
   ]);
@@ -32,7 +35,7 @@ export default async function HomePage() {
     <div className="container-page py-6">
       {announcements.items.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-2 rounded-xl2 border border-brand/20 bg-brand-light/50 px-4 py-3 text-sm text-brand-dark">
-          <span className="font-semibold">公告</span>
+          <span className="font-semibold">{t('公告')}</span>
           <span className="text-ink">{announcements.items[0]?.title}</span>
           <span className="text-muted">{announcements.items[0]?.content}</span>
         </div>
@@ -40,10 +43,10 @@ export default async function HomePage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Link href="/" className="chip chip-active">
-          推荐
+          {t('推荐')}
         </Link>
         <Link href="/trending" className="chip">
-          热门
+          {t('热门')}
         </Link>
         {feed.categories.slice(0, 8).map((category) => (
           <Link key={category.id} href={`/category/${category.slug}`} className="chip">
@@ -52,10 +55,10 @@ export default async function HomePage() {
         ))}
         {feed.categories.length === 0 && (
           <>
-            <span className="chip">动画</span>
-            <span className="chip">音乐</span>
-            <span className="chip">游戏</span>
-            <span className="chip">知识</span>
+            <span className="chip">{t('动画')}</span>
+            <span className="chip">{t('音乐')}</span>
+            <span className="chip">{t('游戏')}</span>
+            <span className="chip">{t('知识')}</span>
           </>
         )}
       </div>
@@ -63,16 +66,16 @@ export default async function HomePage() {
       {isEmpty ? (
         <div className="card flex min-h-[360px] flex-col items-center justify-center p-10 text-center">
           <Sparkles className="mb-4 h-10 w-10 text-brand" />
-          <h1 className="text-2xl font-semibold">欢迎来到 uiliuili</h1>
+          <h1 className="text-2xl font-semibold">{t('欢迎来到 uiliuili')}</h1>
           <p className="mt-2 max-w-lg text-sm text-muted">
-            还没有已发布的视频。完成安装并上传第一支视频后，这里会自动出现推荐内容。
+            {t('还没有已发布的视频。完成安装并上传第一支视频后，这里会自动出现推荐内容。')}
           </p>
           <div className="mt-6 flex gap-3">
             <Link href="/studio" className="btn-primary">
-              去投稿
+              {t('去投稿')}
             </Link>
             <a href="/admin/" className="btn-ghost">
-              管理后台
+              {t('管理后台')}
             </a>
           </div>
         </div>
@@ -98,17 +101,17 @@ export default async function HomePage() {
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent p-5 text-white sm:p-7">
                   <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-1 text-[11px] font-semibold">
                     <Sparkles className="h-3 w-3" />
-                    今日推荐
+                    {t('今日推荐')}
                   </div>
                   <h1 className="line-clamp-2 text-xl font-semibold sm:text-2xl">{hero.title}</h1>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-white/75">
                     <span>{hero.uploader.displayName}</span>
                     <span className="inline-flex items-center gap-1">
                       <Play className="h-3 w-3" />
-                      {formatCount(hero.views)}
+                      {formatCount(hero.views, locale)}
                     </span>
                     <span>{formatDuration(hero.durationSeconds)}</span>
-                    <span>{formatDate(hero.publishedAt)}</span>
+                    <span>{formatDate(hero.publishedAt, locale)}</span>
                   </div>
                 </div>
               </Link>
@@ -116,7 +119,7 @@ export default async function HomePage() {
               <div className="card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-brand" />
-                  <h2 className="text-lg font-semibold">正在流行</h2>
+                  <h2 className="text-lg font-semibold">{t('正在流行')}</h2>
                 </div>
                 <div className="space-y-3">
                   {feed.sections.trending.items.slice(0, 5).map((video, index) => (
@@ -136,13 +139,14 @@ export default async function HomePage() {
                           {video.title}
                         </div>
                         <div className="mt-1 text-xs text-muted">
-                          {video.uploader.displayName} · {formatCount(video.views)} 播放
+                          {video.uploader.displayName} · {formatCount(video.views, locale)}{' '}
+                          {t('播放')}
                         </div>
                       </div>
                     </Link>
                   ))}
                   {feed.sections.trending.items.length === 0 && (
-                    <p className="text-sm text-muted">暂无热门内容</p>
+                    <p className="text-sm text-muted">{t('暂无热门内容')}</p>
                   )}
                 </div>
               </div>
@@ -151,7 +155,11 @@ export default async function HomePage() {
 
           {feed.sections.continueWatching.items.length > 0 && (
             <section className="mb-9">
-              <SectionHeader title="继续观看" description="接着上次的进度继续" href="/history" />
+              <SectionHeader
+                title={t('继续观看')}
+                description={t('接着上次的进度继续')}
+                href="/history"
+              />
               <div className="video-grid">
                 {feed.sections.continueWatching.items.map((video) => (
                   <VideoCard key={video.id} video={video} />
@@ -162,7 +170,7 @@ export default async function HomePage() {
 
           {recommended.length > 0 && (
             <section className="mb-9">
-              <SectionHeader title="为你推荐" description="根据你的观看与互动生成" />
+              <SectionHeader title={t('为你推荐')} description={t('根据你的观看与互动生成')} />
               <div className="video-grid">
                 {recommended.map((video) => (
                   <VideoCard key={video.id} video={video} />
@@ -172,7 +180,7 @@ export default async function HomePage() {
           )}
 
           <section className="mb-9">
-            <SectionHeader title="最新投稿" href="/trending" />
+            <SectionHeader title={t('最新投稿')} href="/trending" />
             <div className="video-grid">
               {feed.sections.newest.items.map((video) => (
                 <VideoCard key={video.id} video={video} />

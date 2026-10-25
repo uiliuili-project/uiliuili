@@ -1,6 +1,7 @@
 import { FollowButton } from '@/components/FollowButton';
 import { VideoCard } from '@/components/VideoCard';
 import { formatCount, formatDate } from '@/lib/format';
+import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
 import type { SpaceProfile } from '@/lib/types';
 import type { VideoCard as VideoCardType } from '@uiliuili/shared';
@@ -16,21 +17,23 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;
+  const t = await getT();
   const profile = await serverFetchSafe<SpaceProfile | null>(`/api/v1/users/${username}`, null);
-  return { title: profile ? `${profile.user.displayName} 的空间` : '个人空间' };
+  return { title: profile ? `${profile.user.displayName}${t('的空间')}` : t('个人空间') };
 }
 
 export default async function SpacePage({ params }: PageProps) {
   const { username } = await params;
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   let profile: SpaceProfile;
   try {
     profile = await serverFetch<SpaceProfile>(`/api/v1/users/${username}`);
   } catch {
     return (
       <div className="container-page py-16 text-center">
-        <h1 className="text-xl font-semibold">用户不存在</h1>
+        <h1 className="text-xl font-semibold">{t('用户不存在')}</h1>
         <Link href="/" className="btn-primary mt-6">
-          返回首页
+          {t('返回首页')}
         </Link>
       </div>
     );
@@ -66,7 +69,7 @@ export default async function SpacePage({ params }: PageProps) {
             <div className="flex items-center gap-3 pb-1">
               {profile.isSelf && (
                 <Link href="/settings" className="btn-ghost h-9 rounded-full">
-                  编辑资料
+                  {t('编辑资料')}
                 </Link>
               )}
               <FollowButton
@@ -79,17 +82,20 @@ export default async function SpacePage({ params }: PageProps) {
           <div className="mt-4 flex flex-wrap gap-5 text-sm">
             <span className="inline-flex items-center gap-1.5 text-muted">
               <Users className="h-4 w-4" />
-              <strong className="text-ink">{formatCount(profile.stats.followers)}</strong> 粉丝
+              <strong className="text-ink">{formatCount(profile.stats.followers, locale)}</strong>{' '}
+              {t('粉丝')}
             </span>
             <span className="text-muted">
-              <strong className="text-ink">{formatCount(profile.stats.following)}</strong> 关注
+              <strong className="text-ink">{formatCount(profile.stats.following, locale)}</strong>{' '}
+              {t('关注')}
             </span>
             <span className="text-muted">
-              <strong className="text-ink">{formatCount(profile.stats.videos)}</strong> 投稿
+              <strong className="text-ink">{formatCount(profile.stats.videos, locale)}</strong>{' '}
+              {t('投稿')}
             </span>
             <span className="inline-flex items-center gap-1.5 text-muted">
               <CalendarDays className="h-4 w-4" />
-              加入于 {formatDate(profile.user.createdAt)}
+              {t('common.joinDate', { date: formatDate(profile.user.createdAt, locale) })}
             </span>
           </div>
           {profile.user.bio && (
@@ -101,7 +107,7 @@ export default async function SpacePage({ params }: PageProps) {
       <div className="mt-7">
         <div className="mb-4 flex items-center gap-4 border-b border-line pb-2">
           <span className="border-b-2 border-brand px-2 pb-2 text-sm font-medium text-brand">
-            投稿
+            {t('投稿')}
           </span>
         </div>
         {videos.items.length > 0 ? (
@@ -111,7 +117,7 @@ export default async function SpacePage({ params }: PageProps) {
             ))}
           </div>
         ) : (
-          <div className="card py-16 text-center text-sm text-muted">还没有公开投稿</div>
+          <div className="card py-16 text-center text-sm text-muted">{t('还没有公开投稿')}</div>
         )}
       </div>
     </div>

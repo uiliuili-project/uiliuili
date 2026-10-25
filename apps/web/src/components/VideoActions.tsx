@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from './I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -18,6 +19,8 @@ const reportReasons = [
 ];
 
 export function VideoActions({ video }: { video: VideoDetail }) {
+  const t = useT();
+  const locale = useLocale();
   const [liked, setLiked] = useState(video.liked);
   const [likes, setLikes] = useState(video.likes);
   const [coins, setCoins] = useState(video.coinCount);
@@ -32,8 +35,12 @@ export function VideoActions({ video }: { video: VideoDetail }) {
     try {
       await action();
     } catch (error) {
-      const text = error instanceof Error ? error.message : '操作失败';
-      setMessage(text.includes('登录') || text.includes('401') ? '请先登录后再操作' : text);
+      const text = error instanceof Error ? error.message : t('操作失败');
+      setMessage(
+        text.includes('登录') || text.toLowerCase().includes('log in') || text.includes('401')
+          ? t('请先登录后再操作')
+          : text,
+      );
     }
   };
 
@@ -60,7 +67,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         amount: 1,
       });
       setCoins(data.count);
-      setMessage('投币成功');
+      setMessage(t('投币成功'));
     });
 
   const toggleFavorite = () =>
@@ -93,10 +100,10 @@ export function VideoActions({ video }: { video: VideoDetail }) {
       if (navigator.share) await navigator.share({ title: video.title, url });
       else {
         await navigator.clipboard.writeText(url);
-        setMessage('链接已复制');
+        setMessage(t('链接已复制'));
       }
     } catch {
-      setMessage('复制失败，请手动复制地址栏链接');
+      setMessage(t('复制失败，请手动复制地址栏链接'));
     }
   };
 
@@ -108,7 +115,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         reason,
       });
       setReportOpen(false);
-      setMessage('举报已提交，我们会尽快处理');
+      setMessage(t('举报已提交，我们会尽快处理'));
     });
 
   const notInterested = () =>
@@ -117,7 +124,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         videoId: video.id,
         action: 'not_interested',
       });
-      setMessage('已减少此类推荐');
+      setMessage(t('已减少此类推荐'));
     });
 
   return (
@@ -132,11 +139,11 @@ export function VideoActions({ video }: { video: VideoDetail }) {
           )}
         >
           <ThumbsUp className={cn('h-4 w-4', liked && 'fill-current')} />
-          {formatCount(likes)}
+          {formatCount(likes, locale)}
         </button>
         <button type="button" onClick={addCoin} className="btn-ghost h-10 rounded-full">
           <Coins className="h-4 w-4" />
-          {formatCount(coins)}
+          {formatCount(coins, locale)}
         </button>
         <button
           type="button"
@@ -147,11 +154,11 @@ export function VideoActions({ video }: { video: VideoDetail }) {
           )}
         >
           <Star className={cn('h-4 w-4', favorited && 'fill-current')} />
-          {formatCount(favorites)}
+          {formatCount(favorites, locale)}
         </button>
         <button type="button" onClick={share} className="btn-ghost h-10 rounded-full">
           <Share2 className="h-4 w-4" />
-          分享
+          {t('分享')}{' '}
         </button>
         <div className="relative">
           <button
@@ -160,7 +167,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
             className="btn-ghost h-10 rounded-full"
           >
             <Flag className="h-4 w-4" />
-            举报
+            {t('举报')}{' '}
           </button>
           {reportOpen && (
             <div className="absolute left-0 top-12 z-20 w-44 rounded-xl border border-line bg-white p-1 shadow-float">
@@ -171,7 +178,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
                   onClick={() => report(reason.value)}
                   className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-canvas"
                 >
-                  {reason.label}
+                  {t(reason.label)}
                 </button>
               ))}
               <button
@@ -183,7 +190,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
                 className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
               >
                 <X className="mr-1 inline h-3.5 w-3.5" />
-                不感兴趣
+                {t('不感兴趣')}{' '}
               </button>
             </div>
           )}
@@ -201,12 +208,12 @@ export function VideoActions({ video }: { video: VideoDetail }) {
           {following ? (
             <>
               <Check className="mr-1 inline h-4 w-4" />
-              已关注
+              {t('已关注')}{' '}
             </>
           ) : (
             <>
               <UserPlus className="mr-1 inline h-4 w-4" />
-              关注
+              {t('关注')}{' '}
             </>
           )}
         </button>
@@ -220,7 +227,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
         >
           {message ||
             (video.status === 'pending_review'
-              ? '该视频正在等待审核，仅你和管理员可见'
+              ? t('该视频正在等待审核，仅你和管理员可见')
               : video.status)}
         </p>
       )}

@@ -17,6 +17,7 @@ import {
 } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { AdminVideo } from '../types';
 
 const { Title, Text } = Typography;
@@ -46,6 +47,7 @@ const statusColor: Record<string, string> = {
 };
 
 export function VideosPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -81,7 +83,7 @@ export function VideosPage() {
       const values = await form.validateFields();
       setSaving(true);
       await api.patch(`/api/v1/admin/videos/${editing.id}`, values);
-      notification.success({ message: '视频已更新' });
+      notification.success({ message: t('视频已更新') });
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-videos'] });
     } catch (error) {
@@ -97,7 +99,7 @@ export function VideosPage() {
       await queryClient.invalidateQueries({ queryKey: ['admin-videos'] });
     } catch (error) {
       notification.error({
-        message: error instanceof Error ? error.message : '操作失败',
+        message: error instanceof Error ? error.message : t('操作失败'),
       });
     }
   };
@@ -106,14 +108,14 @@ export function VideosPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          视频管理
+          {t('视频管理')}{' '}
         </Title>
-        <Text className="muted">审核、下架、推荐加权</Text>
+        <Text className="muted">{t('审核、下架、推荐加权')}</Text>
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search
-            placeholder="搜索视频标题"
+            placeholder={t('搜索视频标题')}
             allowClear
             style={{ width: 280 }}
             onSearch={(value) => {
@@ -122,7 +124,7 @@ export function VideosPage() {
             }}
           />
           <Select
-            placeholder="状态"
+            placeholder={t('状态')}
             allowClear
             style={{ width: 160 }}
             options={statusOptions}
@@ -150,7 +152,7 @@ export function VideosPage() {
           }}
           columns={[
             {
-              title: '视频',
+              title: t('视频'),
               dataIndex: 'title',
               render: (value: string, record) => (
                 <div>
@@ -160,13 +162,13 @@ export function VideosPage() {
               ),
             },
             {
-              title: '状态',
+              title: t('状态'),
               dataIndex: 'status',
               width: 130,
               render: (value: string) => <Tag color={statusColor[value]}>{value}</Tag>,
             },
             {
-              title: '推荐',
+              title: t('推荐'),
               dataIndex: 'featured',
               width: 100,
               render: (value: boolean, record) => (
@@ -179,32 +181,33 @@ export function VideosPage() {
               ),
             },
             {
-              title: '权重',
+              title: t('权重'),
               dataIndex: 'recommendWeight',
               width: 80,
             },
             {
-              title: '数据',
+              title: t('数据'),
               width: 220,
               render: (_value, record) => (
                 <Text type="secondary">
-                  {record.views} 播放 · {record.likes} 赞 · {record.danmaku} 弹幕
+                  {record.views} {t('播放 ·')} {record.likes} {t('赞 ·')} {record.danmaku}{' '}
+                  {t('弹幕')}{' '}
                 </Text>
               ),
             },
             {
-              title: '创建时间',
+              title: t('创建时间'),
               dataIndex: 'createdAt',
               width: 180,
               render: (value: string) => new Date(value).toLocaleString(),
             },
             {
-              title: '操作',
+              title: t('操作'),
               width: 190,
               render: (_value, record) => (
                 <Space>
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                    编辑
+                    {t('编辑')}{' '}
                   </Button>
                   <Button
                     size="small"
@@ -220,25 +223,25 @@ export function VideosPage() {
       </Card>
 
       <Modal
-        title={`编辑视频 · ${editing?.title ?? ''}`}
+        title={t('编辑视频 · {0}', { 0: editing?.title ?? '' })}
         open={Boolean(editing)}
         onCancel={() => setEditing(null)}
         onOk={() => void save()}
         confirmLoading={saving}
-        okText="保存"
+        okText={t('保存')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item label="状态" name="status">
+          <Form.Item label={t('状态')} name="status">
             <Select options={statusOptions} />
           </Form.Item>
-          <Form.Item label="推荐" name="featured" valuePropName="checked">
+          <Form.Item label={t('推荐')} name="featured" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item label="推荐权重" name="recommendWeight">
+          <Form.Item label={t('推荐权重')} name="recommendWeight">
             <InputNumber min={-100} max={100} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="下架原因" name="blockReason">
-            <Input.TextArea rows={3} placeholder="仅下架时需要填写" />
+          <Form.Item label={t('下架原因')} name="blockReason">
+            <Input.TextArea rows={3} placeholder={t('仅下架时需要填写')} />
           </Form.Item>
         </Form>
       </Modal>

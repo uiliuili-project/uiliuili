@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from '@/components/I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -9,10 +10,35 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function NotificationsPage() {
+  const t = useT();
+  const locale = useLocale();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const localizedTitle = (item: NotificationItem) => {
+    const actor = item.actor?.displayName;
+    if (!actor) return item.title;
+    switch (item.type) {
+      case 'follow':
+        return `${actor} ${t('notifications.follow')}`;
+      case 'comment':
+        return `${actor} ${t('notifications.comment')}`;
+      case 'reply':
+        return `${actor} ${t('notifications.reply')}`;
+      case 'mention':
+        return `${actor} ${t('notifications.mention')}`;
+      case 'like':
+        return `${actor} ${t('notifications.like')}`;
+      case 'coin':
+        return `${actor} ${t('notifications.coin')}`;
+      case 'favorite':
+        return `${actor} ${t('notifications.favorite')}`;
+      default:
+        return item.title;
+    }
+  };
 
   const load = async (unread = unreadOnly) => {
     setLoading(true);
@@ -23,7 +49,7 @@ export default function NotificationsPage() {
       setItems(data.items);
       setError('');
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '加载失败');
+      setError(loadError instanceof Error ? loadError.message : t('加载失败'));
     } finally {
       setLoading(false);
     }
@@ -52,7 +78,7 @@ export default function NotificationsPage() {
   return (
     <div className="container-page py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">消息中心</h1>
+        <h1 className="text-xl font-semibold">{t('消息中心')}</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -63,11 +89,11 @@ export default function NotificationsPage() {
             }}
             className={cn('chip', unreadOnly && 'chip-active')}
           >
-            仅未读
+            {t('仅未读')}{' '}
           </button>
           <button type="button" onClick={() => void markAll()} className="btn-ghost">
             <CheckCheck className="h-4 w-4" />
-            全部已读
+            {t('全部已读')}{' '}
           </button>
         </div>
       </div>
@@ -75,13 +101,13 @@ export default function NotificationsPage() {
         <div className="card p-8 text-center">
           <p className="text-sm text-muted">{error}</p>
           <Link href="/login" className="btn-primary mt-4">
-            去登录
+            {t('去登录')}{' '}
           </Link>
         </div>
       )}
-      {loading && <p className="text-sm text-muted">加载中…</p>}
+      {loading && <p className="text-sm text-muted">{t('加载中…')}</p>}
       {!loading && !error && items.length === 0 && (
-        <div className="card py-16 text-center text-sm text-muted">没有消息</div>
+        <div className="card py-16 text-center text-sm text-muted">{t('没有消息')}</div>
       )}
       <div className="space-y-2">
         {items.map((item) => {
@@ -98,11 +124,11 @@ export default function NotificationsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">{item.title}</span>
+                  <span className="text-sm font-medium">{localizedTitle(item)}</span>
                   {!item.readAt && <span className="h-2 w-2 rounded-full bg-brand" />}
                 </div>
                 {item.body && <p className="mt-1 text-sm text-muted">{item.body}</p>}
-                <p className="mt-1 text-xs text-muted">{relativeTime(item.createdAt)}</p>
+                <p className="mt-1 text-xs text-muted">{relativeTime(item.createdAt, locale)}</p>
               </div>
             </div>
           );

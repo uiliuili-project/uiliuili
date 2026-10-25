@@ -1,4 +1,5 @@
 'use client';
+import { useLocale, useT } from './I18nProvider';
 
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -13,6 +14,8 @@ interface CommentResponse {
 }
 
 export function CommentSection({ videoId }: { videoId: string }) {
+  const t = useT();
+  const locale = useLocale();
   const [items, setItems] = useState<CommentItem[]>([]);
   const [sort, setSort] = useState<'hot' | 'new'>('hot');
   const [loading, setLoading] = useState(true);
@@ -32,7 +35,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
       setItems((current) => (append ? [...current, ...data.items] : data.items));
       setNextCursor(data.nextCursor);
     } catch {
-      setMessage('评论加载失败');
+      setMessage(t('评论加载失败'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +63,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
       }
       await load();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '发布失败');
+      setMessage(error instanceof Error ? error.message : t('发布失败'));
     } finally {
       setPosting(false);
     }
@@ -94,28 +97,28 @@ export function CommentSection({ videoId }: { videoId: string }) {
         }),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作失败');
+      setMessage(error instanceof Error ? error.message : t('操作失败'));
     }
   };
 
   return (
     <section className="mt-8">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">评论</h2>
+        <h2 className="text-lg font-semibold">{t('评论')}</h2>
         <div className="flex gap-1 rounded-lg bg-canvas p-1 text-xs">
           <button
             type="button"
             onClick={() => setSort('hot')}
             className={cn('rounded-md px-3 py-1.5', sort === 'hot' && 'bg-white shadow-sm')}
           >
-            热门
+            {t('热门')}{' '}
           </button>
           <button
             type="button"
             onClick={() => setSort('new')}
             className={cn('rounded-md px-3 py-1.5', sort === 'new' && 'bg-white shadow-sm')}
           >
-            最新
+            {t('最新')}{' '}
           </button>
         </div>
       </div>
@@ -126,7 +129,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
           onChange={(event) => setText(event.target.value)}
           maxLength={1000}
           rows={3}
-          placeholder="发一条友善的评论…"
+          placeholder={t('发一条友善的评论…')}
           className="input resize-none"
         />
         <div className="mt-2 flex items-center justify-between">
@@ -138,17 +141,17 @@ export function CommentSection({ videoId }: { videoId: string }) {
             className="btn-primary"
           >
             <Send className="h-4 w-4" />
-            发布
+            {t('发布')}{' '}
           </button>
         </div>
         {message && <p className="mt-2 text-xs text-red-500">{message}</p>}
       </div>
 
       <div className="mt-5 space-y-5">
-        {loading && items.length === 0 && <p className="text-sm text-muted">评论加载中…</p>}
+        {loading && items.length === 0 && <p className="text-sm text-muted">{t('评论加载中…')}</p>}
         {!loading && items.length === 0 && (
           <div className="rounded-xl border border-dashed border-line bg-white/60 py-10 text-center text-sm text-muted">
-            还没有评论，来抢沙发吧
+            {t('还没有评论，来抢沙发吧')}{' '}
           </div>
         )}
         {items.map((comment) => (
@@ -170,7 +173,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
                     if (event.key === 'Enter' && !event.shiftKey) void submit(comment.id);
                   }}
                   maxLength={1000}
-                  placeholder={`回复 @${comment.user.displayName}`}
+                  placeholder={t('回复 @{0}', { 0: comment.user.displayName })}
                   className="input"
                 />
                 <button
@@ -179,7 +182,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
                   disabled={posting}
                   className="btn-primary shrink-0"
                 >
-                  回复
+                  {t('回复')}{' '}
                 </button>
               </div>
             )}
@@ -193,7 +196,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
             ))}
             {comment.replyCount > comment.replies.length && (
               <p className="mt-2 text-xs text-muted">
-                还有 {comment.replyCount - comment.replies.length} 条回复
+                {t('还有')} {comment.replyCount - comment.replies.length} {t('条回复')}{' '}
               </p>
             )}
           </CommentRow>
@@ -204,7 +207,7 @@ export function CommentSection({ videoId }: { videoId: string }) {
             onClick={() => void load(nextCursor, true)}
             className="btn-ghost w-full"
           >
-            加载更多评论
+            {t('加载更多评论')}{' '}
           </button>
         )}
       </div>
@@ -225,6 +228,8 @@ function CommentRow({
   onReply?: () => void;
   children?: React.ReactNode;
 }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <div className={cn('flex gap-3', compact && 'mt-3 pl-10')}>
       <div
@@ -242,7 +247,7 @@ function CommentRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <span className="font-medium text-ink">{comment.user.displayName}</span>
-          <span>{relativeTime(comment.createdAt)}</span>
+          <span>{relativeTime(comment.createdAt, locale)}</span>
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.content}</p>
         <div className="mt-1.5 flex items-center gap-4 text-xs text-muted">
@@ -255,7 +260,7 @@ function CommentRow({
             )}
           >
             <Heart className={cn('h-3.5 w-3.5', comment.liked && 'fill-current')} />
-            {formatCount(comment.likeCount)}
+            {formatCount(comment.likeCount, locale)}
           </button>
           {onReply && (
             <button
@@ -264,7 +269,7 @@ function CommentRow({
               className="inline-flex items-center gap-1 hover:text-brand"
             >
               <MessageCircle className="h-3.5 w-3.5" />
-              回复
+              {t('回复')}{' '}
             </button>
           )}
         </div>

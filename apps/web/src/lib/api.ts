@@ -1,3 +1,5 @@
+import { createTranslator, localeCookieName, normalizeLocale } from '@uiliuili/i18n';
+
 const serverBase = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001';
 
 export class ApiError extends Error {
@@ -22,9 +24,10 @@ async function parseResponse<T>(response: Response): Promise<T> {
   }
   if (!response.ok) {
     const body = data as { error?: { message?: string; code?: string } };
+    const t = createTranslator(normalizeLocale(readCookie(localeCookieName)));
     throw new ApiError(
       response.status,
-      body?.error?.message ?? `请求失败（${response.status}）`,
+      body?.error?.message ? t(body.error.message) : t('请求失败（{0}）', { 0: response.status }),
       body?.error?.code,
     );
   }

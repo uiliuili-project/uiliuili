@@ -1,15 +1,15 @@
 'use client';
 
 import { api } from '@/lib/api';
-import { createTranslator } from '@uiliuili/i18n';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-
-const t = createTranslator('zh-CN');
+import { useT } from './I18nProvider';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 type FooterSettings = { site: { name: string; footer?: string; icp?: string } };
 
 export function Footer() {
+  const t = useT();
   const [settings, setSettings] = useState<FooterSettings>({ site: { name: 'uiliuili' } });
 
   useEffect(() => {
@@ -25,7 +25,9 @@ export function Footer() {
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
             u
           </span>
-          <span>{settings.site.name || 'uiliuili'} · 开源弹幕视频社区</span>
+          <span>
+            {settings.site.name || 'uiliuili'} · {t('common.footerTagline')}
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/about" className="hover:text-brand">
@@ -37,6 +39,7 @@ export function Footer() {
           <a href="/admin/" className="hover:text-brand">
             {t('nav.admin')}
           </a>
+          <LanguageSwitcher compact />
           {settings.site.icp && <span>{settings.site.icp}</span>}
           <span>{settings.site.footer || 'MIT License'}</span>
         </div>

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Select, Space, Table, Tag, Typography, notification } from 'antd';
 import { useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { AdminReport } from '../types';
 
 const { Title, Text } = Typography;
@@ -25,6 +26,7 @@ const targetLabels: Record<string, string> = {
 };
 
 export function ReportsPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -44,10 +46,10 @@ export function ReportsPage() {
   const handle = async (id: string, action: string) => {
     try {
       await api.post(`/api/v1/admin/reports/${id}/handle`, { action });
-      notification.success({ message: '举报已处理' });
+      notification.success({ message: t('举报已处理') });
       await queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
     } catch (error) {
-      notification.error({ message: error instanceof Error ? error.message : '操作失败' });
+      notification.error({ message: error instanceof Error ? error.message : t('操作失败') });
     }
   };
 
@@ -55,20 +57,20 @@ export function ReportsPage() {
     <div>
       <div style={{ marginBottom: 18 }}>
         <Title level={3} style={{ margin: 0 }}>
-          举报处理
+          {t('举报处理')}{' '}
         </Title>
-        <Text className="muted">处理用户举报并执行内容操作</Text>
+        <Text className="muted">{t('处理用户举报并执行内容操作')}</Text>
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
           <Select
-            placeholder="状态"
+            placeholder={t('状态')}
             allowClear
             style={{ width: 140 }}
             options={[
-              { value: 'open', label: '待处理' },
-              { value: 'resolved', label: '已处理' },
-              { value: 'rejected', label: '已驳回' },
+              { value: 'open', label: t('待处理') },
+              { value: 'resolved', label: t('已处理') },
+              { value: 'rejected', label: t('已驳回') },
             ]}
             value={status}
             onChange={(value) => {
@@ -77,10 +79,13 @@ export function ReportsPage() {
             }}
           />
           <Select
-            placeholder="类型"
+            placeholder={t('类型')}
             allowClear
             style={{ width: 140 }}
-            options={Object.entries(targetLabels).map(([value, label]) => ({ value, label }))}
+            options={Object.entries(targetLabels).map(([value, label]) => ({
+              value,
+              label: t(label),
+            }))}
             value={targetType}
             onChange={(value) => {
               setTargetType(value);
@@ -105,21 +110,21 @@ export function ReportsPage() {
           }}
           columns={[
             {
-              title: '类型',
+              title: t('类型'),
               dataIndex: 'targetType',
               width: 90,
-              render: (value: string) => <Tag>{targetLabels[value] ?? value}</Tag>,
+              render: (value: string) => <Tag>{t(targetLabels[value] ?? value)}</Tag>,
             },
             {
-              title: '原因',
+              title: t('原因'),
               dataIndex: 'reason',
               width: 120,
-              render: (value: string) => reasonLabels[value] ?? value,
+              render: (value: string) => t(reasonLabels[value] ?? value),
             },
-            { title: '说明', dataIndex: 'detail' },
-            { title: '举报人', dataIndex: 'reporter', width: 140 },
+            { title: t('说明'), dataIndex: 'detail' },
+            { title: t('举报人'), dataIndex: 'reporter', width: 140 },
             {
-              title: '状态',
+              title: t('状态'),
               dataIndex: 'status',
               width: 100,
               render: (value: string) => (
@@ -131,17 +136,17 @@ export function ReportsPage() {
               ),
             },
             {
-              title: '时间',
+              title: t('时间'),
               dataIndex: 'createdAt',
               width: 170,
               render: (value: string) => new Date(value).toLocaleString(),
             },
             {
-              title: '操作',
+              title: t('操作'),
               width: 250,
               render: (_value, record) =>
                 record.status !== 'open' ? (
-                  <Text type="secondary">已处理</Text>
+                  <Text type="secondary">{t('已处理')}</Text>
                 ) : (
                   <Space wrap>
                     <Button
@@ -150,21 +155,21 @@ export function ReportsPage() {
                       icon={<DeleteOutlined />}
                       onClick={() => void handle(record.id, 'delete')}
                     >
-                      删除内容
+                      {t('删除内容')}{' '}
                     </Button>
                     <Button
                       size="small"
                       icon={<StopOutlined />}
                       onClick={() => void handle(record.id, 'ban')}
                     >
-                      封禁
+                      {t('封禁')}{' '}
                     </Button>
                     <Button
                       size="small"
                       icon={<CloseOutlined />}
                       onClick={() => void handle(record.id, 'restore')}
                     >
-                      忽略
+                      {t('忽略')}{' '}
                     </Button>
                   </Space>
                 ),

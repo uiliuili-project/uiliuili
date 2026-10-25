@@ -8,11 +8,13 @@ import {
 import { Alert, Card, Col, Row, Skeleton, Statistic, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import type { DashboardStats } from '../types';
 
 const { Title, Paragraph, Text } = Typography;
 
 export function DashboardPage() {
+  const t = useT();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,15 +22,17 @@ export function DashboardPage() {
     api
       .get<DashboardStats>('/api/v1/admin/dashboard')
       .then(setStats)
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : '加载失败'));
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : t('加载失败')),
+      );
   }, []);
 
   if (error) {
     return (
       <Card>
-        <Alert type="warning" showIcon message="仪表盘暂不可用" description={error} />
+        <Alert type="warning" showIcon message={t('仪表盘暂不可用')} description={error} />
         <Paragraph className="muted" style={{ marginTop: 16 }}>
-          如果这是刚安装完成的实例，请确认 API 已重启且 worker 正在运行。
+          {t('如果这是刚安装完成的实例，请确认 API 已重启且 worker 正在运行。')}{' '}
         </Paragraph>
       </Card>
     );
@@ -38,9 +42,9 @@ export function DashboardPage() {
     <div>
       <div style={{ marginBottom: 20 }}>
         <Title level={3} style={{ margin: 0 }}>
-          仪表盘
+          {t('仪表盘')}{' '}
         </Title>
-        <Text className="muted">站点运行概览</Text>
+        <Text className="muted">{t('站点运行概览')}</Text>
       </div>
       {!stats ? (
         <Card>
@@ -51,18 +55,22 @@ export function DashboardPage() {
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} lg={6}>
               <Card className="stat-card">
-                <Statistic title="用户总数" value={stats.users} prefix={<TeamOutlined />} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Card className="stat-card">
-                <Statistic title="视频总数" value={stats.videos} prefix={<PlayCircleOutlined />} />
+                <Statistic title={t('用户总数')} value={stats.users} prefix={<TeamOutlined />} />
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>
               <Card className="stat-card">
                 <Statistic
-                  title="今日弹幕"
+                  title={t('视频总数')}
+                  value={stats.videos}
+                  prefix={<PlayCircleOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card className="stat-card">
+                <Statistic
+                  title={t('今日弹幕')}
                   value={stats.danmakuToday}
                   prefix={<CommentOutlined />}
                 />
@@ -71,7 +79,7 @@ export function DashboardPage() {
             <Col xs={24} sm={12} lg={6}>
               <Card className="stat-card">
                 <Statistic
-                  title="待处理举报"
+                  title={t('待处理举报')}
                   value={stats.pendingReports}
                   prefix={<FlagOutlined />}
                 />
@@ -80,37 +88,40 @@ export function DashboardPage() {
           </Row>
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={12}>
-              <Card title="系统状态">
+              <Card title={t('系统状态')}>
                 <div style={{ display: 'grid', gap: 10 }}>
                   <div>
-                    版本：<Text code>{stats.system.version}</Text>
+                    {t('版本：')}
+                    <Text code>{stats.system.version}</Text>
                   </div>
                   <div>
-                    数据库：<Tag color="green">{stats.system.database}</Tag>
+                    {t('数据库：')}
+                    <Tag color="green">{stats.system.database}</Tag>
                   </div>
                   <div>
                     FFmpeg：
                     <Tag color={stats.system.ffmpeg ? 'green' : 'red'}>
-                      {stats.system.ffmpeg ? '可用' : '不可用'}
+                      {stats.system.ffmpeg ? t('可用') : t('不可用')}
                     </Tag>
                   </div>
                   <div>
-                    搜索：<Tag>{stats.system.search}</Tag>
+                    {t('搜索：')}
+                    <Tag>{stats.system.search}</Tag>
                   </div>
                   <div>
-                    缓存：<Tag>{stats.system.cache}</Tag>
+                    {t('缓存：')}
+                    <Tag>{stats.system.cache}</Tag>
                   </div>
                   <div>
-                    存储占用：
-                    <Text>{formatBytes(stats.storageUsed)}</Text>
+                    {t('存储占用：')} <Text>{formatBytes(stats.storageUsed)}</Text>
                   </div>
                 </div>
               </Card>
             </Col>
             <Col xs={24} lg={12}>
-              <Card title="队列">
+              <Card title={t('队列')}>
                 {Object.keys(stats.queue).length === 0 ? (
-                  <Text className="muted">暂无任务</Text>
+                  <Text className="muted">{t('暂无任务')}</Text>
                 ) : (
                   <div style={{ display: 'grid', gap: 8 }}>
                     {Object.entries(stats.queue).map(([name, count]) => (
@@ -126,9 +137,9 @@ export function DashboardPage() {
           </Row>
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={12}>
-              <Card title="最近注册">
+              <Card title={t('最近注册')}>
                 {stats.recentUsers.length === 0 ? (
-                  <Text className="muted">暂无用户</Text>
+                  <Text className="muted">{t('暂无用户')}</Text>
                 ) : (
                   stats.recentUsers.map((user) => (
                     <div
@@ -150,9 +161,9 @@ export function DashboardPage() {
               </Card>
             </Col>
             <Col xs={24} lg={12}>
-              <Card title="最近投稿">
+              <Card title={t('最近投稿')}>
                 {stats.recentVideos.length === 0 ? (
-                  <Text className="muted">暂无投稿</Text>
+                  <Text className="muted">{t('暂无投稿')}</Text>
                 ) : (
                   stats.recentVideos.map((video) => (
                     <div
