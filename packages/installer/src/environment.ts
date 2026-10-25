@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFfmpeg } from '@uiliuili/media';
-import { ensureRuntimeDirs, resolveInstallerPaths } from './paths';
+import { ensureRuntimeDirs, resolveInstallerPaths, runtimeRoot } from './paths';
 
 export interface EnvironmentCheck {
   id: string;
@@ -34,7 +34,7 @@ function canWrite(directory: string): boolean {
   }
 }
 
-export async function checkEnvironment(root = process.cwd()): Promise<EnvironmentReport> {
+export async function checkEnvironment(root = runtimeRoot()): Promise<EnvironmentReport> {
   const checks: EnvironmentCheck[] = [];
   const major = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
   checks.push({

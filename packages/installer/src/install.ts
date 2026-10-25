@@ -20,7 +20,7 @@ import { sql } from 'drizzle-orm';
 import { testDatabase } from './database';
 import { buildEnvFile, writeEnvFile } from './env';
 import { type InstanceRecord, instanceExists, writeInstance } from './instance';
-import { resolveInstallerPaths } from './paths';
+import { resolveInstallerPaths, runtimeRoot } from './paths';
 import { clearInstallToken, getOrCreateInstallToken } from './token';
 
 export type InstallStage =
@@ -78,7 +78,7 @@ export async function runInstall(
   config: InstallConfig,
   options: InstallOptions = {},
 ): Promise<InstallResult> {
-  const root = options.root ?? process.cwd();
+  const root = runtimeRoot(options.root);
   const warnings: string[] = [];
   if (instanceExists(root)) {
     throw new Error('uiliuili 已经安装。如需重装请使用 CLI reset 命令。');

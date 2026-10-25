@@ -105,7 +105,7 @@ async function bootstrap(): Promise<void> {
   logger.log(`uiliuili API listening on http://0.0.0.0:${config.apiPort}`);
 
   if (!installed) {
-    const token = getOrCreateInstallToken(process.cwd());
+    const token = getOrCreateInstallToken();
     logger.warn('uiliuili is not installed yet.');
     logger.warn(`Open the web installer at ${config.appUrl}/admin/install`);
     logger.warn(`Installer token: ${token}`);

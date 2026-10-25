@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { ensureRuntimeDirs, resolveInstallerPaths, writeFileAtomic } from './paths';
+import { ensureRuntimeDirs, resolveInstallerPaths, runtimeRoot, writeFileAtomic } from './paths';
 
-export function getOrCreateInstallToken(root = process.cwd()): string {
+export function getOrCreateInstallToken(root = runtimeRoot()): string {
   if (process.env.INSTALL_TOKEN) return process.env.INSTALL_TOKEN;
   const paths = resolveInstallerPaths(root);
   ensureRuntimeDirs(paths);
@@ -23,7 +23,7 @@ export function verifyInstallToken(root: string, input: string): boolean {
   return crypto.timingSafeEqual(left, right);
 }
 
-export function clearInstallToken(root = process.cwd()): void {
+export function clearInstallToken(root = runtimeRoot()): void {
   const paths = resolveInstallerPaths(root);
   fs.rmSync(paths.installTokenFile, { force: true });
   fs.rmSync(paths.installSessionDir, { recursive: true, force: true });

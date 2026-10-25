@@ -18,6 +18,7 @@ import {
   removeInstanceFile,
   resolveInstallerPaths,
   runInstall,
+  runtimeRoot,
 } from '@uiliuili/installer';
 import { APP_VERSION, installConfigSchema } from '@uiliuili/shared';
 import argon2 from 'argon2';
@@ -51,7 +52,7 @@ program
   .requiredOption('-c, --config <path>', '安装配置文件路径')
   .option('--no-restart', '不做任何服务重启提示（CLI 默认为此行为）')
   .action(async (options: { config: string }) => {
-    const root = process.cwd();
+    const root = runtimeRoot();
     if (instanceExists(root)) {
       console.error('uiliuili 已经安装。如需重装请先执行 reset --force。');
       process.exit(1);
@@ -89,7 +90,7 @@ program
   .command('doctor')
   .description('检查环境、数据库与 FFmpeg')
   .action(async () => {
-    const environment = await checkEnvironment(process.cwd());
+    const environment = await checkEnvironment(runtimeRoot());
     console.log(`Node.js ${environment.nodeVersion} · ${environment.platform}/${environment.arch}`);
     for (const check of environment.checks) {
       console.log(
@@ -118,7 +119,7 @@ program
   .command('status')
   .description('显示实例与迁移状态')
   .action(async () => {
-    const instance = readInstance(process.cwd());
+    const instance = readInstance(runtimeRoot());
     if (!instance) {
       console.log('尚未安装。');
       return;
@@ -223,7 +224,7 @@ program
       console.error('危险操作：请附加 --force 确认。');
       process.exit(1);
     }
-    const root = process.cwd();
+    const root = runtimeRoot();
     if (options.drop && process.env.DATABASE_URL) {
       const client = postgres(process.env.DATABASE_URL, { max: 1 });
       try {

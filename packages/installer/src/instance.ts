@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { APP_VERSION, INSTALL_TOKEN_FILE, type InstallConfig } from '@uiliuili/shared';
-import { ensureRuntimeDirs, resolveInstallerPaths, writeFileAtomic } from './paths';
+import { ensureRuntimeDirs, resolveInstallerPaths, runtimeRoot, writeFileAtomic } from './paths';
 
 export interface InstanceRecord {
   installed: true;
@@ -12,11 +12,11 @@ export interface InstanceRecord {
   locale: string;
 }
 
-export function instanceExists(root = process.cwd()): boolean {
+export function instanceExists(root = runtimeRoot()): boolean {
   return fs.existsSync(resolveInstallerPaths(root).instanceFile);
 }
 
-export function readInstance(root = process.cwd()): InstanceRecord | null {
+export function readInstance(root = runtimeRoot()): InstanceRecord | null {
   const file = resolveInstallerPaths(root).instanceFile;
   if (!fs.existsSync(file)) return null;
   try {
@@ -46,10 +46,10 @@ export function writeInstance(
   return record;
 }
 
-export function removeInstanceFile(root = process.cwd()): void {
+export function removeInstanceFile(root = runtimeRoot()): void {
   fs.rmSync(resolveInstallerPaths(root).instanceFile, { force: true });
 }
 
-export function installTokenPath(root = process.cwd()): string {
+export function installTokenPath(root = runtimeRoot()): string {
   return `${resolveInstallerPaths(root).storageDir}/${INSTALL_TOKEN_FILE}`;
 }

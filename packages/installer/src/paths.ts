@@ -11,14 +11,27 @@ export interface InstallerPaths {
   installSessionDir: string;
 }
 
-export function resolveInstallerPaths(root = process.cwd()): InstallerPaths {
-  const configDir = path.join(root, 'config');
-  const storageDir = path.join(root, 'storage');
+/**
+ * Directory that holds installer state: `.env`, `config/instance.json` and `storage`.
+ *
+ * Defaults to the process working directory for source and systemd installs.
+ * Containers set `UILIUILI_ROOT` (for example `/data`) so application code can
+ * stay read-only while state lives on a persistent volume.
+ */
+export function runtimeRoot(override?: string): string {
+  const configured = override?.trim() || process.env.UILIUILI_ROOT?.trim() || process.cwd();
+  return path.resolve(configured);
+}
+
+export function resolveInstallerPaths(root = runtimeRoot()): InstallerPaths {
+  const resolvedRoot = runtimeRoot(root);
+  const configDir = path.join(resolvedRoot, 'config');
+  const storageDir = path.join(resolvedRoot, 'storage');
   return {
-    root,
+    root: resolvedRoot,
     configDir,
     instanceFile: path.join(configDir, 'instance.json'),
-    envFile: path.join(root, '.env'),
+    envFile: path.join(resolvedRoot, '.env'),
     storageDir,
     installTokenFile: path.join(storageDir, 'install-token'),
     installSessionDir: path.join(storageDir, 'install-sessions'),

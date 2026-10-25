@@ -10,6 +10,7 @@ import {
   isLoopback,
   readInstance,
   runInstall,
+  runtimeRoot,
   testDatabase,
   testMail,
   testStorage,
@@ -90,7 +91,7 @@ export class InstallService {
     if (this.isLocalRequest(ip, forwardedFor) && !token) {
       return { bypass: true };
     }
-    if (!verifyInstallToken(process.cwd(), token)) {
+    if (!verifyInstallToken(runtimeRoot(), token)) {
       throw new Error('安装令牌不正确');
     }
     const sessionId = crypto.randomBytes(24).toString('base64url');
@@ -118,11 +119,11 @@ export class InstallService {
   }
 
   token(): string {
-    return getOrCreateInstallToken(process.cwd());
+    return getOrCreateInstallToken(runtimeRoot());
   }
 
   async environment(): Promise<EnvironmentReport> {
-    return checkEnvironment(process.cwd());
+    return checkEnvironment(runtimeRoot());
   }
 
   async testDatabase(database: DatabaseConfig) {
@@ -183,7 +184,7 @@ export class InstallService {
   private async performInstall(installConfig: InstallConfig): Promise<void> {
     try {
       const result: InstallResult = await runInstall(installConfig, {
-        root: process.cwd(),
+        root: runtimeRoot(),
         production: config.production || installConfig.site.url.startsWith('https://'),
         onProgress: (progress) => {
           this.update(progress);
