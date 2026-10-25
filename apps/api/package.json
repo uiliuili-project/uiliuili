@@ -32,7 +32,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.0",
     "fastify": "^4.29.0",
-    "ioredis": "^5.4.2",
+    "ioredis": "^6.0.0",
     "mime-types": "^2.1.35",
     "nodemailer": "^6.9.16",
     "postgres": "^3.4.5",
