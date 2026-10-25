@@ -1,0 +1,174 @@
+name: ${COMPOSE_PROJECT_NAME:-uiliuili}
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  UILIUILI_ROOT: /data
+  DOTENV_CONFIG_PATH: /data/.env
+  APP_URL: ${APP_URL:-http://localhost:8080}
+  DATABASE_URL: postgres://${DB_USER:-uiliuili}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:-uiliuili}
+  DB_SCHEMA: ${DB_SCHEMA:-uiliuili}
+  APP_KEY: ${APP_KEY:?APP_KEY is required}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  STORAGE_ROOT: /data/storage/uploads
+  WORKER_TEMP_ROOT: /data/storage/tmp
+  FFMPEG_PATH: ffmpeg
+  FFPROBE_PATH: ffprobe
+  TRANSCODE_CONCURRENCY: ${TRANSCODE_CONCURRENCY:-2}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  TRUST_PROXY: "true"
+  API_INTERNAL_URL: http://api:3001
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-uiliuili}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-uiliuili}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-uiliuili} -d ${DB_NAME:-uiliuili}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: installs on the first run, applies migrations afterwards.
+  bootstrap:
+    build:
+      context: .
+      target: cli
+    image: uiliuili-cli:local
+    restart: "no"
+    environment:
+      <<: *app-environment
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      SITE_NAME: ${SITE_NAME:-uiliuili}
+      SITE_DESCRIPTION: ${SITE_DESCRIPTION:-一个自托管的弹幕视频站}
+      SITE_LOCALE: ${SITE_LOCALE:-zh-CN}
+      SITE_TIMEZONE: ${SITE_TIMEZONE:-Asia/Shanghai}
+      SITE_REGISTRATION: ${SITE_REGISTRATION:-open}
+      INSTALL_LOCALE: ${INSTALL_LOCALE:-zh-CN}
+      INSTALL_DEMO_CONTENT: ${INSTALL_DEMO_CONTENT:-false}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      MEILISEARCH_URL: ${MEILISEARCH_URL:-}
+      MEILISEARCH_KEY: ${MEILISEARCH_KEY:-}
+      MEILISEARCH_INDEX_PREFIX: ${MEILISEARCH_INDEX_PREFIX:-uiliuili}
+    volumes:
+      - app-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: api
+    image: uiliuili-api:local
+    restart: unless-stopped
+    environment: *app-environment
+    volumes:
+      - app-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    image: uiliuili-worker:local
+    restart: unless-stopped
+    environment: *app-environment
+    volumes:
+      - app-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    stop_grace_period: 60s
+
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        API_INTERNAL_URL: http://api:3001
+    image: uiliuili-web:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  gateway:
+    build:
+      context: .
+      target: gateway
+    image: uiliuili-gateway:local
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  redis-data:
+  app-data:
