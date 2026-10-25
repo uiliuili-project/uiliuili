@@ -69,9 +69,26 @@ Environment variables take precedence over database settings.
 ## Site settings
 
 Runtime settings are stored in PostgreSQL and can be edited in the admin panel:
-site information, registration, upload limits, playback defaults, danmaku
-rules, social limits, recommendation weights, storage, transcoding, mail,
-OAuth, search, security, and audit retention.
+site information (including the site logo), registration, upload limits,
+playback defaults, danmaku rules, social limits, recommendation weights,
+storage, transcoding, mail, OAuth, search, security, and audit retention.
 
 Secrets in the database are encrypted with `APP_KEY`. Back up `.env`; losing
 `APP_KEY` makes stored provider secrets unreadable.
+
+## User groups and interfaces
+
+Each user row stores a `user_group` marker. Roles remain the source of truth for
+permissions; the marker is recalculated whenever a role changes and is
+backfilled for existing accounts during migration.
+
+| Roles | Group | Interface |
+| --- | --- | --- |
+| `ADMIN`, `SUPER_ADMIN` | `ADMIN` | Creator center and admin console |
+| `UPLOADER`, `REVIEWER` | `CREATOR` | Creator center |
+| anything else | `USER` | Creator center |
+
+The creator center lives at `/studio`. The administration console lives at
+`/admin/`. The public site only displays the admin-console entry to users in the
+`ADMIN` group; admin APIs additionally enforce their normal permissions.
+
