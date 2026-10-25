@@ -34,7 +34,8 @@ FROM deps AS build
 ARG API_INTERNAL_URL=http://api:3001
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
 COPY . .
-RUN pnpm exec turbo run build --concurrency=2
+RUN --mount=type=cache,id=uiliuili-turbo,target=/app/.turbo \
+    pnpm exec turbo run build --concurrency=2
 
 # Trim each runtime down to its production dependency tree.
 FROM build AS deploy-api
