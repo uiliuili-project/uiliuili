@@ -899,4 +899,83 @@ export const uiEn: Record<string, string> = {
   总榜: 'All time',
   待上传: 'Pending upload',
   已完成: 'Completed',
+  操作成功: 'Done',
+  封面: 'Cover',
+  驳回: 'Reject',
+  隐藏: 'Hide',
+  恢复: 'Restore',
+  确认转移: 'Transfer',
+  转移站长身份: 'Transfer ownership',
+  站长身份已转移: 'Ownership transferred',
+  设为站长: 'Make owner',
+  审核中心: 'Review center',
+  注册站长账号: 'Create the owner account',
+  无权访问此页面: 'You cannot access this page',
+  '当前账号没有执行该操作的权限。': 'This account does not have permission to do that.',
+  返回上一页: 'Go back',
+  审核概览: 'Review overview',
+  '集中处理待审视频、评论与举报。': 'Handle pending videos, comments, and reports in one place.',
+  待审视频: 'Pending videos',
+  已隐藏评论: 'Hidden comments',
+  今日审核操作: 'Moderation actions today',
+  '超过 24 小时未处理的待审视频：{0} 个': 'Pending videos older than 24 hours: {0}',
+  进入视频审核: 'Review videos',
+  进入评论审核: 'Review comments',
+  处理举报: 'Handle reports',
+  视频审核: 'Video review',
+  '通过后将立即公开发布；驳回需要填写原因并通知投稿人。':
+    'Approving publishes the video immediately; rejecting requires a reason and notifies the uploader.',
+  搜索标题: 'Search titles',
+  待审核: 'Pending review',
+  提交时间: 'Submitted',
+  '确认通过该视频？': 'Approve this video?',
+  驳回视频: 'Reject video',
+  确认驳回: 'Reject',
+  '请说明驳回原因，投稿人会收到通知。':
+    'Explain the rejection reason; the uploader will be notified.',
+  已通过审核: 'Approved',
+  评论审核: 'Comment review',
+  '处理被举报的评论，或恢复、删除已隐藏的评论。':
+    'Handle reported comments, or restore or delete hidden ones.',
+  被举报: 'Reported',
+  '确认删除该评论？': 'Delete this comment?',
+  '管理用户组、角色、封禁与禁言，并可转移站长身份':
+    'Manage groups, roles, bans, and mutes, and transfer ownership',
+  '查看账号状态，执行封禁与禁言': 'View account status, ban and mute users',
+  '当前站长密码（可选，用于二次确认）': 'Current owner password (optional, for confirmation)',
+  '确定把站长身份转移给 {0} 吗？你将降为管理员。':
+    'Transfer ownership to {0}? You will become an administrator.',
+  '用户组会根据角色自动同步；站长身份请使用“设为站长”':
+    'The group follows the role; use “Make owner” to transfer ownership',
+  只有站长可以修改角色: 'Only the owner can change roles',
+  审核员: 'Reviewer',
+  站长: 'Owner',
+  安装后不再创建初始管理员: 'No initial administrator is created',
+  '安装完成后请注册第一个账号，该账号会自动成为站长。请务必先完成注册再开放站点访问。':
+    'After installation, register the first account to become the owner. Finish that before opening the site to visitors.',
+  站点信息: 'Site information',
+  '设置站点名称、地址与注册策略。站点负责人将在安装完成后通过注册创建。':
+    'Set the site name, address, and registration policy. The owner account is created by registering after installation.',
+  测试收件邮箱: 'Test recipient',
+  请填写测试收件邮箱: 'Enter a test recipient address',
+  '站长认领码（仅显示一次）': 'Owner claim token (shown once)',
+  '从非本机地址注册站长账号时需要填写此认领码。请立即保存；丢失后可通过 CLI owner:promote 恢复。':
+    'The claim token is required to register the owner from a non-local address. Save it now; if lost, recover with the CLI command owner:promote.',
+  '安装已完成，但站点还没有站长。请访问站点并注册第一个账号，该账号将自动成为站长。':
+    'Installation is complete, but the site has no owner yet. Visit the site and register the first account; it becomes the owner automatically.',
+  创建站长账号: 'Create owner account',
+  '这是本站的第一个账号，注册后将自动成为站长并拥有全部管理权限。':
+    'This is the first account on the site. It becomes the owner with every management permission.',
+  '站点尚未设置站长。请先完成注册，再开放站点访问；该账号将成为站长。':
+    'The site has no owner yet. Finish registering before opening the site; that account becomes the owner.',
+  站长认领码: 'Owner claim token',
+  '安装完成时显示的一次性认领码；仅从非本机地址注册时需要。':
+    'The one-time claim token shown when installation finished; only needed when registering from a non-local address.',
+  '站点尚未设置站长，请注册第一个账号完成初始化。':
+    'The site has no owner yet. Register the first account to finish setup.',
+  '请使用审核员、管理员或站长账号登录。普通用户请前往创作中心。':
+    'Sign in with a reviewer, administrator, or owner account. Regular users should use the creator center.',
+  审核控制台: 'Review console',
+  '安装器将写入 .env、创建数据库表并初始化站点。此操作会修改数据库。':
+    'The installer writes .env, creates database tables, and initializes the site. This modifies the database.',
 };
