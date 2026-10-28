@@ -1,7 +1,7 @@
 'use client';
 
 import { getMe } from '@/lib/api';
-import { isAdminGroup } from '@uiliuili/shared';
+import { consoleAreaForGroup } from '@uiliuili/shared';
 import { useEffect, useState } from 'react';
 import { useT } from './I18nProvider';
 
@@ -11,36 +11,29 @@ interface AdminConsoleLinkProps {
 }
 
 /**
- * Renders the admin-console entry only for administrators. The same check is
- * applied by the administration console itself; this component only keeps the
- * link out of the public interface for everyone else.
+ * Renders the staff-console entry for reviewers, administrators and the owner.
+ * The same check is applied by the console itself; this component only keeps
+ * the link out of the public interface for everyone else.
  */
 export function AdminConsoleLink({ className, children }: AdminConsoleLinkProps) {
   const t = useT();
-  const [visible, setVisible] = useState(false);
+  const [area, setArea] = useState<'review' | 'admin' | 'owner' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void getMe().then((user) => {
       if (cancelled) return;
-      setVisible(
-        Boolean(
-          user &&
-            (isAdminGroup(user.group) ||
-              user.roles.includes('ADMIN') ||
-              user.roles.includes('SUPER_ADMIN')),
-        ),
-      );
+      setArea(consoleAreaForGroup(user?.group));
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!visible) return null;
+  if (!area) return null;
   return (
     <a href="/admin/" className={className}>
-      {children ?? t('nav.admin')}
+      {children ?? t(area === 'review' ? 'nav.review' : 'nav.admin')}
     </a>
   );
 }

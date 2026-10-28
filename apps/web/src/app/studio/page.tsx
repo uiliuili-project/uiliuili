@@ -6,7 +6,7 @@ import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatBytes, formatDate, formatDuration } from '@/lib/format';
 import type { StudioVideo } from '@/lib/types';
-import { type AuthUser, type Category, isAdminGroup } from '@uiliuili/shared';
+import { type AuthUser, type Category, isStaffGroup } from '@uiliuili/shared';
 import { CheckCircle2, Clock, Film, Loader2, ShieldCheck, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -283,10 +283,10 @@ export default function StudioPage() {
           <Link href={`/space/${user.username}`} className="btn-ghost">
             {t('查看我的空间')}{' '}
           </Link>
-          {isAdminGroup(user.group) && (
+          {isStaffGroup(user.group) && (
             <a href="/admin/" className="btn-soft">
               <ShieldCheck className="h-4 w-4" />
-              {t('管理后台')}
+              {t(user.group === 'REVIEWER' ? '审核中心' : '管理后台')}
             </a>
           )}
         </div>

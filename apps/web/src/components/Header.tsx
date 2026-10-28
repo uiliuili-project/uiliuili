@@ -2,7 +2,7 @@
 
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import type { AuthUser } from '@uiliuili/shared';
+import { type AuthUser, consoleAreaForGroup } from '@uiliuili/shared';
 import {
   Bell,
   Clapperboard,
@@ -35,12 +35,9 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState('uiliuili');
   const [siteLogo, setSiteLogo] = useState('');
-  const isAdmin = Boolean(
-    user &&
-      (user.group === 'ADMIN' ||
-        user.roles.includes('ADMIN') ||
-        user.roles.includes('SUPER_ADMIN')),
-  );
+  const consoleArea = consoleAreaForGroup(user?.group);
+  const isStaff = consoleArea !== null;
+  const consoleLabel = t(consoleArea === 'review' ? 'nav.review' : 'nav.admin');
 
   const navItems = [
     { href: '/', label: t('nav.home'), icon: Home },
@@ -137,10 +134,10 @@ export function Header() {
                 <Clapperboard className="h-4 w-4" />
                 {t('nav.studio')}
               </Link>
-              {isAdmin && (
+              {isStaff && (
                 <a href="/admin/" className="btn-ghost hidden md:inline-flex">
                   <ShieldCheck className="h-4 w-4" />
-                  {t('nav.admin')}
+                  {consoleLabel}
                 </a>
               )}
               <Link
@@ -198,14 +195,14 @@ export function Header() {
                       <Clapperboard className="h-4 w-4" />
                       {t('nav.studio')}
                     </Link>
-                    {isAdmin && (
+                    {isStaff && (
                       <a
                         href="/admin/"
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
                       >
                         <ShieldCheck className="h-4 w-4" />
-                        {t('nav.admin')}
+                        {consoleLabel}
                       </a>
                     )}
                     <Link

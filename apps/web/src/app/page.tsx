@@ -22,11 +22,12 @@ const emptyFeed: HomeFeed = {
 };
 
 export default async function HomePage() {
-  const [t, locale, feed, announcements] = await Promise.all([
+  const [t, locale, feed, announcements, setup] = await Promise.all([
     getT(),
     getLocale(),
     serverFetchSafe<HomeFeed>('/api/v1/feed/home', emptyFeed),
     serverFetchSafe<{ items: Announcement[] }>('/api/v1/announcements', { items: [] }),
+    serverFetchSafe<{ needsOwner: boolean }>('/api/v1/auth/setup-status', { needsOwner: false }),
   ]);
   const hero = feed.sections.recommended.items[0];
   const recommended = feed.sections.recommended.items.slice(hero ? 1 : 0, 8);
@@ -34,6 +35,14 @@ export default async function HomePage() {
 
   return (
     <div className="container-page py-6">
+      {setup.needsOwner && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <span>{t('站点尚未设置站长，请注册第一个账号完成初始化。')}</span>
+          <Link href="/register" className="btn-primary">
+            {t('注册站长账号')}
+          </Link>
+        </div>
+      )}
       {announcements.items.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-2 rounded-xl2 border border-brand/20 bg-brand-light/50 px-4 py-3 text-sm text-brand-dark">
           <span className="font-semibold">{t('公告')}</span>

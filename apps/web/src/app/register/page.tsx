@@ -17,12 +17,18 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [claimToken, setClaimToken] = useState('');
+  const [setup, setSetup] = useState<{ needsOwner: boolean; claimRequired: boolean } | null>(null);
 
   useEffect(() => {
     void ensureCsrf();
     void getMe().then((user) => {
       if (user) router.replace('/');
     });
+    void api
+      .get<{ needsOwner: boolean; claimRequired: boolean }>('/api/v1/auth/setup-status')
+      .then(setSetup)
+      .catch(() => undefined);
   }, [router]);
 
   const submit = async (event: React.FormEvent) => {
@@ -34,7 +40,16 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      await api.post<{ user: AuthUser }>('/api/v1/auth/register', { username, email, password });
+      const result = await api.post<{ user: AuthUser }>('/api/v1/auth/register', {
+        username,
+        email,
+        password,
+        claimToken: claimToken || undefined,
+      });
+      if (result.user.group === 'OWNER') {
+        window.location.href = '/admin/';
+        return;
+      }
       router.push('/');
       router.refresh();
     } catch (registerError) {
@@ -46,8 +61,12 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      title={t('创建账号')}
-      subtitle={t('加入 uiliuili，开始分享你的视频')}
+      title={setup?.needsOwner ? t('创建站长账号') : t('创建账号')}
+      subtitle={
+        setup?.needsOwner
+          ? t('这是本站的第一个账号，注册后将自动成为站长并拥有全部管理权限。')
+          : t('加入 uiliuili，开始分享你的视频')
+      }
       footer={
         <>
           {t('已经有账号？')}{' '}
@@ -58,6 +77,11 @@ export default function RegisterPage() {
       }
     >
       <form onSubmit={submit} className="space-y-4">
+        {setup?.needsOwner && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            {t('站点尚未设置站长。请先完成注册，再开放站点访问；该账号将成为站长。')}
+          </div>
+        )}
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
@@ -111,6 +135,24 @@ export default function RegisterPage() {
           />
           <p className="mt-1 text-xs text-muted">{t('至少 10 个字符，并包含字母和数字')}</p>
         </div>
+        {setup?.claimRequired && (
+          <div>
+            <label className="label" htmlFor="claimToken">
+              {t('站长认领码')}{' '}
+            </label>
+            <input
+              id="claimToken"
+              value={claimToken}
+              onChange={(event) => setClaimToken(event.target.value)}
+              className="input"
+              autoComplete="off"
+              required
+            />
+            <p className="mt-1 text-xs text-muted">
+              {t('安装完成时显示的一次性认领码；仅从非本机地址注册时需要。')}
+            </p>
+          </div>
+        )}
         <div>
           <label className="label" htmlFor="confirm">
             {t('确认密码')}{' '}
