@@ -1,9 +1,4 @@
-import {
-  type AdminConfig,
-  DEFAULT_CATEGORIES,
-  DEFAULT_SETTINGS,
-  type SiteConfig,
-} from '@uiliuili/shared';
+import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, type SiteConfig } from '@uiliuili/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import {
@@ -16,9 +11,7 @@ import {
 } from './schema';
 
 export interface SeedOptions {
-  admin: AdminConfig;
   site: SiteConfig;
-  passwordHash: string;
   instanceId: string;
   version: string;
   appKey: string;
@@ -46,29 +39,6 @@ export async function seedInstance(db: Db, options: SeedOptions): Promise<void> 
   for (const [key, value] of Object.entries(settings)) {
     await db.insert(siteSettings).values({ key, value, isSecret: false }).onConflictDoNothing();
   }
-
-  const [admin] = await db
-    .insert(users)
-    .values({
-      username: options.admin.username,
-      email: options.admin.email.toLowerCase(),
-      passwordHash: options.passwordHash,
-      displayName: options.admin.username,
-      emailVerified: true,
-      roles: ['SUPER_ADMIN'],
-      userGroup: 'ADMIN',
-      level: 6,
-      coinBalance: settings.social.dailyCoins,
-    })
-    .returning();
-
-  if (!admin) throw new Error('Failed to create administrator');
-
-  await db.insert(favoriteFolders).values({
-    userId: admin.id,
-    name: '默认收藏夹',
-    isDefault: true,
-  });
 
   for (const category of DEFAULT_CATEGORIES) {
     await db

@@ -56,6 +56,9 @@ export const users = appSchema.table(
     uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`),
     index('users_created_at_idx').on(table.createdAt),
     index('users_group_idx').on(table.userGroup),
+    uniqueIndex('users_single_owner_idx')
+      .on(table.userGroup)
+      .where(sql`${table.userGroup} = 'OWNER'`),
   ],
 );
 
