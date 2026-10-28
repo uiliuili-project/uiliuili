@@ -3,6 +3,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
+  type Db,
   createDb,
   ensureDefaultFolders,
   migrationStatus,
@@ -89,7 +90,12 @@ async function runInstallCommand(config: InstallConfig): Promise<void> {
     console.log('');
     console.log('安装完成。');
     console.log(`实例 ID：${result.instance.instanceId}`);
-    console.log(`管理员：${config.admin.username} <${config.admin.email}>`);
+    console.log('');
+    console.log('本站还没有站长账号。请打开站点并注册第一个账号，该账号将成为站长。');
+    console.log(`站长认领码：${result.ownerClaimToken}`);
+    console.log(
+      '从服务器本机（localhost）注册时无需填写认领码。认领码只会显示这一次，请妥善保存。',
+    );
     if (result.warnings.length) {
       console.log('警告：');
       for (const warning of result.warnings) console.log(`  - ${warning}`);
@@ -208,14 +214,15 @@ program
   });
 
 program
-  .command('admin:create')
-  .description('创建或提升一个超级管理员')
+  .command('owner:promote')
+  .alias('admin:create')
+  .description('恢复站长账号：创建或提升一个用户为站长')
   .option('-u, --username <username>', '用户名')
   .option('-e, --email <email>', '邮箱')
   .option('-p, --password <password>', '密码（不填则随机生成）')
   .action(async (options: { username?: string; email?: string; password?: string }) => {
     const url = requireDatabaseUrl();
-    const username = options.username ?? `admin_${crypto.randomBytes(3).toString('hex')}`;
+    const username = options.username ?? `owner_${crypto.randomBytes(3).toString('hex')}`;
     const email = options.email ?? `${username}@example.com`;
     const password = options.password ?? crypto.randomBytes(12).toString('base64url');
     if (password.length < 10) {
@@ -230,34 +237,47 @@ program
     });
     const { client, db } = createDb(url, { max: 1 });
     try {
-      const existing = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(sql`lower(${users.username}) = ${username.toLowerCase()}`)
-        .limit(1);
-      if (existing.length > 0) {
-        await db
-          .update(users)
-          .set({ roles: ['SUPER_ADMIN'], userGroup: 'ADMIN', banned: false, passwordHash })
-          .where(eq(users.id, existing[0]!.id));
-        console.log(`已提升用户 ${username} 为超级管理员。`);
-      } else {
-        const [created] = await db
-          .insert(users)
-          .values({
-            username,
-            email: email.toLowerCase(),
-            displayName: username,
-            passwordHash,
-            emailVerified: true,
-            roles: ['SUPER_ADMIN'],
-            userGroup: 'ADMIN',
-            level: 6,
-          })
-          .returning();
-        if (created) await ensureDefaultFolders(db, created.id);
-        console.log(`已创建超级管理员 ${username} <${email}>`);
-      }
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:owner'))`);
+        const existing = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`lower(${users.username}) = ${username.toLowerCase()}`)
+          .limit(1);
+        if (existing[0]) {
+          await tx
+            .update(users)
+            .set({ roles: ['ADMIN'], userGroup: 'ADMIN', updatedAt: new Date() })
+            .where(
+              sql`${users.id} <> ${existing[0].id} AND ${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`,
+            );
+          await tx
+            .update(users)
+            .set({ roles: ['SUPER_ADMIN'], userGroup: 'OWNER', banned: false, passwordHash })
+            .where(eq(users.id, existing[0].id));
+          console.log(`已将用户 ${username} 恢复为站长。`);
+        } else {
+          await tx
+            .update(users)
+            .set({ roles: ['ADMIN'], userGroup: 'ADMIN', updatedAt: new Date() })
+            .where(sql`${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`);
+          const [created] = await tx
+            .insert(users)
+            .values({
+              username,
+              email: email.toLowerCase(),
+              displayName: username,
+              passwordHash,
+              emailVerified: true,
+              roles: ['SUPER_ADMIN'],
+              userGroup: 'OWNER',
+              level: 6,
+            })
+            .returning();
+          if (created) await ensureDefaultFolders(tx as unknown as Db, created.id);
+          console.log(`已创建站长 ${username} <${email}>`);
+        }
+      });
       console.log(`密码：${password}`);
       console.log('请立即登录并修改密码。');
     } finally {
