@@ -44,6 +44,12 @@ Worker ── FFmpeg ── HLS ── 存储
 | `@uiliuili/danmaku` | Canvas 渲染引擎与 Bilibili XML 转换 |
 | `@uiliuili/i18n` | 中文/英文语言包 |
 
+## 身份与权限
+
+角色是权限的唯一来源。用户记录保存 `user_group` 标记（`USER`、`CREATOR`、`REVIEWER`、`ADMIN`、`OWNER`），用于选择界面，并在角色变化时重新计算。审核员使用审核台，管理员使用完整管理后台，站长拥有全部权限。
+
+安装过程不创建账号。第一次注册会在 PostgreSQL advisory lock 保护下成为站长；部分唯一索引保证最多只有一个站长。请求不是来自回环地址时，注册必须携带安装器生成的一次性认领码；认领码只保存哈希，站长产生后立即删除。`owner:promote` 是恢复入口。
+
 ## 请求链路
 
 - 公开页面由 Next.js 渲染，API 调用使用同源 `/api`。
@@ -58,3 +64,4 @@ Worker ── FFmpeg ── HLS ── 存储
 - 交互明细表是唯一事实来源；聚合计数在同一个事务中更新。
 - 安装迁移在 PostgreSQL advisory lock 保护下以事务执行。
 - 安装器最后写入 `config/instance.json`；该文件不存在时，API 只运行安装模式。
+- 首位站长注册与站长转移同样在 advisory lock 下执行，并由 `users_single_owner_idx` 在数据库层保证唯一。

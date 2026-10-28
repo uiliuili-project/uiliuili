@@ -36,14 +36,35 @@ token when `INSTALL_ALLOW_LOCALHOST=true`.
 
 1. Environment check
 2. PostgreSQL connection and schema
-3. Site information and administrator account
+3. Site information
 4. Local or S3 storage
 5. Optional Redis, Meilisearch, SMTP, OAuth
 6. Review and install
 
 The installer writes `.env` and `config/instance.json`, runs migrations and
-seeds in a transaction, creates the administrator, then disables itself and
-requests a service restart.
+seeds in a transaction, then disables itself and requests a service restart.
+It does **not** create an administrator. The install result shows a one-time
+owner claim token; save it, because it is only displayed once.
+
+## Create the owner
+
+Open the site and register the first account. That account becomes the owner
+and receives every permission. When you register from the server itself
+(loopback), no token is required. From any other address, paste the owner claim
+token shown by the installer.
+
+Do this before opening the site to visitors: while no owner exists, the first
+registration bypasses the registration policy. The claim token is stored
+hashed, and the record is removed as soon as the owner exists.
+
+If the token is lost or the owner account is unavailable, recover with:
+
+```bash
+pnpm cli owner:promote --username owner --email owner@example.com
+```
+
+`admin:create` is kept as an alias. Ownership can later be transferred from
+**Admin → Users → Make owner**; the current owner is demoted to administrator.
 
 ## Headless install
 

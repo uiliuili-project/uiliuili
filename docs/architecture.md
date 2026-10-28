@@ -45,6 +45,19 @@ independently.
 | `@uiliuili/danmaku` | Canvas rendering engine and Bilibili XML conversion |
 | `@uiliuili/i18n` | Chinese/English message catalogs |
 
+## Identity and permissions
+
+Roles are the permission source. A persisted `user_group` marker (`USER`,
+`CREATOR`, `REVIEWER`, `ADMIN`, `OWNER`) selects the interface and is derived
+from roles whenever they change. Reviewers use the review desk, administrators
+use the full console, and the owner has every permission.
+
+Installation creates no account. The first registration becomes the owner under
+a PostgreSQL advisory lock; a partial unique index allows at most one owner.
+When the request does not come from loopback, the registration must present the
+installer's one-time claim token, which is stored hashed and deleted once the
+owner exists. `owner:promote` is the recovery path.
+
 ## Request paths
 
 - Public pages are rendered by Next.js. API calls use same-origin `/api`.
@@ -63,5 +76,7 @@ independently.
 - Interaction rows are the source of truth; aggregate counters are updated in the
   same transactions.
 - Installer migrations run in a transaction under a PostgreSQL advisory lock.
+- First-owner registration and ownership transfer also run under an advisory
+  lock, and `users_single_owner_idx` enforces one owner at the database level.
 - The installer writes `config/instance.json` last. Without that file the API
   runs in install-only mode.

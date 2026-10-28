@@ -55,11 +55,6 @@ Environment variables take precedence over database settings.
     "locale": "zh-CN",
     "registration": "open"
   },
-  "admin": {
-    "username": "admin",
-    "email": "admin@example.com",
-    "password": "a-strong-password-123"
-  },
   "storage": { "driver": "local", "localPath": "./storage/uploads" },
   "search": { "driver": "postgres" },
   "demoContent": false
@@ -82,13 +77,33 @@ Each user row stores a `user_group` marker. Roles remain the source of truth for
 permissions; the marker is recalculated whenever a role changes and is
 backfilled for existing accounts during migration.
 
-| Roles | Group | Interface |
-| --- | --- | --- |
-| `ADMIN`, `SUPER_ADMIN` | `ADMIN` | Creator center and admin console |
-| `UPLOADER`, `REVIEWER` | `CREATOR` | Creator center |
-| anything else | `USER` | Creator center |
+| Roles | Group | Label | Interface |
+| --- | --- | --- | --- |
+| `USER` | `USER` | User | Creator center |
+| `UPLOADER` | `CREATOR` | Creator | Creator center |
+| `REVIEWER` | `REVIEWER` | Reviewer | Review desk at `/admin/review` |
+| `ADMIN` | `ADMIN` | Administrator | Admin console at `/admin/` |
+| `SUPER_ADMIN` | `OWNER` | Owner | Everything, including ownership transfer |
 
-The creator center lives at `/studio`. The administration console lives at
-`/admin/`. The public site only displays the admin-console entry to users in the
-`ADMIN` group; admin APIs additionally enforce their normal permissions.
+The creator center lives at `/studio`. Reviewers get video, comment, danmaku,
+and report moderation in the review desk. Administrators add feature flags,
+user moderation, categories, announcements, site and content settings, system
+status, and the audit log. The owner additionally controls integration and
+security settings, role assignment, and passes ownership to another account.
+
+At most one account can be the owner; a partial unique index enforces it. The
+first account registered after installation automatically becomes the owner,
+and the installer no longer creates an initial administrator. The installer
+prints a one-time **owner claim token**; registration from a non-loopback
+address must present it. Loopback registration (the server itself) does not.
+The token is stored hashed and is removed as soon as an owner exists.
+
+If the owner account is lost, recover it with the CLI:
+
+```bash
+pnpm cli owner:promote --username owner --email owner@example.com
+```
+
+`admin:create` remains an alias. The command demotes the current owner to
+administrator and promotes or creates the target account inside a transaction.
 

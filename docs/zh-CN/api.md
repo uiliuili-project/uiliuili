@@ -7,7 +7,8 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 ## 鉴权
 
 - `GET /api/v1/auth/csrf`
-- `POST /api/v1/auth/register`
+- `GET /api/v1/auth/setup-status`
+- `POST /api/v1/auth/register`（可选 `claimToken`）
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
@@ -23,7 +24,9 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 
 鉴权使用 HttpOnly 的 access/refresh Cookie。使用 Cookie 鉴权的写请求必须携带与 `ul_csrf` Cookie 匹配的 `x-csrf-token` 请求头。
 
-`GET /api/v1/auth/me` 以及登录、注册响应会在 `roles`、`permissions` 之外返回持久化的 `group` 字段（`USER`、`CREATOR` 或 `ADMIN`）。权限仍以角色为准；用户组只决定用户进入创作中心还是管理后台。
+`GET /api/v1/auth/me` 以及登录、注册响应会在 `roles`、`permissions` 之外返回持久化的 `group` 字段（`USER`、`CREATOR`、`REVIEWER`、`ADMIN` 或 `OWNER`）。权限仍以角色为准；用户组只决定用户进入哪个界面。
+
+`GET /api/v1/auth/setup-status` 返回 `{ needsOwner, claimRequired }`。尚未产生站长时，第一次注册会成为站长；从非本机地址发起的注册必须携带安装器生成的 `claimToken`，回环地址无需填写。
 
 ## 内容
 
@@ -77,11 +80,24 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 - `GET|PATCH /api/v1/admin/videos`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
+- `POST /api/v1/admin/owner/transfer`（仅站长；调用者会降为管理员）
 - `GET|PUT /api/v1/admin/settings`
 - `POST /api/v1/admin/site/logo`（请求体为 JPEG/PNG/WebP 原始字节，最大 2 MB）
 - `GET /api/v1/admin/system`
 - `GET /api/v1/admin/jobs`
 - `GET /api/v1/admin/audit`
+
+## 审核
+
+审核员、管理员与站长使用，每个接口按 `video:review`、`comment:manage`、`report:manage` 分别校验权限：
+
+- `GET /api/v1/review/summary`
+- `GET /api/v1/review/videos`
+- `POST /api/v1/review/videos/:id/decision`（`approve` 或带原因的 `reject`）
+- `GET /api/v1/review/comments`
+- `POST /api/v1/review/comments/:id/action`（`hide`、`restore` 或 `delete`）
+- `GET /api/v1/review/reports`
+- `POST /api/v1/review/reports/:id/handle`
 
 ## WebSocket
 

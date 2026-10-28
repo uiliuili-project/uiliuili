@@ -42,7 +42,6 @@ Edit `.env` and set at least:
 - `APP_KEY` — `openssl rand -hex 32`
 - `DB_PASSWORD` — URL-safe password, for example
   `openssl rand -base64 24 | tr '+/' '-_' | tr -d '='`
-- `ADMIN_PASSWORD` — at least 10 characters with a letter and a digit
 
 Then:
 
@@ -51,9 +50,12 @@ docker compose up -d --build
 docker compose logs -f bootstrap
 ```
 
-The first run installs the database schema, creates the admin account and
-writes `/data/.env` and `/data/config/instance.json`. Later runs only apply
-pending migrations, so the same command is also the upgrade path.
+The first run installs the database schema and writes `/data/.env` and
+`/data/config/instance.json`. It does not create an account. The bootstrap log
+prints a one-time owner claim token; keep it, then register the first account
+on the site to become the owner. Registration through the gateway is not
+loopback, so paste the claim token. Later runs only apply pending migrations,
+so the same command is also the upgrade path.
 
 Open:
 
@@ -61,8 +63,8 @@ Open:
 - Admin: `http://server.example.com:8080/admin/`
 - API health: `http://server.example.com:8080/health`
 
-Log in with `ADMIN_USERNAME` / `ADMIN_PASSWORD` and change the password after
-the first login.
+After registering the owner, sign in at `/admin/` with that account and create
+additional reviewers or administrators from **Users**.
 
 ### Use a different port
 
@@ -91,7 +93,6 @@ ones most deployments change.
 | `DB_PASSWORD` | yes | — | Must be URL-safe because it is embedded in `DATABASE_URL` |
 | `DB_SCHEMA` | no | `uiliuili` | Application schema |
 | `REDIS_URL` | no | `redis://redis:6379` | Leave empty for in-memory mode |
-| `ADMIN_USERNAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | first run | — | Admin account created by `bootstrap` |
 | `SITE_NAME` / `SITE_DESCRIPTION` | no | `uiliuili` | Site metadata |
 | `SITE_LOCALE` / `SITE_TIMEZONE` / `SITE_REGISTRATION` | no | `zh-CN` / `Asia/Shanghai` / `open` | Initial site settings |
 | `STORAGE_DRIVER` | no | `local` | `local` or `s3` on the first install |
@@ -124,7 +125,8 @@ Run the CLI inside the stack:
 ```bash
 docker compose run --rm bootstrap node dist/index.js status
 docker compose run --rm bootstrap node dist/index.js doctor
-docker compose run --rm bootstrap node dist/index.js admin:create
+docker compose logs bootstrap   # first run: owner claim token
+docker compose run --rm bootstrap node dist/index.js owner:promote --username owner --email owner@example.com
 ```
 
 `bootstrap` is the container entry point. It installs when

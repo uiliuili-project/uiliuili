@@ -38,7 +38,6 @@ cp docker/.env.example .env
 - `APP_KEY`：`openssl rand -hex 32`
 - `DB_PASSWORD`：URL 安全密码，例如
   `openssl rand -base64 24 | tr '+/' '-_' | tr -d '='`
-- `ADMIN_PASSWORD`：至少 10 位，包含字母和数字
 
 然后启动：
 
@@ -47,8 +46,8 @@ docker compose up -d --build
 docker compose logs -f bootstrap
 ```
 
-首次运行会创建表结构、管理员账号，并写入 `/data/.env` 与
-`/data/config/instance.json`。之后再次执行同一条命令只会应用待执行的迁移，因此它也是升级入口。
+首次运行会创建表结构，并写入 `/data/.env` 与
+`/data/config/instance.json`，不会创建账号。`bootstrap` 日志会打印一次性的站长认领码；请保存它，然后在站点注册第一个账号成为站长。通过 gateway 访问不属于回环地址，因此需要填写认领码。之后再次执行同一条命令只会应用待执行的迁移，因此它也是升级入口。
 
 访问：
 
@@ -56,7 +55,7 @@ docker compose logs -f bootstrap
 - 管理后台：`http://server.example.com:8080/admin/`
 - 健康检查：`http://server.example.com:8080/health`
 
-使用 `ADMIN_USERNAME` 与 `ADMIN_PASSWORD` 登录，并在首次登录后修改密码。
+注册站长后，用该账号登录 `/admin/`，在**用户**页面添加审核员或管理员。
 
 ### 修改端口
 
@@ -83,7 +82,6 @@ Compose 在创建容器时读取 `.env`。常用变量：
 | `DB_PASSWORD` | 是 | — | 必须 URL 安全，因为会拼进 `DATABASE_URL` |
 | `DB_SCHEMA` | 否 | `uiliuili` | 业务 schema |
 | `REDIS_URL` | 否 | `redis://redis:6379` | 留空则使用单机内存模式 |
-| `ADMIN_USERNAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 首次安装 | — | `bootstrap` 创建的管理员 |
 | `SITE_NAME` / `SITE_DESCRIPTION` | 否 | `uiliuili` | 站点信息 |
 | `SITE_LOCALE` / `SITE_TIMEZONE` / `SITE_REGISTRATION` | 否 | `zh-CN` / `Asia/Shanghai` / `open` | 初始站点设置 |
 | `STORAGE_DRIVER` | 否 | `local` | 首次安装可选 `local` 或 `s3` |
@@ -110,7 +108,8 @@ docker compose exec postgres psql -U uiliuili -d uiliuili
 ```bash
 docker compose run --rm bootstrap node dist/index.js status
 docker compose run --rm bootstrap node dist/index.js doctor
-docker compose run --rm bootstrap node dist/index.js admin:create
+docker compose logs bootstrap   # 首次安装：查看站长认领码
+docker compose run --rm bootstrap node dist/index.js owner:promote --username owner --email owner@example.com
 ```
 
 `bootstrap` 是容器入口：`/data/config/instance.json` 不存在时执行安装，存在时执行迁移。它失败时 API 与 worker 不会启动，避免半安装实例对外服务。

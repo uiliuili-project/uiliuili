@@ -13,6 +13,22 @@
 If migrations are pending, run `pnpm cli migrate`. If you downgrade the code,
 restore a database backup taken before the upgrade.
 
+## Recovering the owner
+
+Migration `0003` maps the previous `SUPER_ADMIN` account to the `OWNER` group
+and backfills the other groups. If several `SUPER_ADMIN` accounts existed, only
+the oldest stays owner and the rest become administrators.
+
+If no owner can sign in, recover it from the server:
+
+```bash
+pnpm cli owner:promote --username owner --email owner@example.com
+```
+
+`admin:create` is an alias. The command replaces the current owner inside a
+transaction. After signing in, transfer ownership from **Admin → Users → Make
+owner** instead of editing the database.
+
 ## Backup
 
 Back up:

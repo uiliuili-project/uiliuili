@@ -55,11 +55,6 @@
     "locale": "zh-CN",
     "registration": "open"
   },
-  "admin": {
-    "username": "admin",
-    "email": "admin@example.com",
-    "password": "a-strong-password-123"
-  },
   "storage": { "driver": "local", "localPath": "./storage/uploads" },
   "search": { "driver": "postgres" },
   "demoContent": false
@@ -77,12 +72,23 @@
 
 每个用户记录都保存一个 `user_group` 标记。角色仍然是权限的唯一来源；角色变化时会重新计算该标记，升级迁移也会为已有账号补齐。
 
-| 角色 | 用户组 | 可用界面 |
-| --- | --- | --- |
-| `ADMIN`、`SUPER_ADMIN` | `ADMIN` | 创作中心与管理后台 |
-| `UPLOADER`、`REVIEWER` | `CREATOR` | 创作中心 |
-| 其他 | `USER` | 创作中心 |
+| 角色 | 用户组 | 名称 | 可用界面 |
+| --- | --- | --- | --- |
+| `USER` | `USER` | 普通用户 | 创作中心 |
+| `UPLOADER` | `CREATOR` | 创作者 | 创作中心 |
+| `REVIEWER` | `REVIEWER` | 审核员 | `/admin/review` 审核台 |
+| `ADMIN` | `ADMIN` | 管理员 | `/admin/` 管理后台 |
+| `SUPER_ADMIN` | `OWNER` | 站长 | 全部功能，可转移站长身份 |
 
-创作中心位于 `/studio`，管理后台位于 `/admin/`。公开站只会向 `ADMIN`
-用户组显示管理后台入口；管理接口本身仍然按权限校验。
+创作中心位于 `/studio`。审核员在审核台处理视频、评论、弹幕与举报；管理员在此基础上增加推荐、用户管理、分区、公告、站点与内容设置、系统状态和审计日志；站长还拥有集成与安全设置、角色分配和站长转移权限。
+
+同一时间只能有一个站长账号，由部分唯一索引保证。安装后注册的第一个账号会自动成为站长，安装器不再创建初始管理员。安装器会打印一次性的**站长认领码**；从非本机地址注册站长账号时必须填写，服务器本机（回环地址）注册则不需要。认领码只保存哈希，站长产生后立即删除。
+
+如果站长账号丢失，可使用 CLI 恢复：
+
+```bash
+pnpm cli owner:promote --username owner --email owner@example.com
+```
+
+`admin:create` 仍可作为别名使用。该命令会在事务中把当前站长降为管理员，并提升或创建目标账号。
 

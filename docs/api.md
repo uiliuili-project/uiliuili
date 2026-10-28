@@ -8,7 +8,8 @@ The API is served by NestJS under `/api/v1`. Installer endpoints live under
 ## Authentication
 
 - `GET /api/v1/auth/csrf`
-- `POST /api/v1/auth/register`
+- `GET /api/v1/auth/setup-status`
+- `POST /api/v1/auth/register` (accepts optional `claimToken`)
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
@@ -26,9 +27,14 @@ Authentication uses HttpOnly access/refresh cookies. Mutating cookie-authenticat
 requests require the `x-csrf-token` header matching the `ul_csrf` cookie.
 
 `GET /api/v1/auth/me` and the login/register responses include the persisted
-`group` field (`USER`, `CREATOR`, or `ADMIN`) next to `roles` and `permissions`.
-Roles remain the source of truth for permissions; the group only decides which
-interface a user enters (creator center or admin console).
+`group` field (`USER`, `CREATOR`, `REVIEWER`, `ADMIN`, or `OWNER`) next to
+`roles` and `permissions`. Roles remain the source of truth for permissions;
+the group only decides which interface a user enters.
+
+`GET /api/v1/auth/setup-status` reports `{ needsOwner, claimRequired }`. While
+no owner exists, the first registration becomes the owner. From a non-loopback
+address that request must include the installer's one-time `claimToken`;
+loopback registration does not need it.
 
 ## Content
 
@@ -83,11 +89,25 @@ All admin routes require the corresponding permission and are listed in
 - `GET|PATCH /api/v1/admin/videos`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
+- `POST /api/v1/admin/owner/transfer` (owner only; demotes the caller)
 - `GET|PUT /api/v1/admin/settings`
 - `POST /api/v1/admin/site/logo` (raw JPEG/PNG/WebP body, max 2 MB)
 - `GET /api/v1/admin/system`
 - `GET /api/v1/admin/jobs`
 - `GET /api/v1/admin/audit`
+
+## Review
+
+Routes for reviewers, administrators, and the owner. Each endpoint enforces
+its own permission (`video:review`, `comment:manage`, or `report:manage`):
+
+- `GET /api/v1/review/summary`
+- `GET /api/v1/review/videos`
+- `POST /api/v1/review/videos/:id/decision` (`approve` or `reject` with a reason)
+- `GET /api/v1/review/comments`
+- `POST /api/v1/review/comments/:id/action` (`hide`, `restore`, or `delete`)
+- `GET /api/v1/review/reports`
+- `POST /api/v1/review/reports/:id/handle`
 
 ## WebSocket
 
