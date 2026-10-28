@@ -1,20 +1,44 @@
 import { type Permission, ROLE_PERMISSIONS, type UserGroup, type UserRole } from './constants';
 
-const ADMIN_ROLES: UserRole[] = ['ADMIN', 'SUPER_ADMIN'];
-const CREATOR_ROLES: UserRole[] = ['UPLOADER', 'REVIEWER'];
+const CREATOR_ROLES: UserRole[] = ['UPLOADER'];
 
 /**
  * Derives the persisted user group from a role list. Roles remain the only
  * security boundary; the group merely decides which interface a user enters.
  */
 export function userGroupForRoles(roles: UserRole[] = []): UserGroup {
-  if (roles.some((role) => ADMIN_ROLES.includes(role))) return 'ADMIN';
+  if (roles.includes('SUPER_ADMIN')) return 'OWNER';
+  if (roles.includes('ADMIN')) return 'ADMIN';
+  if (roles.includes('REVIEWER')) return 'REVIEWER';
   if (roles.some((role) => CREATOR_ROLES.includes(role))) return 'CREATOR';
   return 'USER';
 }
 
+/** True for groups that may open the management console. */
 export function isAdminGroup(group: UserGroup | string | null | undefined): boolean {
-  return group === 'ADMIN';
+  return group === 'ADMIN' || group === 'OWNER';
+}
+
+export function isOwnerGroup(group: UserGroup | string | null | undefined): boolean {
+  return group === 'OWNER';
+}
+
+export function isReviewerGroup(group: UserGroup | string | null | undefined): boolean {
+  return group === 'REVIEWER';
+}
+
+/** True for every group with staff-level moderation access. */
+export function isStaffGroup(group: UserGroup | string | null | undefined): boolean {
+  return group === 'REVIEWER' || isAdminGroup(group);
+}
+
+export type ConsoleArea = 'review' | 'admin' | 'owner' | null;
+
+export function consoleAreaForGroup(group: UserGroup | string | null | undefined): ConsoleArea {
+  if (group === 'OWNER') return 'owner';
+  if (group === 'ADMIN') return 'admin';
+  if (group === 'REVIEWER') return 'review';
+  return null;
 }
 
 export function permissionsForRoles(roles: UserRole[]): Permission[] {

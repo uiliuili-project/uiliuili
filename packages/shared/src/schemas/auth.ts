@@ -23,6 +23,7 @@ export const registerSchema = z.object({
   username: usernameSchema,
   email: z.string().email('邮箱格式不正确'),
   password: passwordSchema,
+  claimToken: z.string().max(200).optional(),
 });
 
 export const updateProfileSchema = z.object({

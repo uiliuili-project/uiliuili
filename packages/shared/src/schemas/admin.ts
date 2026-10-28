@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { USER_ROLES, VIDEO_STATUSES } from '../constants';
+import { USER_GROUPS, USER_ROLES, VIDEO_STATUSES } from '../constants';
 
 export const adminPaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -9,6 +9,7 @@ export const adminPaginationSchema = z.object({
 
 export const adminUserQuerySchema = adminPaginationSchema.extend({
   role: z.enum(USER_ROLES).optional(),
+  group: z.enum(USER_GROUPS).optional(),
   banned: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
@@ -20,6 +21,11 @@ export const adminUserUpdateSchema = z.object({
   banned: z.boolean().optional(),
   mutedUntil: z.string().datetime().nullable().optional(),
   level: z.number().int().min(0).max(6).optional(),
+});
+
+export const ownerTransferSchema = z.object({
+  userId: z.string().uuid(),
+  password: z.string().min(1).optional(),
 });
 
 export const adminVideoQuerySchema = adminPaginationSchema.extend({

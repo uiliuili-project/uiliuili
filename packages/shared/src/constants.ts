@@ -10,53 +10,86 @@ export type UserRole = (typeof USER_ROLES)[number];
 /**
  * Coarse user group stored on the user record. Roles remain the source of
  * truth for permissions; the group is a stable marker used by the interface to
- * separate the creator center from the administration console.
+ * separate the creator center, the review desk, and the administration
+ * console.
  */
-export const USER_GROUPS = ['USER', 'CREATOR', 'ADMIN'] as const;
+export const USER_GROUPS = ['USER', 'CREATOR', 'REVIEWER', 'ADMIN', 'OWNER'] as const;
 export type UserGroup = (typeof USER_GROUPS)[number];
 
 export const PERMISSIONS = [
   'video:read',
   'video:upload',
   'video:manage_own',
-  'video:manage_any',
   'danmaku:send',
-  'danmaku:manage',
+  'video:review',
+  'video:manage_any',
+  'video:feature',
   'comment:manage',
-  'user:manage',
-  'settings:manage',
-  'system:manage',
-  'audit:read',
+  'danmaku:manage',
   'report:manage',
+  'user:view',
+  'user:moderate',
+  'user:assign_role',
+  'category:manage',
+  'announcement:manage',
+  'settings:site',
+  'settings:content',
+  'settings:integration',
+  'settings:security',
+  'system:view',
+  'system:operate',
+  'system:update',
+  'audit:read',
+  'owner:transfer',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
+const BASIC_PERMISSIONS: Permission[] = [
+  'video:read',
+  'video:upload',
+  'video:manage_own',
+  'danmaku:send',
+];
+
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  USER: ['video:read', 'video:upload', 'video:manage_own', 'danmaku:send'],
-  UPLOADER: ['video:read', 'video:upload', 'video:manage_own', 'danmaku:send'],
+  USER: [...BASIC_PERMISSIONS],
+  UPLOADER: [...BASIC_PERMISSIONS],
   REVIEWER: [
-    'video:read',
+    ...BASIC_PERMISSIONS,
+    'video:review',
     'video:manage_any',
-    'danmaku:send',
-    'danmaku:manage',
     'comment:manage',
+    'danmaku:manage',
     'report:manage',
   ],
   ADMIN: [
-    'video:read',
-    'video:upload',
-    'video:manage_own',
+    ...BASIC_PERMISSIONS,
+    'video:review',
     'video:manage_any',
-    'danmaku:send',
-    'danmaku:manage',
+    'video:feature',
     'comment:manage',
-    'user:manage',
-    'settings:manage',
-    'audit:read',
+    'danmaku:manage',
     'report:manage',
+    'user:view',
+    'user:moderate',
+    'category:manage',
+    'announcement:manage',
+    'settings:site',
+    'settings:content',
+    'system:view',
+    'audit:read',
   ],
   SUPER_ADMIN: [...PERMISSIONS],
 };
+
+export const OWNER_ROLE: UserRole = 'SUPER_ADMIN';
+export const OWNER_GROUP: UserGroup = 'OWNER';
+
+/**
+ * Secret setting holding the hashed one-time claim token that allows the
+ * first registration to become the owner when the request is not local.
+ */
+export const OWNER_CLAIM_SETTING = 'owner_claim';
 
 export const VIDEO_STATUSES = [
   'draft',

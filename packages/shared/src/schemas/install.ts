@@ -108,7 +108,6 @@ export const installConfigSchema = z.object({
   locale: z.enum(['zh-CN', 'en-US']).default('zh-CN'),
   database: databaseConfigSchema,
   site: siteConfigSchema,
-  admin: adminConfigSchema,
   storage: storageConfigSchema.default({ driver: 'local', localPath: './storage/uploads' }),
   redis: redisConfigSchema.nullish(),
   search: searchConfigSchema.default({ driver: 'postgres' }),
