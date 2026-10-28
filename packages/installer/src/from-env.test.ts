@@ -4,9 +4,6 @@ import { InstallEnvError, buildInstallConfigFromEnv } from './from-env';
 const baseEnv: NodeJS.ProcessEnv = {
   APP_URL: 'https://video.example.com',
   DATABASE_URL: 'postgres://user:p%40ss@db.internal:5433/uiliuili?sslmode=require',
-  ADMIN_USERNAME: 'admin',
-  ADMIN_EMAIL: 'admin@example.com',
-  ADMIN_PASSWORD: 'TestPassword123',
 };
 
 describe('buildInstallConfigFromEnv', () => {
@@ -22,7 +19,6 @@ describe('buildInstallConfigFromEnv', () => {
       schema: 'uiliuili',
     });
     expect(config.site.url).toBe('https://video.example.com');
-    expect(config.admin.username).toBe('admin');
   });
 
   it('maps storage, redis and search toggles', () => {
@@ -45,10 +41,10 @@ describe('buildInstallConfigFromEnv', () => {
     expect(config.mail).toBeUndefined();
   });
 
-  it('fails loudly without admin credentials', () => {
-    expect(() => buildInstallConfigFromEnv({ ...baseEnv, ADMIN_PASSWORD: undefined })).toThrow(
-      InstallEnvError,
-    );
+  it('does not require administrator credentials', () => {
+    const config = buildInstallConfigFromEnv(baseEnv);
+    expect(config.site.name).toBe('uiliuili');
+    expect('admin' in config).toBe(false);
   });
 
   it('rejects an unsupported storage driver', () => {

@@ -4,6 +4,7 @@ import {
   authProviders,
   createDb,
   encryptSecret,
+  hashToken,
   readMigrations,
   seedInstance,
   siteSettings,
@@ -14,8 +15,8 @@ import {
   DEFAULT_SETTINGS,
   type InstallConfig,
   type MailConfig,
+  OWNER_CLAIM_SETTING,
 } from '@uiliuili/shared';
-import argon2 from 'argon2';
 import { sql } from 'drizzle-orm';
 import { testDatabase } from './database';
 import { buildEnvFile, writeEnvFile } from './env';
@@ -29,7 +30,7 @@ export type InstallStage =
   | 'config'
   | 'migrate'
   | 'seed'
-  | 'admin'
+  | 'owner'
   | 'providers'
   | 'finalize'
   | 'restart';
@@ -51,7 +52,11 @@ export interface InstallOptions {
 export interface InstallResult {
   instance: InstanceRecord;
   appKey: string;
-  adminId: string;
+  /**
+   * One-time secret that lets the first registration claim the owner account
+   * when the installer is reached from a non-loopback address.
+   */
+  ownerClaimToken: string;
   warnings: string[];
 }
 
@@ -107,13 +112,6 @@ export async function runInstall(
   });
   writeEnvFile(paths.envFile, envContent);
 
-  const passwordHash = await argon2.hash(config.admin.password, {
-    type: argon2.argon2id,
-    memoryCost: 19456,
-    timeCost: 2,
-    parallelism: 1,
-  });
-
   const migrations = readMigrations();
   if (migrations.length === 0) throw new Error('安装包缺少数据库迁移文件');
 
@@ -122,7 +120,7 @@ export async function runInstall(
     { max: 3, onNotice: () => undefined },
   );
 
-  let adminId = '';
+  const ownerClaimToken = crypto.randomBytes(18).toString('base64url');
   try {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:install'))`);
@@ -163,16 +161,22 @@ export async function runInstall(
 
       progress(options, 'seed', 55, '正在初始化站点数据');
       await seedInstance(tx as unknown as Db, {
-        admin: config.admin,
         site: config.site,
-        passwordHash,
         instanceId,
         version: APP_VERSION,
         appKey,
       });
 
-      progress(options, 'admin', 70, '管理员账号已创建');
+      progress(options, 'owner', 70, '正在准备站长认领码');
       const secretSettings: Array<{ key: string; value: unknown; isSecret: boolean }> = [
+        {
+          key: OWNER_CLAIM_SETTING,
+          value: encryptSecret(
+            { tokenHash: hashToken(ownerClaimToken), createdAt: new Date().toISOString() },
+            appKey,
+          ),
+          isSecret: true,
+        },
         { key: 'storage_config', value: encryptSecret(config.storage, appKey), isSecret: true },
         { key: 'redis_config', value: encryptSecret(config.redis ?? null, appKey), isSecret: true },
         { key: 'search_config', value: encryptSecret(config.search, appKey), isSecret: true },
@@ -229,18 +233,13 @@ export async function runInstall(
             });
         }
       }
-
-      const rows = await tx.execute<{ id: string }>(
-        sql`SELECT id FROM "uiliuili"."users" WHERE roles @> ARRAY['SUPER_ADMIN']::text[] LIMIT 1`,
-      );
-      adminId = rows[0]?.id ?? '';
     });
 
     progress(options, 'finalize', 94, '正在写入安装标记');
     const instance = writeInstance(root, config, instanceId);
     clearInstallToken(root);
     progress(options, 'restart', 100, '安装完成，服务即将重启');
-    return { instance, appKey, adminId, warnings };
+    return { instance, appKey, ownerClaimToken, warnings };
   } finally {
     await client.end({ timeout: 5 });
   }

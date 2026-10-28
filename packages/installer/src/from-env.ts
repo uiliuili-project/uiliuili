@@ -132,15 +132,6 @@ function mailFromEnv(env: NodeJS.ProcessEnv): MailConfig | undefined {
  * credentials.
  */
 export function buildInstallConfigFromEnv(env: NodeJS.ProcessEnv = process.env): InstallConfig {
-  const username = optional(env.ADMIN_USERNAME);
-  const email = optional(env.ADMIN_EMAIL);
-  const password = env.ADMIN_PASSWORD;
-  if (!username || !email || !password) {
-    throw new InstallEnvError(
-      '需要 ADMIN_USERNAME、ADMIN_EMAIL 与 ADMIN_PASSWORD 才能无人值守安装',
-    );
-  }
-
   const locale = (optional(env.INSTALL_LOCALE) ?? optional(env.SITE_LOCALE) ?? 'zh-CN') as
     | 'zh-CN'
     | 'en-US';
@@ -159,7 +150,6 @@ export function buildInstallConfigFromEnv(env: NodeJS.ProcessEnv = process.env):
       locale,
       registration: optional(env.SITE_REGISTRATION) ?? 'open',
     },
-    admin: { username, email, password },
     storage: storageFromEnv(env),
     redis: redisUrl ? { url: redisUrl } : null,
     search: meilisearchUrl

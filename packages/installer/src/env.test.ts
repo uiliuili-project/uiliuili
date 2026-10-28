@@ -22,11 +22,6 @@ const baseConfig: InstallConfig = {
     locale: 'zh-CN',
     registration: 'open',
   },
-  admin: {
-    username: 'admin',
-    email: 'admin@example.com',
-    password: 'TestPassword123',
-  },
   storage: { driver: 'local', localPath: './storage/uploads' },
   search: { driver: 'postgres' },
   demoContent: false,
