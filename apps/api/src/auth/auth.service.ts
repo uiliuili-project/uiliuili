@@ -2,16 +2,20 @@ import crypto from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
+  type Db,
   type DbUser,
   ensureDefaultFolders,
   hashToken,
   randomToken,
   refreshSessions,
+  siteSettings,
   users,
   verificationTokens,
 } from '@uiliuili/db';
+import { isLoopback } from '@uiliuili/installer';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
+  OWNER_CLAIM_SETTING,
   type Permission,
   REFRESH_TOKEN_TTL_DAYS,
   type UserGroup,
@@ -51,30 +55,18 @@ export class AuthService {
     private readonly audit: AuditService,
   ) {}
 
-  async register(input: {
-    username: string;
-    email: string;
-    password: string;
-  }): Promise<IssuedTokens> {
+  async register(
+    input: {
+      username: string;
+      email: string;
+      password: string;
+      claimToken?: string;
+    },
+    meta: SessionMeta = {},
+  ): Promise<IssuedTokens> {
     const site = await this.settings.getSite();
-    const registration = String(site.registration ?? 'open');
-    if (registration === 'closed') throw new Error('本站暂未开放注册');
-    if (registration === 'invite') throw new Error('本站目前仅限邀请注册');
-
     const email = input.email.trim().toLowerCase();
     const username = input.username.trim();
-    const existing = await this.database.db
-      .select({ id: users.id })
-      .from(users)
-      .where(
-        or(
-          sql`lower(${users.email}) = ${email}`,
-          sql`lower(${users.username}) = ${username.toLowerCase()}`,
-        ),
-      )
-      .limit(1);
-    if (existing.length > 0) throw new Error('用户名或邮箱已被使用');
-
     const social = await this.settings.getSocialSettings();
     const mail = await this.settings.getMailConfig();
     const verificationRequired = Boolean(
@@ -88,22 +80,112 @@ export class AuthService {
       timeCost: 2,
       parallelism: 1,
     });
-    const [created] = await this.database.db
-      .insert(users)
-      .values({
-        username,
-        email,
-        displayName: username,
-        passwordHash,
-        emailVerified: !verificationRequired,
-        roles: ['USER'],
-        coinBalance: Number(social.dailyCoins ?? 2),
-      })
-      .returning();
-    if (!created) throw new Error('注册失败');
-    await ensureDefaultFolders(this.database.db, created.id);
-    if (verificationRequired) await this.createEmailVerification(created.id, email);
-    return this.issueSession(created, {}, false);
+
+    const result = await this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:owner'))`);
+      const owners = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`${users.userGroup} = 'OWNER' OR ${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`)
+        .limit(1);
+      const becomesOwner = owners.length === 0;
+
+      if (becomesOwner) {
+        await this.assertOwnerClaim(input.claimToken, meta.ip);
+      } else {
+        const registration = String(site.registration ?? 'open');
+        if (registration === 'closed') throw new Error('本站暂未开放注册');
+        if (registration === 'invite') throw new Error('本站目前仅限邀请注册');
+      }
+
+      const existing = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          or(
+            sql`lower(${users.email}) = ${email}`,
+            sql`lower(${users.username}) = ${username.toLowerCase()}`,
+          ),
+        )
+        .limit(1);
+      if (existing.length > 0) throw new Error('用户名或邮箱已被使用');
+
+      const [created] = await tx
+        .insert(users)
+        .values({
+          username,
+          email,
+          displayName: username,
+          passwordHash,
+          emailVerified: becomesOwner ? true : !verificationRequired,
+          roles: becomesOwner ? ['SUPER_ADMIN'] : ['USER'],
+          userGroup: becomesOwner ? 'OWNER' : 'USER',
+          level: becomesOwner ? 6 : 0,
+          coinBalance: Number(social.dailyCoins ?? 2),
+        })
+        .returning();
+      if (!created) throw new Error('注册失败');
+      await ensureDefaultFolders(tx as unknown as Db, created.id);
+      if (becomesOwner) {
+        await tx.delete(siteSettings).where(eq(siteSettings.key, OWNER_CLAIM_SETTING));
+      }
+      return { created, becomesOwner };
+    });
+
+    if (!result.becomesOwner && verificationRequired) {
+      await this.createEmailVerification(result.created.id, email);
+    }
+    await this.audit.record({
+      actorId: result.created.id,
+      action: result.becomesOwner ? 'auth.owner.claim' : 'auth.register',
+      targetType: 'user',
+      targetId: result.created.id,
+      ipHash: this.hashIp(meta.ip),
+      userAgent: meta.userAgent,
+    });
+    return this.issueSession(result.created, meta, false);
+  }
+
+  /**
+   * Reports whether the instance still needs its first owner and whether a
+   * claim token is required for the current caller.
+   */
+  async setupStatus(ip?: string): Promise<{ needsOwner: boolean; claimRequired: boolean }> {
+    const rows = await this.database.db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`${users.userGroup} = 'OWNER' OR ${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`)
+      .limit(1);
+    const needsOwner = rows.length === 0;
+    if (!needsOwner) return { needsOwner: false, claimRequired: false };
+    const claim = await this.settings.getSecret<{ tokenHash?: string } | null>(
+      OWNER_CLAIM_SETTING,
+      null,
+    );
+    return {
+      needsOwner: true,
+      claimRequired: Boolean(claim?.tokenHash) && !isLoopback(ip),
+    };
+  }
+
+  private async assertOwnerClaim(
+    claimToken: string | undefined,
+    ip: string | undefined,
+  ): Promise<void> {
+    if (isLoopback(ip)) return;
+    const claim = await this.settings.getSecret<{ tokenHash?: string } | null>(
+      OWNER_CLAIM_SETTING,
+      null,
+    );
+    if (!claim?.tokenHash) {
+      throw new Error('本站尚未配置站长认领码，请从服务器本机注册，或使用 owner:promote 恢复');
+    }
+    if (!claimToken?.trim()) throw new Error('请填写站长认领码');
+    const expected = Buffer.from(claim.tokenHash, 'hex');
+    const actual = Buffer.from(hashToken(claimToken.trim()), 'hex');
+    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
+      throw new Error('站长认领码不正确');
+    }
   }
 
   async login(identifier: string, password: string, meta: SessionMeta): Promise<IssuedTokens> {
@@ -313,14 +395,17 @@ export class AuthService {
       .where(and(eq(refreshSessions.id, sessionId), eq(refreshSessions.userId, userId)));
   }
 
-  async findOrCreateOAuthUser(profile: {
-    provider: string;
-    providerAccountId: string;
-    email: string;
-    emailVerified: boolean;
-    name: string;
-    avatarUrl?: string;
-  }): Promise<AuthUser> {
+  async findOrCreateOAuthUser(
+    profile: {
+      provider: string;
+      providerAccountId: string;
+      email: string;
+      emailVerified: boolean;
+      name: string;
+      avatarUrl?: string;
+    },
+    meta: SessionMeta = {},
+  ): Promise<AuthUser> {
     const { oauthAccounts } = await import('@uiliuili/db');
     const linked = await this.database.db
       .select({ user: users })
@@ -350,34 +435,54 @@ export class AuthService {
         throw new Error('该邮箱已有账号，请先使用密码登录后在设置中绑定第三方账号');
       }
     } else {
-      const base =
-        (profile.name || email.split('@')[0] || 'user')
-          .replace(/[^a-zA-Z0-9_-]/g, '')
-          .slice(0, 20) || 'user';
-      let username = base;
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const exists = await this.database.db
+      user = await this.database.db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:owner'))`);
+        const owners = await tx
           .select({ id: users.id })
           .from(users)
-          .where(sql`lower(${users.username}) = ${username.toLowerCase()}`)
+          .where(
+            sql`${users.userGroup} = 'OWNER' OR ${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`,
+          )
           .limit(1);
-        if (exists.length === 0) break;
-        username = `${base}${crypto.randomInt(1000, 9999)}`;
-      }
-      const created = await this.database.db
-        .insert(users)
-        .values({
-          username,
-          email,
-          displayName: profile.name || username,
-          avatarUrl: profile.avatarUrl,
-          emailVerified: profile.emailVerified,
-          roles: ['USER'],
-        })
-        .returning();
-      user = created[0];
-      if (!user) throw new Error('无法创建第三方登录账号');
-      await ensureDefaultFolders(this.database.db, user.id);
+        const becomesOwner = owners.length === 0;
+        if (becomesOwner && !isLoopback(meta.ip)) {
+          throw new Error('请先使用密码注册第一个站长账号，再绑定第三方登录');
+        }
+        const base =
+          (profile.name || email.split('@')[0] || 'user')
+            .replace(/[^a-zA-Z0-9_-]/g, '')
+            .slice(0, 20) || 'user';
+        let username = base;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          const exists = await tx
+            .select({ id: users.id })
+            .from(users)
+            .where(sql`lower(${users.username}) = ${username.toLowerCase()}`)
+            .limit(1);
+          if (exists.length === 0) break;
+          username = `${base}${crypto.randomInt(1000, 9999)}`;
+        }
+        const created = await tx
+          .insert(users)
+          .values({
+            username,
+            email,
+            displayName: profile.name || username,
+            avatarUrl: profile.avatarUrl,
+            emailVerified: profile.emailVerified,
+            roles: becomesOwner ? ['SUPER_ADMIN'] : ['USER'],
+            userGroup: becomesOwner ? 'OWNER' : 'USER',
+            level: becomesOwner ? 6 : 0,
+          })
+          .returning();
+        const row = created[0];
+        if (!row) throw new Error('无法创建第三方登录账号');
+        await ensureDefaultFolders(tx as unknown as Db, row.id);
+        if (becomesOwner) {
+          await tx.delete(siteSettings).where(eq(siteSettings.key, OWNER_CLAIM_SETTING));
+        }
+        return row;
+      });
     }
 
     await this.database.db

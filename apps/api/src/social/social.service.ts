@@ -169,7 +169,7 @@ export class SocialService {
     const rows = await this.database.db.select().from(dynamics).where(eq(dynamics.id, id)).limit(1);
     const dynamic = rows[0];
     if (!dynamic) throw new AppError(ERROR_CODES.NOT_FOUND, '动态不存在', 404);
-    if (dynamic.userId !== viewer.id && !viewer.permissions.includes('video:manage_any')) {
+    if (dynamic.userId !== viewer.id && !viewer.permissions.includes('user:moderate')) {
       throw new AppError(ERROR_CODES.FORBIDDEN, '没有权限删除此动态', 403);
     }
     await this.database.db.delete(dynamics).where(eq(dynamics.id, id));

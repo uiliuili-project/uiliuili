@@ -10,6 +10,7 @@ import { HealthController } from './health.controller';
 import { MeModule } from './me/me.module';
 import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ReviewModule } from './review/review.module';
 import { SearchModule } from './search/search.module';
 import { SocialModule } from './social/social.module';
 import { UsersModule } from './users/users.module';
@@ -20,6 +21,7 @@ import { VideosModule } from './videos/videos.module';
     CommonModule,
     AuthModule,
     AdminModule,
+    ReviewModule,
     UsersModule,
     VideosModule,
     DanmakuModule,

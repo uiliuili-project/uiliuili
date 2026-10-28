@@ -9,6 +9,7 @@ import {
   categories,
   comments,
   danmaku,
+  notifications,
   reports,
   siteSettings,
   tags,
@@ -20,6 +21,7 @@ import { checkFfmpeg } from '@uiliuili/media';
 import {
   AppError,
   ERROR_CODES,
+  type Permission,
   type UserRole,
   announcementCreateSchema,
   categoryCreateSchema,
@@ -29,9 +31,11 @@ import {
   storageConfigSchema,
   userGroupForRoles,
 } from '@uiliuili/shared';
+import argon2 from 'argon2';
 import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service';
+import type { AuthUser } from '../common/auth-user';
 import { CacheService } from '../common/cache.service';
 import { DatabaseService } from '../common/database.service';
 import { QueueService } from '../common/queue.service';
@@ -143,6 +147,7 @@ export class AdminService {
     limit: number;
     q?: string;
     role?: UserRole;
+    group?: string;
     banned?: boolean;
   }) {
     const conditions = [];
@@ -157,6 +162,7 @@ export class AdminService {
       );
     }
     if (query.role) conditions.push(sql`${users.roles} @> ARRAY[${query.role}]::text[]`);
+    if (query.group) conditions.push(eq(users.userGroup, query.group));
     if (query.banned !== undefined) conditions.push(eq(users.banned, query.banned));
     const where = conditions.length ? and(...conditions) : undefined;
     const offset = (query.page - 1) * query.limit;
@@ -191,29 +197,38 @@ export class AdminService {
   }
 
   async updateUser(
-    actorId: string,
+    actor: AuthUser,
     id: string,
     input: { role?: UserRole; banned?: boolean; mutedUntil?: string | null; level?: number },
   ) {
     const rows = await this.database.db.select().from(users).where(eq(users.id, id)).limit(1);
     const user = rows[0];
     if (!user) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
-    if (input.role && user.roles.includes('SUPER_ADMIN') && input.role !== 'SUPER_ADMIN') {
-      const [countRow] = await this.database.db
-        .select({ value: count() })
-        .from(users)
-        .where(sql`${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`);
-      if (Number(countRow?.value ?? 0) <= 1) {
-        throw new AppError(ERROR_CODES.BAD_REQUEST, '不能移除最后一个超级管理员', 400);
+    const targetRoles = (user.roles ?? []) as UserRole[];
+    const targetIsOwner = user.userGroup === 'OWNER' || targetRoles.includes('SUPER_ADMIN');
+    const targetIsAdmin = user.userGroup === 'ADMIN' || targetRoles.includes('ADMIN');
+    const actorIsOwner = actor.group === 'OWNER';
+
+    if (targetIsOwner) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '站长账号不能在这里修改，请先转移站长身份', 403);
+    }
+    if (targetIsAdmin && !actorIsOwner) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '不能修改其他管理员的账号', 403);
+    }
+    if (id === actor.id && (input.role !== undefined || input.banned !== undefined)) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '不能修改自己的角色或封禁状态', 400);
+    }
+    if (input.role) {
+      this.assertPermission(actor, 'user:assign_role');
+      if (input.role === 'SUPER_ADMIN') {
+        throw new AppError(ERROR_CODES.BAD_REQUEST, '请使用站长转移功能移交站长身份', 400);
       }
     }
     const [updated] = await this.database.db
       .update(users)
       .set({
         roles: input.role ? [input.role] : undefined,
-        userGroup: input.role
-          ? userGroupForRoles([input.role])
-          : userGroupForRoles(user.roles as UserRole[]),
+        userGroup: input.role ? userGroupForRoles([input.role]) : userGroupForRoles(targetRoles),
         banned: input.banned,
         mutedUntil:
           input.mutedUntil === undefined
@@ -227,7 +242,7 @@ export class AdminService {
       .where(eq(users.id, id))
       .returning();
     await this.audit.record({
-      actorId,
+      actorId: actor.id,
       action: 'admin.user.update',
       targetType: 'user',
       targetId: id,
@@ -302,7 +317,7 @@ export class AdminService {
   }
 
   async updateVideo(
-    actorId: string,
+    actor: AuthUser,
     id: string,
     input: {
       status?: string;
@@ -311,6 +326,12 @@ export class AdminService {
       blockReason?: string;
     },
   ) {
+    if (input.featured !== undefined || input.recommendWeight !== undefined) {
+      this.assertPermission(actor, 'video:feature');
+    }
+    if (input.status !== undefined || input.blockReason !== undefined) {
+      this.assertPermission(actor, 'video:manage_any');
+    }
     const rows = await this.database.db.select().from(videos).where(eq(videos.id, id)).limit(1);
     const video = rows[0];
     if (!video) throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
@@ -333,7 +354,7 @@ export class AdminService {
       { idempotencyKey: `search:${id}:${Date.now()}` },
     );
     await this.audit.record({
-      actorId,
+      actorId: actor.id,
       action: 'admin.video.update',
       targetType: 'video',
       targetId: id,
@@ -623,19 +644,160 @@ export class AdminService {
       .limit(200);
   }
 
-  async getSettings() {
-    const groups = await Promise.all(
-      ['site', 'upload', 'playback', 'danmaku', 'social', 'recommendation', 'mail', 'security'].map(
-        async (key) => {
-          const rows = await this.database.db
-            .select()
-            .from(siteSettings)
-            .where(eq(siteSettings.key, key))
-            .limit(1);
-          return [key, (rows[0]?.value ?? {}) as Record<string, unknown>] as const;
+  async transferOwner(
+    actor: AuthUser,
+    targetUserId: string,
+    password?: string,
+  ): Promise<{ ok: true }> {
+    if (targetUserId === actor.id) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '目标用户已经是站长', 400);
+    }
+    if (password) {
+      const actorRows = await this.database.db
+        .select()
+        .from(users)
+        .where(eq(users.id, actor.id))
+        .limit(1);
+      const actorRecord = actorRows[0];
+      if (actorRecord?.passwordHash) {
+        const valid = await argon2.verify(actorRecord.passwordHash, password).catch(() => false);
+        if (!valid) throw new AppError(ERROR_CODES.BAD_REQUEST, '密码不正确', 400);
+      }
+    }
+    const targetRows = await this.database.db
+      .select()
+      .from(users)
+      .where(eq(users.id, targetUserId))
+      .limit(1);
+    const target = targetRows[0];
+    if (!target) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
+    if (target.banned)
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '不能把站长身份转移给已封禁用户', 400);
+
+    await this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('uiliuili:owner'))`);
+      const owners = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`${users.userGroup} = 'OWNER' OR ${users.roles} @> ARRAY['SUPER_ADMIN']::text[]`);
+      if (!owners.some((owner) => owner.id === actor.id)) {
+        throw new AppError(ERROR_CODES.FORBIDDEN, '只有站长可以转移站长身份', 403);
+      }
+      await tx
+        .update(users)
+        .set({ roles: ['ADMIN'], userGroup: 'ADMIN', updatedAt: new Date() })
+        .where(
+          sql`${users.id} <> ${target.id} AND (${users.userGroup} = 'OWNER' OR ${users.roles} @> ARRAY['SUPER_ADMIN']::text[])`,
+        );
+      await tx
+        .update(users)
+        .set({
+          roles: ['SUPER_ADMIN'],
+          userGroup: 'OWNER',
+          banned: false,
+          level: 6,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, target.id));
+      await tx.insert(notifications).values([
+        {
+          userId: actor.id,
+          type: 'system',
+          title: '站长身份已转移',
+          body: `你已将站长身份转移给 ${target.displayName || target.username}。`,
+          link: '/',
         },
-      ),
+        {
+          userId: target.id,
+          type: 'system',
+          title: '你已成为站长',
+          body: '你已接管本站的站长账号，拥有全部管理权限。',
+          link: '/admin/',
+        },
+      ]);
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      action: 'admin.owner.transfer',
+      targetType: 'user',
+      targetId: target.id,
+      before: { owner: actor.id },
+      after: { owner: target.id },
+    });
+    return { ok: true };
+  }
+
+  private hasPermission(actor: AuthUser, permission: Permission): boolean {
+    return actor.permissions.includes(permission);
+  }
+
+  private assertPermission(actor: AuthUser, permission: Permission): void {
+    if (!this.hasPermission(actor, permission)) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '没有权限执行此操作', 403);
+    }
+  }
+
+  private assertSettingPermission(actor: AuthUser, key: string, value: unknown): void {
+    if (key === 'site') {
+      const fields = value && typeof value === 'object' ? Object.keys(value) : [];
+      const securityFields: string[] = fields.filter(
+        (field) => field === 'registration' || field === 'maintenance',
+      );
+      const otherFields = fields.filter((field) => !securityFields.includes(field));
+      if (otherFields.length > 0) this.assertPermission(actor, 'settings:site');
+      if (securityFields.length > 0) this.assertPermission(actor, 'settings:security');
+      return;
+    }
+    if (['upload', 'playback', 'danmaku', 'social', 'recommendation'].includes(key)) {
+      this.assertPermission(actor, 'settings:content');
+      return;
+    }
+    if (['storage_config', 'search_config', 'redis_config', 'mail_config', 'mail'].includes(key)) {
+      this.assertPermission(actor, 'settings:integration');
+      return;
+    }
+    if (key === 'security') {
+      this.assertPermission(actor, 'settings:security');
+    }
+  }
+
+  async getSettings(actor: AuthUser) {
+    const groupKeys: string[] = [];
+    if (
+      this.hasPermission(actor, 'settings:site') ||
+      this.hasPermission(actor, 'settings:security')
+    ) {
+      groupKeys.push('site');
+    }
+    if (this.hasPermission(actor, 'settings:content')) {
+      groupKeys.push('upload', 'playback', 'danmaku', 'social', 'recommendation');
+    }
+    if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail');
+    if (this.hasPermission(actor, 'settings:security')) groupKeys.push('security');
+
+    const groups = await Promise.all(
+      groupKeys.map(async (key) => {
+        const rows = await this.database.db
+          .select()
+          .from(siteSettings)
+          .where(eq(siteSettings.key, key))
+          .limit(1);
+        return [key, (rows[0]?.value ?? {}) as Record<string, unknown>] as const;
+      }),
     );
+
+    if (!this.hasPermission(actor, 'settings:integration')) {
+      return {
+        groups: Object.fromEntries(groups),
+        storage: null,
+        mail: null,
+        search: null,
+        redis: null,
+        oauth: [],
+      };
+    }
+
     const [storage, mail, search, redis] = await Promise.all([
       this.settings.getStorageConfig(),
       this.settings.getSecret<Record<string, unknown> | null>('mail_config', null),
@@ -703,8 +865,9 @@ export class AdminService {
     return { logoUrl };
   }
 
-  async updateSettings(actorId: string, patches: Record<string, unknown>) {
+  async updateSettings(actor: AuthUser, patches: Record<string, unknown>) {
     for (const [key, value] of Object.entries(patches)) {
+      this.assertSettingPermission(actor, key, value);
       if (key === 'storage_config') {
         const parsed = storageConfigSchema.parse(
           mergeMasked(value, await this.settings.getStorageConfig()),
@@ -754,7 +917,7 @@ export class AdminService {
         continue;
       }
       await this.audit.record({
-        actorId,
+        actorId: actor.id,
         action: 'admin.settings.update',
         targetType: 'setting',
         targetId: key,

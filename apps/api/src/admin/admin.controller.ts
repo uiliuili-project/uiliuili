@@ -23,11 +23,12 @@ import {
   categoryUpdateSchema,
   jobQuerySchema,
   moderationActionSchema,
+  ownerTransferSchema,
   settingsUpdateSchema,
 } from '@uiliuili/shared';
 import { z } from 'zod';
 import type { AuthUser } from '../common/auth-user';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequireAnyPermission, RequirePermissions } from '../common/decorators';
 import { zodBody, zodQuery } from '../common/zod';
 import { AdminService } from './admin.service';
 
@@ -56,19 +57,28 @@ export class AdminController {
   }
 
   @Get('users')
-  @RequirePermissions('user:manage')
+  @RequirePermissions('user:view')
   async users(@Query(zodQuery(adminUserQuerySchema)) query: z.infer<typeof adminUserQuerySchema>) {
     return this.admin.listUsers(query);
   }
 
   @Patch('users/:id')
-  @RequirePermissions('user:manage')
+  @RequirePermissions('user:moderate')
   async updateUser(
     @CurrentUser() actor: AuthUser,
     @Param('id') id: string,
     @Body(zodBody(adminUserUpdateSchema)) body: z.infer<typeof adminUserUpdateSchema>,
   ) {
-    return this.admin.updateUser(actor.id, id, body);
+    return this.admin.updateUser(actor, id, body);
+  }
+
+  @Post('owner/transfer')
+  @RequirePermissions('owner:transfer')
+  async transferOwner(
+    @CurrentUser() actor: AuthUser,
+    @Body(zodBody(ownerTransferSchema)) body: z.infer<typeof ownerTransferSchema>,
+  ) {
+    return this.admin.transferOwner(actor, body.userId, body.password);
   }
 
   @Get('videos')
@@ -86,7 +96,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body(zodBody(adminVideoUpdateSchema)) body: z.infer<typeof adminVideoUpdateSchema>,
   ) {
-    return this.admin.updateVideo(actor.id, id, body);
+    return this.admin.updateVideo(actor, id, body);
   }
 
   @Get('danmaku')
@@ -144,13 +154,13 @@ export class AdminController {
   }
 
   @Get('categories')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('category:manage')
   async categories() {
     return { items: await this.admin.listCategories() };
   }
 
   @Post('categories')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('category:manage')
   async createCategory(
     @CurrentUser() actor: AuthUser,
     @Body(zodBody(categoryCreateSchema)) body: z.infer<typeof categoryCreateSchema>,
@@ -159,7 +169,7 @@ export class AdminController {
   }
 
   @Patch('categories/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('category:manage')
   async updateCategory(
     @CurrentUser() actor: AuthUser,
     @Param('id') id: string,
@@ -169,25 +179,30 @@ export class AdminController {
   }
 
   @Delete('categories/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('category:manage')
   async deleteCategory(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
     return this.admin.deleteCategory(actor.id, id);
   }
 
   @Get('tags')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('category:manage')
   async tags() {
     return { items: await this.admin.listTags() };
   }
 
   @Get('settings')
-  @RequirePermissions('settings:manage')
-  async settings() {
-    return this.admin.getSettings();
+  @RequireAnyPermission(
+    'settings:site',
+    'settings:content',
+    'settings:integration',
+    'settings:security',
+  )
+  async settings(@CurrentUser() actor: AuthUser) {
+    return this.admin.getSettings(actor);
   }
 
   @Post('site/logo')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('settings:site')
   async uploadLogo(
     @CurrentUser() actor: AuthUser,
     @Body() body: Buffer,
@@ -202,16 +217,21 @@ export class AdminController {
   }
 
   @Put('settings')
-  @RequirePermissions('settings:manage')
+  @RequireAnyPermission(
+    'settings:site',
+    'settings:content',
+    'settings:integration',
+    'settings:security',
+  )
   async updateSettings(
     @CurrentUser() actor: AuthUser,
     @Body(zodBody(settingsUpdateSchema)) body: z.infer<typeof settingsUpdateSchema>,
   ) {
-    return this.admin.updateSettings(actor.id, body.patches);
+    return this.admin.updateSettings(actor, body.patches);
   }
 
   @Put('oauth/:provider')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('settings:integration')
   async updateOAuth(
     @CurrentUser() actor: AuthUser,
     @Param('provider') provider: string,
@@ -221,31 +241,31 @@ export class AdminController {
   }
 
   @Get('system')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:view')
   async system() {
     return this.admin.system();
   }
 
   @Get('system/update')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:view')
   async checkUpdate() {
     return this.admin.checkUpdate();
   }
 
   @Get('jobs')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:view')
   async jobs(@Query(zodQuery(jobQuerySchema)) query: z.infer<typeof jobQuerySchema>) {
     return this.admin.listJobs(query);
   }
 
   @Post('jobs/:id/retry')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:operate')
   async retryJob(@Param('id') id: string) {
     return this.admin.retryJob(id);
   }
 
   @Post('jobs/:id/cancel')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:operate')
   async cancelJob(@Param('id') id: string) {
     return this.admin.cancelJob(id);
   }
@@ -257,13 +277,13 @@ export class AdminController {
   }
 
   @Get('announcements')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('announcement:manage')
   async announcements() {
     return { items: await this.admin.listAnnouncements() };
   }
 
   @Post('announcements')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('announcement:manage')
   async createAnnouncement(
     @CurrentUser() actor: AuthUser,
     @Body(zodBody(announcementCreateSchema)) body: z.infer<typeof announcementCreateSchema>,
@@ -272,7 +292,7 @@ export class AdminController {
   }
 
   @Patch('announcements/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('announcement:manage')
   async updateAnnouncement(
     @CurrentUser() actor: AuthUser,
     @Param('id') id: string,
@@ -284,13 +304,13 @@ export class AdminController {
   }
 
   @Delete('announcements/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('announcement:manage')
   async deleteAnnouncement(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
     return this.admin.deleteAnnouncement(actor.id, id);
   }
 
   @Post('search/reindex')
-  @RequirePermissions('system:manage')
+  @RequirePermissions('system:operate')
   async reindex() {
     return this.admin.reindex();
   }

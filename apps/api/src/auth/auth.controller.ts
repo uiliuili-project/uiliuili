@@ -56,6 +56,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('setup-status')
+  async setupStatus(@Req() request: FastifyRequest) {
+    return this.auth.setupStatus(request.ip);
+  }
+
+  @Public()
   @Post('register')
   async register(
     @Body(zodBody(registerSchema)) body: z.infer<typeof registerSchema>,
@@ -67,7 +73,10 @@ export class AuthController {
       throw new AppError(ERROR_CODES.RATE_LIMITED, '注册过于频繁，请稍后再试', 429);
     }
     try {
-      const tokens = await this.auth.register(body);
+      const tokens = await this.auth.register(body, {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
       this.cookies.setAuthCookies(reply, tokens, true);
       return { user: tokens.user };
     } catch (error) {
@@ -244,7 +253,10 @@ export class AuthController {
       if (!cookieState || cookieState !== state) throw new Error('OAuth state 校验失败');
       if (!(await this.oauth.verifyState(state, provider))) throw new Error('OAuth state 已过期');
       const profile = await this.oauth.exchange(provider, code, site.url);
-      const user = await this.auth.findOrCreateOAuthUser(profile);
+      const user = await this.auth.findOrCreateOAuthUser(profile, {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
       const tokens = await this.auth.issueSessionForUserId(user.id, {
         ip: request.ip,
         userAgent: request.headers['user-agent'],

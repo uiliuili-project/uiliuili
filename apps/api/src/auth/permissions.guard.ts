@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Reflector } from '@nestjs/core';
 import type { Permission } from '@uiliuili/shared';
 import type { RequestWithUser } from '../common/auth-user';
-import { PERMISSIONS_KEY } from '../common/decorators';
+import { ANY_PERMISSIONS_KEY, PERMISSIONS_KEY } from '../common/decorators';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -13,12 +13,29 @@ export class PermissionsGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!required || required.length === 0) return true;
+    const anyRequired = this.reflector.getAllAndOverride<Permission[]>(ANY_PERMISSIONS_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if ((!required || required.length === 0) && (!anyRequired || anyRequired.length === 0)) {
+      return true;
+    }
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
     if (!user) throw new ForbiddenException('请先登录');
     const granted = new Set(user.permissions);
-    if (!required.every((permission) => granted.has(permission))) {
+    if (
+      required &&
+      required.length > 0 &&
+      !required.every((permission) => granted.has(permission))
+    ) {
+      throw new ForbiddenException('没有权限执行此操作');
+    }
+    if (
+      anyRequired &&
+      anyRequired.length > 0 &&
+      !anyRequired.some((permission) => granted.has(permission))
+    ) {
       throw new ForbiddenException('没有权限执行此操作');
     }
     return true;

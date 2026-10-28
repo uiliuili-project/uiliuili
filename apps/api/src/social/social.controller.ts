@@ -65,13 +65,13 @@ export class SocialController {
   }
 
   @Post('topics')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('settings:content')
   async createTopic(@Body(zodBody(topicCreateSchema)) body: z.infer<typeof topicCreateSchema>) {
     return this.social.createTopic(body);
   }
 
   @Patch('topics/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('settings:content')
   async updateTopic(
     @Param('id') id: string,
     @Body(zodBody(topicUpdateSchema)) body: z.infer<typeof topicUpdateSchema>,
@@ -80,7 +80,7 @@ export class SocialController {
   }
 
   @Delete('topics/:id')
-  @RequirePermissions('settings:manage')
+  @RequirePermissions('settings:content')
   async removeTopic(@Param('id') id: string) {
     return this.social.removeTopic(id);
   }

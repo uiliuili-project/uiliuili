@@ -51,6 +51,7 @@ export interface InstallProgressState {
   message: string;
   error?: string;
   warnings: string[];
+  ownerClaimToken?: string;
 }
 
 @Injectable()
@@ -199,11 +200,15 @@ export class InstallService {
         percent: 100,
         message: '安装完成',
         warnings: result.warnings,
+        ownerClaimToken: result.ownerClaimToken,
       };
-      this.logger.log(`Installation completed. Admin ID: ${result.adminId}`);
+      this.logger.log(
+        `Installation completed. Owner claim token (shown once): ${result.ownerClaimToken}`,
+      );
+      this.logger.log('注册第一个账号即可成为站长。来自 localhost 的注册无需认领码。');
       if (!config.installNoRestart) {
         this.logger.log('Restarting the API process to load the installed instance…');
-        setTimeout(() => process.exit(75), 1200);
+        setTimeout(() => process.exit(75), 8000);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

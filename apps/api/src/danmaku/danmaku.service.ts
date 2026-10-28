@@ -167,7 +167,7 @@ export class DanmakuService {
     partId?: string,
   ) {
     const video = await this.videos.getRow(videoId);
-    if (video.video.uploaderId !== user.id && !user.permissions.includes('video:manage_any')) {
+    if (video.video.uploaderId !== user.id && !user.permissions.includes('danmaku:manage')) {
       throw new AppError(ERROR_CODES.FORBIDDEN, '没有权限导入弹幕', 403);
     }
     const values = items.slice(0, 10_000).map((item) => ({

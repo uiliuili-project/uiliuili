@@ -391,8 +391,7 @@ export class StudioService {
 
   async publish(user: AuthUser, id: string, publishAt?: string) {
     const video = await this.getOwnVideo(user.id, id);
-    const canReview =
-      user.permissions.includes('video:manage_any') || user.roles.includes('REVIEWER');
+    const canReview = user.permissions.includes('video:review');
     if (!['ready', 'pending_review', 'published'].includes(video.status)) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未完成处理', 400);
     }
