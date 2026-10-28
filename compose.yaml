@@ -56,9 +56,6 @@ services:
     command: ["node", "dist/index.js", "bootstrap"]
     environment:
       <<: *app-environment
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       SITE_NAME: ${SITE_NAME:-uiliuili}
       SITE_DESCRIPTION: ${SITE_DESCRIPTION:-一个自托管的弹幕视频站}
       SITE_LOCALE: ${SITE_LOCALE:-zh-CN}
