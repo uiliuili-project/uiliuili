@@ -57,10 +57,6 @@ interface SiteForm {
   timezone: string;
   locale: 'zh-CN' | 'en-US';
   registration: 'open' | 'invite' | 'closed';
-  adminUsername: string;
-  adminEmail: string;
-  adminPassword: string;
-  adminPasswordConfirm: string;
 }
 
 interface StorageForm {
@@ -90,6 +86,7 @@ interface OptionalForm {
   mailPassword: string;
   mailFromName: string;
   mailFromAddress: string;
+  mailTestTo: string;
   verificationRequired: boolean;
   githubEnabled: boolean;
   githubClientId: string;
@@ -107,7 +104,7 @@ const stepItems = [
   { title: '欢迎' },
   { title: '环境检查' },
   { title: '数据库' },
-  { title: '站点与管理员' },
+  { title: '站点信息' },
   { title: '存储' },
   { title: '可选服务' },
   { title: '确认安装' },
@@ -245,8 +242,8 @@ export function InstallWizard() {
   const testMail = async () => {
     try {
       const values = await optionalForm.validateFields();
-      const to = siteForm.getFieldValue('adminEmail');
-      if (!to) throw new Error(t('请先在“站点与管理员”步骤填写管理员邮箱'));
+      const to = values.mailTestTo;
+      if (!to) throw new Error(t('请填写测试收件邮箱'));
       setBusy(true);
       await api.post('/api/install/test/mail', {
         to,
@@ -311,11 +308,6 @@ export function InstallWizard() {
         timezone: site.timezone,
         locale: site.locale,
         registration: site.registration,
-      },
-      admin: {
-        username: site.adminUsername,
-        email: site.adminEmail,
-        password: site.adminPassword,
       },
       storage:
         storage.driver === 'local'
@@ -648,9 +640,9 @@ export function InstallWizard() {
           {step === 3 && (
             <Space direction="vertical" size="large" className="w-full">
               <div>
-                <Title level={3}>{t('站点与管理员')}</Title>
+                <Title level={3}>{t('站点信息')}</Title>
                 <Paragraph className="muted">
-                  {t('创建超级管理员账号。请使用高强度密码，安装完成后即可登录管理后台。')}{' '}
+                  {t('设置站点名称、地址与注册策略。站点负责人将在安装完成后通过注册创建。')}{' '}
                 </Paragraph>
               </div>
               <Form
@@ -714,68 +706,14 @@ export function InstallWizard() {
                     />
                   </Form.Item>
                 </div>
-                <Divider orientation="left">{t('管理员账号')}</Divider>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 16,
-                  }}
-                >
-                  <Form.Item
-                    label={t('用户名')}
-                    name="adminUsername"
-                    rules={[
-                      { required: true },
-                      { min: 3 },
-                      {
-                        pattern: /^[a-zA-Z0-9_-]+$/,
-                        message: t('只能包含字母、数字、下划线和短横线'),
-                      },
-                    ]}
-                  >
-                    <Input autoComplete="off" />
-                  </Form.Item>
-                  <Form.Item
-                    label={t('邮箱')}
-                    name="adminEmail"
-                    rules={[{ required: true, type: 'email' }]}
-                  >
-                    <Input autoComplete="off" />
-                  </Form.Item>
-                  <Form.Item
-                    label={t('密码')}
-                    name="adminPassword"
-                    rules={[
-                      { required: true },
-                      { min: 10, message: t('至少 10 个字符') },
-                      {
-                        pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
-                        message: t('必须同时包含字母和数字'),
-                      },
-                    ]}
-                  >
-                    <Input.Password autoComplete="new-password" />
-                  </Form.Item>
-                  <Form.Item
-                    label={t('确认密码')}
-                    name="adminPasswordConfirm"
-                    dependencies={['adminPassword']}
-                    rules={[
-                      { required: true },
-                      ({ getFieldValue }) => ({
-                        validator(_, value) {
-                          if (!value || getFieldValue('adminPassword') === value) {
-                            return Promise.resolve();
-                          }
-                          return Promise.reject(new Error(t('两次输入的密码不一致')));
-                        },
-                      }),
-                    ]}
-                  >
-                    <Input.Password autoComplete="new-password" />
-                  </Form.Item>
-                </div>
+                <Alert
+                  type="info"
+                  showIcon
+                  message={t('安装后不再创建初始管理员')}
+                  description={t(
+                    '安装完成后请注册第一个账号，该账号会自动成为站长。请务必先完成注册再开放站点访问。',
+                  )}
+                />
               </Form>
             </Space>
           )}
@@ -1013,6 +951,13 @@ export function InstallWizard() {
                                 >
                                   <Input />
                                 </Form.Item>
+                                <Form.Item
+                                  label={t('测试收件邮箱')}
+                                  name="mailTestTo"
+                                  rules={[{ type: 'email' }]}
+                                >
+                                  <Input />
+                                </Form.Item>
                               </div>
                               <Space size="large">
                                 <Form.Item name="mailSecure" valuePropName="checked" noStyle>
@@ -1171,9 +1116,7 @@ export function InstallWizard() {
               <div>
                 <Title level={3}>{t('确认安装')}</Title>
                 <Paragraph className="muted">
-                  {t(
-                    '安装器将写入 .env、创建数据库表、初始化站点并创建管理员账号。此操作会修改数据库。',
-                  )}{' '}
+                  {t('安装器将写入 .env、创建数据库表并初始化站点。此操作会修改数据库。')}{' '}
                 </Paragraph>
               </div>
               <div className="install-summary">
@@ -1190,10 +1133,6 @@ export function InstallWizard() {
                   </Descriptions.Item>
                   <Descriptions.Item label="Schema">
                     {dbForm.getFieldValue('schema')}
-                  </Descriptions.Item>
-                  <Descriptions.Item label={t('管理员')}>
-                    {siteForm.getFieldValue('adminUsername')} ·{' '}
-                    {siteForm.getFieldValue('adminEmail')}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('存储')}>
                     {storageForm.getFieldValue('driver') === 's3' ? 'S3' : t('本地磁盘')}
@@ -1232,19 +1171,42 @@ export function InstallWizard() {
           {step === 7 && (
             <Space direction="vertical" size="large" className="w-full">
               {progress?.installed ? (
-                <Result
-                  status="success"
-                  title={t('安装完成')}
-                  subTitle={t('管理员账号已创建。服务重启后即可登录管理后台。')}
-                  extra={[
-                    <Button type="primary" key="login" href={`${base}/login`}>
-                      {t('前往登录')}{' '}
-                    </Button>,
-                    <Button key="site" href="/">
-                      {t('访问站点')}{' '}
-                    </Button>,
-                  ]}
-                />
+                <>
+                  <Result
+                    status="success"
+                    title={t('安装完成')}
+                    subTitle={t(
+                      '安装已完成，但站点还没有站长。请访问站点并注册第一个账号，该账号将自动成为站长。',
+                    )}
+                    extra={[
+                      <Button type="primary" key="register" href="/register">
+                        {t('注册站长账号')}{' '}
+                      </Button>,
+                      <Button key="site" href="/">
+                        {t('访问站点')}{' '}
+                      </Button>,
+                    ]}
+                  />
+                  {progress.ownerClaimToken && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message={t('站长认领码（仅显示一次）')}
+                      description={
+                        <Space direction="vertical">
+                          <Typography.Text code copyable>
+                            {progress.ownerClaimToken}
+                          </Typography.Text>
+                          <span>
+                            {t(
+                              '从非本机地址注册站长账号时需要填写此认领码。请立即保存；丢失后可通过 CLI owner:promote 恢复。',
+                            )}
+                          </span>
+                        </Space>
+                      }
+                    />
+                  )}
+                </>
               ) : progress?.failed ? (
                 <Result
                   status="error"

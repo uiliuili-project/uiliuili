@@ -37,6 +37,7 @@ export interface InstallProgressState {
   message: string;
   error?: string;
   warnings: string[];
+  ownerClaimToken?: string;
 }
 
 export interface AuthUser {
@@ -46,7 +47,7 @@ export interface AuthUser {
   displayName: string;
   avatarUrl: string | null;
   roles: string[];
-  group: 'USER' | 'CREATOR' | 'ADMIN';
+  group: 'USER' | 'CREATOR' | 'REVIEWER' | 'ADMIN' | 'OWNER';
   permissions: string[];
   level: number;
   emailVerified: boolean;
@@ -96,7 +97,7 @@ export interface AdminUser {
   email: string;
   displayName: string;
   roles: string[];
-  group: 'USER' | 'CREATOR' | 'ADMIN';
+  group: 'USER' | 'CREATOR' | 'REVIEWER' | 'ADMIN' | 'OWNER';
   level: number;
   banned: boolean;
   mutedUntil: string | null;

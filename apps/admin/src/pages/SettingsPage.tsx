@@ -20,20 +20,23 @@ import {
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useT } from '../i18n';
+import { can } from '../permissions';
+import { useAdminUser } from '../user-context';
 
 const { Title, Text } = Typography;
 
 interface SettingsData {
   groups: Record<string, Record<string, any>>;
-  storage: Record<string, any>;
+  storage: Record<string, any> | null;
   mail: Record<string, any> | null;
-  search: Record<string, any>;
+  search: Record<string, any> | null;
   redis: { url: string } | null;
   oauth: Array<{ provider: string; enabled: boolean; config: Record<string, any> }>;
 }
 
 export function SettingsPage() {
   const t = useT();
+  const actor = useAdminUser();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [siteForm] = Form.useForm();
@@ -48,6 +51,20 @@ export function SettingsPage() {
   const [securityForm] = Form.useForm();
   const [oauthForms] = Form.useForm();
   const logoUrl = Form.useWatch('logoUrl', siteForm) as string | undefined;
+  const canSite = can(actor, 'settings:site');
+  const canContent = can(actor, 'settings:content');
+  const canIntegration = can(actor, 'settings:integration');
+  const canSecurity = can(actor, 'settings:security');
+
+  const canSeeTab = (key: string) => {
+    if (key === 'site') return canSite;
+    if (key === 'content' || key === 'social') return canContent;
+    if (key === 'storage' || key === 'mail' || key === 'search' || key === 'oauth') {
+      return canIntegration;
+    }
+    if (key === 'security') return canSecurity;
+    return false;
+  };
 
   const query = useQuery({
     queryKey: ['admin-settings'],
@@ -57,6 +74,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (!query.data) return;
     const { groups, storage, mail, search, oauth } = query.data;
+    const siteGroups = groups.site ?? {};
     siteForm.setFieldsValue(groups.site ?? {});
     uploadForm.setFieldsValue({
       ...(groups.upload ?? {}),
@@ -75,18 +93,20 @@ export function SettingsPage() {
       ...(groups.recommendation ?? {}),
       ...(groups.recommendation?.weights ?? {}),
     });
-    storageForm.setFieldsValue({
-      driver: storage.driver ?? 'local',
-      localPath: storage.localPath ?? './storage/uploads',
-      endpoint: storage.s3?.endpoint ?? '',
-      region: storage.s3?.region ?? 'us-east-1',
-      bucket: storage.s3?.bucket ?? '',
-      accessKeyId: storage.s3?.accessKeyId ?? '',
-      secretAccessKey: storage.s3?.secretAccessKey ?? '',
-      forcePathStyle: storage.s3?.forcePathStyle ?? false,
-      publicBaseUrl: storage.s3?.publicBaseUrl ?? '',
-      prefix: storage.s3?.prefix ?? 'uiliuili',
-    });
+    if (storage) {
+      storageForm.setFieldsValue({
+        driver: storage.driver ?? 'local',
+        localPath: storage.localPath ?? './storage/uploads',
+        endpoint: storage.s3?.endpoint ?? '',
+        region: storage.s3?.region ?? 'us-east-1',
+        bucket: storage.s3?.bucket ?? '',
+        accessKeyId: storage.s3?.accessKeyId ?? '',
+        secretAccessKey: storage.s3?.secretAccessKey ?? '',
+        forcePathStyle: storage.s3?.forcePathStyle ?? false,
+        publicBaseUrl: storage.s3?.publicBaseUrl ?? '',
+        prefix: storage.s3?.prefix ?? 'uiliuili',
+      });
+    }
     if (mail) {
       mailForm.setFieldsValue({
         ...mail,
@@ -95,15 +115,21 @@ export function SettingsPage() {
           groups.mail?.verificationRequired ?? mail.verificationRequired ?? false,
       });
     }
-    searchForm.setFieldsValue({
-      driver: search.driver ?? 'postgres',
-      url: search.url ?? '',
-      key: search.key ?? '',
-      indexPrefix: search.indexPrefix ?? 'uiliuili',
+    if (search) {
+      searchForm.setFieldsValue({
+        driver: search.driver ?? 'postgres',
+        url: search.url ?? '',
+        key: search.key ?? '',
+        indexPrefix: search.indexPrefix ?? 'uiliuili',
+      });
+    }
+    securityForm.setFieldsValue({
+      ...(groups.security ?? {}),
+      registration: siteGroups.registration ?? 'open',
+      maintenance: Boolean(siteGroups.maintenance),
     });
-    securityForm.setFieldsValue(groups.security ?? {});
     const oauthValues: Record<string, any> = {};
-    for (const provider of oauth) {
+    for (const provider of oauth ?? []) {
       oauthValues[provider.provider] = {
         enabled: provider.enabled,
         clientId: provider.config.clientId ?? '',
@@ -131,7 +157,8 @@ export function SettingsPage() {
 
   const saveSite = async () => {
     const values = await siteForm.validateFields();
-    await save({ site: values });
+    const { registration: _registration, maintenance: _maintenance, ...site } = values;
+    await save({ site });
   };
 
   const uploadLogo = async (file: File) => {
@@ -269,7 +296,11 @@ export function SettingsPage() {
   };
   const saveSecurity = async () => {
     const values = await securityForm.validateFields();
-    await save({ security: values });
+    const { registration, maintenance, ...security } = values;
+    await save({
+      security,
+      site: { registration, maintenance },
+    });
   };
   const saveOAuth = async (provider: string) => {
     const values = await oauthForms.validateFields();
@@ -387,25 +418,9 @@ export function SettingsPage() {
                         <Input />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={8}>
-                      <Form.Item label={t('注册策略')} name="registration">
-                        <Select
-                          options={[
-                            { value: 'open', label: t('开放注册') },
-                            { value: 'invite', label: t('仅邀请') },
-                            { value: 'closed', label: t('关闭注册') },
-                          ]}
-                        />
-                      </Form.Item>
-                    </Col>
                     <Col xs={24} sm={12}>
                       <Form.Item label={t('ICP 备案号')} name="icp">
                         <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('维护模式')} name="maintenance" valuePropName="checked">
-                        <Switch />
                       </Form.Item>
                     </Col>
                     <Col xs={24}>
@@ -828,6 +843,23 @@ export function SettingsPage() {
               label: t('安全'),
               children: (
                 <Form form={securityForm} layout="vertical" style={{ maxWidth: 640 }}>
+                  <Form.Item label={t('注册策略')} name="registration">
+                    <Select
+                      options={[
+                        { value: 'open', label: t('开放注册') },
+                        { value: 'invite', label: t('仅邀请') },
+                        { value: 'closed', label: t('关闭注册') },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('维护模式')}
+                    name="maintenance"
+                    valuePropName="checked"
+                    extra={t('开启后公开站显示维护提示，仅管理员可访问。')}
+                  >
+                    <Switch />
+                  </Form.Item>
                   <Form.Item label={t('会话有效期（天）')} name="sessionDays">
                     <InputNumber min={1} style={{ width: '100%' }} />
                   </Form.Item>
@@ -840,7 +872,7 @@ export function SettingsPage() {
                 </Form>
               ),
             },
-          ]}
+          ].filter((tab) => canSeeTab(tab.key))}
         />
       </Card>
     </div>

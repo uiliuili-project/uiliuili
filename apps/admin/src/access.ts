@@ -1,23 +1,26 @@
+import type { ConsoleArea } from '@uiliuili/shared';
 import type { AuthUser } from './types';
 
-const ADMIN_PERMISSIONS = [
-  'video:manage_any',
-  'danmaku:manage',
-  'comment:manage',
-  'user:manage',
-  'settings:manage',
-  'system:manage',
-  'audit:read',
-  'report:manage',
-];
-
 /**
- * Administrators always have access. Reviewers and other staff roles reach the
- * console through their moderation permissions, but the public entry is only
- * shown to users in the ADMIN group.
+ * The console area a user should land in. Kept local to the admin bundle so
+ * the Vite build does not need runtime exports from the shared CommonJS
+ * package.
  */
+export function consoleArea(user: AuthUser | null): ConsoleArea {
+  const group = user?.group;
+  if (group === 'OWNER') return 'owner';
+  if (group === 'ADMIN') return 'admin';
+  if (group === 'REVIEWER') return 'review';
+  return null;
+}
+
 export function canAccessAdmin(user: AuthUser | null): boolean {
-  if (!user) return false;
-  if (user.group === 'ADMIN') return true;
-  return user.permissions.some((permission) => ADMIN_PERMISSIONS.includes(permission));
+  return consoleArea(user) !== null;
+}
+
+/** Landing route for the current user's console area. */
+export function consoleHome(user: AuthUser | null): string {
+  const area = consoleArea(user);
+  if (area === 'review') return '/review';
+  return '/';
 }
