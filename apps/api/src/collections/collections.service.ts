@@ -10,6 +10,7 @@ import {
 import { and, asc, count, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { videoRegionCondition } from '../common/region-context';
 import { publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -67,6 +68,7 @@ export class CollectionsService {
           eq(videos.status, 'published'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(asc(collectionItems.sort), asc(collectionItems.createdAt));

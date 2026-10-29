@@ -137,6 +137,14 @@ export class SettingsService {
     return this.getGroup('security', DEFAULT_SETTINGS.security);
   }
 
+  async getRegionSettings() {
+    return this.getGroup('region', DEFAULT_SETTINGS.region);
+  }
+
+  async getRestrictedSettings() {
+    return this.getGroup('restricted', DEFAULT_SETTINGS.restricted);
+  }
+
   async getPublicSettings() {
     const cached = await this.cacheService.get('settings:public');
     if (cached) return JSON.parse(cached) as Record<string, unknown>;
@@ -149,6 +157,8 @@ export class SettingsService {
       recommendation,
       mail,
       security,
+      region,
+      restricted,
       search,
       storage,
     ] = await Promise.all([
@@ -160,6 +170,8 @@ export class SettingsService {
       this.getGroup('recommendation', DEFAULT_SETTINGS.recommendation),
       this.getGroup('mail', DEFAULT_SETTINGS.mail),
       this.getGroup('security', DEFAULT_SETTINGS.security),
+      this.getGroup('region', DEFAULT_SETTINGS.region),
+      this.getGroup('restricted', DEFAULT_SETTINGS.restricted),
       this.getGroup('search', { driver: 'postgres' }),
       this.getGroup('storage', { driver: 'local' }),
     ]);
@@ -191,6 +203,11 @@ export class SettingsService {
       },
       mail: { enabled: mail.enabled, verificationRequired: mail.verificationRequired },
       security: { sessionDays: security.sessionDays },
+      region: { fallback: region.fallback },
+      restricted: {
+        defaultBehavior: restricted.defaultBehavior,
+        defaultMessage: restricted.defaultMessage,
+      },
       search,
       storage,
     };

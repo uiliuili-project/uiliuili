@@ -27,6 +27,7 @@ import {
 import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { videoRegionCondition } from '../common/region-context';
 import { decodeCursor, encodeCursor, publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -497,6 +498,7 @@ export class SocialService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .groupBy(videos.id, users.id, categories.id)
@@ -573,7 +575,15 @@ export class SocialService {
       .from(videos)
       .innerJoin(users, eq(users.id, videos.uploaderId))
       .leftJoin(categories, eq(categories.id, videos.categoryId))
-      .where(and(inArray(videos.id, ids), isNull(videos.deletedAt)));
+      .where(
+        and(
+          inArray(videos.id, ids),
+          isNull(videos.deletedAt),
+          eq(videos.status, 'published'),
+          eq(videos.visibility, 'public'),
+          videoRegionCondition(),
+        ),
+      );
     const tagsByVideo = await this.videos.tagsFor(rows.map((row) => row.video.id));
     for (const row of rows) {
       map.set(row.video.id, videoCard(row, tagsByVideo.get(row.video.id) ?? []));

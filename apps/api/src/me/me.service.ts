@@ -16,6 +16,7 @@ import { AppError, ERROR_CODES } from '@uiliuili/shared';
 import { and, count, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { videoRegionCondition } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
@@ -50,6 +51,7 @@ export class MeService {
           eq(videos.status, 'published'),
           isNull(videos.deletedAt),
           eq(videos.visibility, 'public'),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(watchHistories.updatedAt))
@@ -87,6 +89,7 @@ export class MeService {
           eq(videos.status, 'published'),
           isNull(videos.deletedAt),
           eq(videos.visibility, 'public'),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(favoriteItems.createdAt))
@@ -160,6 +163,7 @@ export class MeService {
           eq(videos.status, 'published'),
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(watchLater.createdAt))

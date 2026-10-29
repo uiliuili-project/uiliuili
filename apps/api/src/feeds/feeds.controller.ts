@@ -30,6 +30,7 @@ export class FeedsController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get('popular')
   async popular() {
     return this.feeds.popular();

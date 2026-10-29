@@ -43,6 +43,7 @@ export class UsersController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get(':username/favorites')
   async favorites(@Param('username') username: string, @Query('folderId') folderId?: string) {
     return this.users.publicFavorites(username, folderId);

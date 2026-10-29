@@ -29,6 +29,7 @@ export class VideosController {
   ) {}
 
   @Public()
+  @OptionalAuth()
   @Get()
   async list(@Query(zodQuery(videoListQuerySchema)) query: z.infer<typeof videoListQuerySchema>) {
     return this.videos.list(query);
@@ -42,6 +43,7 @@ export class VideosController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get(':id/related')
   async related(@Param('id') id: string) {
     return this.videos.related(id);
@@ -169,6 +171,7 @@ export class UserVideosController {
   constructor(private readonly videos: VideosService) {}
 
   @Public()
+  @OptionalAuth()
   @Get(':username/videos')
   async byUploader(
     @Param('username') username: string,
@@ -183,6 +186,7 @@ export class CategoriesController {
   constructor(private readonly videos: VideosService) {}
 
   @Public()
+  @OptionalAuth()
   @Get()
   async list() {
     return { items: await this.videos.getCategories() };

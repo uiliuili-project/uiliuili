@@ -19,11 +19,13 @@ import {
   ERROR_CODES,
   MAX_UPLOAD_CHUNK_BYTES,
   type VideoCreateInput,
+  normalizeRegionList,
 } from '@uiliuili/shared';
 import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { QueueService } from '../common/queue.service';
+import { currentRegionContext } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
 import { tagSlug } from './video.helpers';
@@ -83,6 +85,7 @@ export class StudioService {
 
   async create(userId: string, input: VideoCreateInput) {
     await this.validateCategory(input.categoryId);
+    const policy = await this.regionPolicy(input);
     const [created] = await this.database.db
       .insert(videos)
       .values({
@@ -92,6 +95,11 @@ export class StudioService {
         categoryId: input.categoryId ?? null,
         visibility: input.visibility,
         status: 'draft',
+        restricted: policy.restricted,
+        regionMode: policy.regionMode,
+        regionCodes: policy.regionCodes,
+        regionDenyBehavior: policy.regionDenyBehavior,
+        regionDenyMessage: policy.regionDenyMessage,
       })
       .returning();
     if (!created) throw new AppError(ERROR_CODES.INTERNAL_ERROR, '创建稿件失败', 500);
@@ -104,8 +112,23 @@ export class StudioService {
     id: string,
     input: Partial<VideoCreateInput> & { coverUrl?: string },
   ) {
-    await this.getOwnVideo(userId, id);
+    const current = await this.getOwnVideo(userId, id);
     await this.validateCategory(input.categoryId);
+    const touchesRegion =
+      input.restricted !== undefined ||
+      input.regionMode !== undefined ||
+      input.regionCodes !== undefined ||
+      input.regionDenyBehavior !== undefined ||
+      input.regionDenyMessage !== undefined;
+    const policy = touchesRegion
+      ? await this.regionPolicy({
+          restricted: input.restricted ?? current.restricted,
+          regionMode: input.regionMode ?? current.regionMode,
+          regionCodes: input.regionCodes ?? current.regionCodes,
+          regionDenyBehavior: input.regionDenyBehavior ?? current.regionDenyBehavior,
+          regionDenyMessage: input.regionDenyMessage ?? current.regionDenyMessage,
+        })
+      : null;
     const [updated] = await this.database.db
       .update(videos)
       .set({
@@ -114,6 +137,11 @@ export class StudioService {
         categoryId: input.categoryId === undefined ? undefined : input.categoryId,
         visibility: input.visibility,
         coverUrl: input.coverUrl,
+        restricted: policy?.restricted,
+        regionMode: policy?.regionMode,
+        regionCodes: policy?.regionCodes,
+        regionDenyBehavior: policy?.regionDenyBehavior,
+        regionDenyMessage: policy?.regionDenyMessage,
         updatedAt: new Date(),
       })
       .where(eq(videos.id, id))
@@ -121,6 +149,48 @@ export class StudioService {
     if (input.tags !== undefined) await this.setTags(id, input.tags);
     if (!updated) throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
     return this.studioPayload(updated);
+  }
+
+  /**
+   * Resolves the region policy for an upload. Restricted content always uses
+   * the site's blocked-region list, which stays authoritative; normal videos
+   * may additionally block a chosen set of countries.
+   */
+  private async regionPolicy(input: {
+    restricted?: boolean;
+    regionMode?: string;
+    regionCodes?: unknown;
+    regionDenyBehavior?: string;
+    regionDenyMessage?: string;
+  }) {
+    const context = currentRegionContext();
+    const restrictedSettings = await this.settings.getRestrictedSettings();
+    const blockedRegions = normalizeRegionList(restrictedSettings.blockedRegions);
+    const behavior =
+      input.regionDenyBehavior === 'message' || input.regionDenyBehavior === 'not_found'
+        ? input.regionDenyBehavior
+        : 'default';
+    const message = (input.regionDenyMessage ?? '').slice(0, 200);
+    if (input.restricted) {
+      if (!context.code || blockedRegions.includes(context.code)) {
+        throw new AppError(ERROR_CODES.FORBIDDEN, '当前地区不能发布限制级内容', 403);
+      }
+      return {
+        restricted: true,
+        regionMode: 'block' as const,
+        regionCodes: blockedRegions,
+        regionDenyBehavior: behavior,
+        regionDenyMessage: message,
+      };
+    }
+    const regionCodes = normalizeRegionList(input.regionCodes);
+    return {
+      restricted: false,
+      regionMode: input.regionMode === 'block' && regionCodes.length > 0 ? 'block' : 'inherit',
+      regionCodes: input.regionMode === 'block' && regionCodes.length > 0 ? regionCodes : [],
+      regionDenyBehavior: behavior,
+      regionDenyMessage: message,
+    };
   }
 
   async remove(userId: string, id: string) {
@@ -725,6 +795,11 @@ export class StudioService {
       danmaku: video.danmakuCount,
       sourceFilename: video.sourceFilename,
       sourceSize: video.sourceSize,
+      restricted: video.restricted,
+      regionMode: video.regionMode,
+      regionCodes: video.regionCodes,
+      regionDenyBehavior: video.regionDenyBehavior,
+      regionDenyMessage: video.regionDenyMessage,
       publishedAt: video.publishedAt?.toISOString() ?? null,
       createdAt: video.createdAt.toISOString(),
       updatedAt: video.updatedAt.toISOString(),

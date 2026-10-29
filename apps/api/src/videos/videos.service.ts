@@ -52,6 +52,11 @@ import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { grantExperience } from '../common/experience';
 import { QueueService } from '../common/queue.service';
+import {
+  regionDenialError,
+  regionDenialReason,
+  videoRegionCondition,
+} from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
 import {
@@ -89,6 +94,7 @@ export class VideosService {
       eq(videos.visibility, 'public'),
       isNull(videos.deletedAt),
       lte(videos.publishedAt, new Date()),
+      videoRegionCondition(),
     ];
     if (query.category) conditions.push(eq(categories.slug, query.category));
     if (query.q) {
@@ -171,6 +177,7 @@ export class VideosService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(
@@ -326,6 +333,11 @@ export class VideosService {
       status: row.video.status,
       visibility: row.video.visibility,
       featured: row.video.featured,
+      restricted: row.video.restricted,
+      regionMode: row.video.regionMode,
+      regionCodes: row.video.regionCodes,
+      regionDenyBehavior: row.video.regionDenyBehavior,
+      regionDenyMessage: row.video.regionDenyMessage,
       playlistUrl:
         playablePart?.playlistUrl ??
         (row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null),
@@ -363,6 +375,7 @@ export class VideosService {
       isNull(videos.deletedAt),
       lte(videos.publishedAt, new Date()),
       ne(videos.id, id),
+      videoRegionCondition(),
     ];
     if (row.video.categoryId) conditions.push(eq(videos.categoryId, row.video.categoryId));
     const similar = await this.database.db
@@ -378,6 +391,7 @@ export class VideosService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(videoSimilarities.score))
@@ -415,6 +429,7 @@ export class VideosService {
             eq(videos.visibility, 'public'),
             isNull(videos.deletedAt),
             lte(videos.publishedAt, new Date()),
+            videoRegionCondition(),
           ),
         )
         .orderBy(desc(videos.viewCount))
@@ -792,6 +807,10 @@ export class VideosService {
     }
     if (video.publishedAt && video.publishedAt > new Date() && !privileged) {
       throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
+    }
+    const denial = regionDenialReason(video, viewer?.id);
+    if (denial) {
+      throw regionDenialError(video, denial);
     }
   }
 

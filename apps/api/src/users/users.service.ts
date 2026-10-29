@@ -16,6 +16,7 @@ import { and, count, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { badgesForUser } from '../common/experience';
+import { videoRegionCondition } from '../common/region-context';
 import { videoCard } from '../videos/video.helpers';
 
 export interface UserProfile {
@@ -66,6 +67,7 @@ export class UsersService {
             eq(videos.status, 'published'),
             eq(videos.visibility, 'public'),
             lte(videos.publishedAt, new Date()),
+            videoRegionCondition(),
           ),
         ),
       this.database.db
@@ -247,6 +249,7 @@ export class UsersService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(favoriteItems.createdAt))

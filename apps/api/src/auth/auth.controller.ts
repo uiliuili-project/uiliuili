@@ -4,6 +4,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  regionPreferencesSchema,
   registerSchema,
   resetPasswordSchema,
   updateProfileSchema,
@@ -15,6 +16,7 @@ import { z } from 'zod';
 import type { AuthUser, RequestWithUser } from '../common/auth-user';
 import { CacheService } from '../common/cache.service';
 import { CurrentUser, Public } from '../common/decorators';
+import { RegionService } from '../common/region.service';
 import { SettingsService } from '../common/settings.service';
 import { zodBody } from '../common/zod';
 import { config } from '../config';
@@ -29,6 +31,7 @@ export class AuthController {
     private readonly cookies: CookieService,
     private readonly oauth: OAuthService,
     private readonly settings: SettingsService,
+    private readonly region: RegionService,
     private readonly cache: CacheService,
   ) {}
 
@@ -73,9 +76,12 @@ export class AuthController {
       throw new AppError(ERROR_CODES.RATE_LIMITED, '注册过于频繁，请稍后再试', 429);
     }
     try {
+      const region = await this.region.resolveForRegistration(request);
       const tokens = await this.auth.register(body, {
         ip: request.ip,
         userAgent: request.headers['user-agent'],
+        region: region.code,
+        regionSource: region.source,
       });
       this.cookies.setAuthCookies(reply, tokens, true);
       return { user: tokens.user };
@@ -144,6 +150,18 @@ export class AuthController {
     @Body(zodBody(updateProfileSchema)) body: z.infer<typeof updateProfileSchema>,
   ) {
     return { user: await this.auth.updateProfile(user.id, body) };
+  }
+
+  @Patch('preferences')
+  async updatePreferences(
+    @CurrentUser() user: AuthUser,
+    @Body(zodBody(regionPreferencesSchema)) body: z.infer<typeof regionPreferencesSchema>,
+  ) {
+    try {
+      return { user: await this.auth.updateShowRestricted(user.id, body.showRestricted) };
+    } catch (error) {
+      throw this.toAppError(error);
+    }
   }
 
   @Post('password')
@@ -253,13 +271,18 @@ export class AuthController {
       if (!cookieState || cookieState !== state) throw new Error('OAuth state 校验失败');
       if (!(await this.oauth.verifyState(state, provider))) throw new Error('OAuth state 已过期');
       const profile = await this.oauth.exchange(provider, code, site.url);
+      const region = await this.region.resolveForRegistration(request);
       const user = await this.auth.findOrCreateOAuthUser(profile, {
         ip: request.ip,
         userAgent: request.headers['user-agent'],
+        region: region.code,
+        regionSource: region.source,
       });
       const tokens = await this.auth.issueSessionForUserId(user.id, {
         ip: request.ip,
         userAgent: request.headers['user-agent'],
+        region: region.code,
+        regionSource: region.source,
       });
       this.cookies.setAuthCookies(reply, tokens, true);
       this.cookies.clearOauthState(reply);

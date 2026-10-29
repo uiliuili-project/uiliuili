@@ -50,6 +50,7 @@ export function videoCard(row: VideoJoinRow, tags: string[]): VideoCard {
     category: row.category ? categoryPayload(row.category) : null,
     uploader: publicUser(row.uploader),
     tags,
+    restricted: row.video.restricted,
   };
 }
 

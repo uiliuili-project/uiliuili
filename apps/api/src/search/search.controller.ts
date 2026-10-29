@@ -34,6 +34,7 @@ export class SearchController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get('suggest')
   async suggest(@Query(zodQuery(suggestSchema)) query: z.infer<typeof suggestSchema>) {
     return this.search.suggest(query.q);

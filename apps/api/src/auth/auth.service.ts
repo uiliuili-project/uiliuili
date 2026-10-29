@@ -29,11 +29,15 @@ import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { MailService } from '../common/mail.service';
+import { currentRegionContext } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 
 export interface SessionMeta {
   ip?: string;
   userAgent?: string;
+  /** Region snapshot resolved by the controller at registration time. */
+  region?: string;
+  regionSource?: string;
 }
 
 export interface IssuedTokens {
@@ -122,6 +126,8 @@ export class AuthService {
           userGroup: becomesOwner ? 'OWNER' : 'USER',
           level: becomesOwner ? 6 : 0,
           coinBalance: Number(social.dailyCoins ?? 2),
+          region: meta.region ?? '',
+          regionSource: meta.regionSource ?? '',
         })
         .returning();
       if (!created) throw new Error('注册失败');
@@ -473,6 +479,8 @@ export class AuthService {
             roles: becomesOwner ? ['SUPER_ADMIN'] : ['USER'],
             userGroup: becomesOwner ? 'OWNER' : 'USER',
             level: becomesOwner ? 6 : 0,
+            region: meta.region ?? '',
+            regionSource: meta.regionSource ?? '',
           })
           .returning();
         const row = created[0];
@@ -590,7 +598,29 @@ export class AuthService {
       banned: user.banned,
       mutedUntil: user.mutedUntil,
       coinBalance: user.coinBalance,
+      region: user.region,
+      showRestricted: user.showRestricted,
     };
+  }
+
+  /**
+   * Updates personal region preferences. Restricted content can only be
+   * enabled while the resolved region is unrestricted.
+   */
+  async updateShowRestricted(userId: string, showRestricted: boolean): Promise<AuthUser> {
+    if (showRestricted) {
+      const context = currentRegionContext();
+      if (!context.code || context.blockedRegions.includes(context.code)) {
+        throw new Error('当前地区不支持显示限制级内容');
+      }
+    }
+    const [updated] = await this.database.db
+      .update(users)
+      .set({ showRestricted, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) throw new Error('用户不存在');
+    return this.toAuthUser(updated);
   }
 
   hashIp(ip?: string): string {

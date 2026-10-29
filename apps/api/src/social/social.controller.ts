@@ -86,6 +86,7 @@ export class SocialController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get('rankings')
   async rankings(@Query(zodQuery(rankingQuerySchema)) query: z.infer<typeof rankingQuerySchema>) {
     return this.social.rankings(query.period, query.limit);

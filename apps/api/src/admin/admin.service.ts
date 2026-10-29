@@ -27,6 +27,7 @@ import {
   categoryCreateSchema,
   categoryUpdateSchema,
   mailConfigSchema,
+  normalizeRegionList,
   searchConfigSchema,
   storageConfigSchema,
   userGroupForRoles,
@@ -148,6 +149,7 @@ export class AdminService {
     q?: string;
     role?: UserRole;
     group?: string;
+    region?: string;
     banned?: boolean;
   }) {
     const conditions = [];
@@ -163,6 +165,7 @@ export class AdminService {
     }
     if (query.role) conditions.push(sql`${users.roles} @> ARRAY[${query.role}]::text[]`);
     if (query.group) conditions.push(eq(users.userGroup, query.group));
+    if (query.region) conditions.push(eq(users.region, query.region));
     if (query.banned !== undefined) conditions.push(eq(users.banned, query.banned));
     const where = conditions.length ? and(...conditions) : undefined;
     const offset = (query.page - 1) * query.limit;
@@ -185,6 +188,9 @@ export class AdminService {
         roles: user.roles,
         group: user.userGroup,
         level: user.level,
+        region: user.region,
+        regionSource: user.regionSource,
+        showRestricted: user.showRestricted,
         banned: user.banned,
         mutedUntil: user.mutedUntil?.toISOString() ?? null,
         coinBalance: user.coinBalance,
@@ -199,7 +205,14 @@ export class AdminService {
   async updateUser(
     actor: AuthUser,
     id: string,
-    input: { role?: UserRole; banned?: boolean; mutedUntil?: string | null; level?: number },
+    input: {
+      role?: UserRole;
+      banned?: boolean;
+      mutedUntil?: string | null;
+      level?: number;
+      region?: string | null;
+      showRestricted?: boolean;
+    },
   ) {
     const rows = await this.database.db.select().from(users).where(eq(users.id, id)).limit(1);
     const user = rows[0];
@@ -224,6 +237,19 @@ export class AdminService {
         throw new AppError(ERROR_CODES.BAD_REQUEST, '请使用站长转移功能移交站长身份', 400);
       }
     }
+    const nextRegion = input.region === undefined ? user.region : (input.region ?? '');
+    const nextShowRestricted = input.showRestricted ?? user.showRestricted;
+    if (input.region !== undefined || input.showRestricted !== undefined) {
+      const restricted = await this.settings.getRestrictedSettings();
+      const blockedRegions = normalizeRegionList(restricted.blockedRegions);
+      if (nextShowRestricted && blockedRegions.includes(nextRegion)) {
+        throw new AppError(
+          ERROR_CODES.BAD_REQUEST,
+          '该地区不能开启限制级内容显示，请先调整限制级内容不可发布的地区',
+          400,
+        );
+      }
+    }
     const [updated] = await this.database.db
       .update(users)
       .set({
@@ -237,6 +263,9 @@ export class AdminService {
               ? new Date(input.mutedUntil)
               : null,
         level: input.level,
+        region: input.region === undefined ? undefined : nextRegion,
+        regionSource: input.region === undefined ? undefined : nextRegion ? 'admin' : '',
+        showRestricted: input.showRestricted,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
@@ -257,6 +286,8 @@ export class AdminService {
           group: updated.userGroup,
           banned: updated.banned,
           level: updated.level,
+          region: updated.region,
+          showRestricted: updated.showRestricted,
         }
       : null;
   }
@@ -267,12 +298,26 @@ export class AdminService {
     q?: string;
     status?: string;
     categoryId?: string;
+    region?: string;
+    restricted?: boolean;
     featured?: boolean;
   }) {
     const conditions = [isNull(videos.deletedAt)];
     if (query.q) conditions.push(ilike(videos.title, `%${query.q}%`));
     if (query.status) conditions.push(eq(videos.status, query.status));
     if (query.categoryId) conditions.push(eq(videos.categoryId, query.categoryId));
+    if (query.restricted !== undefined) conditions.push(eq(videos.restricted, query.restricted));
+    if (query.region) {
+      const restricted = await this.settings.getRestrictedSettings();
+      const blockedRegions = normalizeRegionList(restricted.blockedRegions);
+      const regionConditions = [
+        and(eq(videos.regionMode, 'block'), sql`${query.region} = ANY(${videos.regionCodes})`)!,
+      ];
+      if (blockedRegions.includes(query.region)) {
+        regionConditions.push(eq(videos.restricted, true));
+      }
+      conditions.push(or(...regionConditions)!);
+    }
     if (query.featured !== undefined) conditions.push(eq(videos.featured, query.featured));
     const offset = (query.page - 1) * query.limit;
     const [rows, total] = await Promise.all([
@@ -298,6 +343,11 @@ export class AdminService {
         visibility: row.video.visibility,
         featured: row.video.featured,
         recommendWeight: row.video.recommendWeight,
+        restricted: row.video.restricted,
+        regionMode: row.video.regionMode,
+        regionCodes: row.video.regionCodes,
+        regionDenyBehavior: row.video.regionDenyBehavior,
+        regionDenyMessage: row.video.regionDenyMessage,
         views: row.video.viewCount,
         likes: row.video.likeCount,
         comments: row.video.commentCount,
@@ -324,17 +374,37 @@ export class AdminService {
       featured?: boolean;
       recommendWeight?: number;
       blockReason?: string;
+      restricted?: boolean;
+      regionMode?: 'inherit' | 'block';
+      regionCodes?: string[];
+      regionDenyBehavior?: 'default' | 'message' | 'not_found';
+      regionDenyMessage?: string;
     },
   ) {
+    const touchesRegion =
+      input.restricted !== undefined ||
+      input.regionMode !== undefined ||
+      input.regionCodes !== undefined ||
+      input.regionDenyBehavior !== undefined ||
+      input.regionDenyMessage !== undefined;
     if (input.featured !== undefined || input.recommendWeight !== undefined) {
       this.assertPermission(actor, 'video:feature');
     }
-    if (input.status !== undefined || input.blockReason !== undefined) {
+    if (input.status !== undefined || input.blockReason !== undefined || touchesRegion) {
       this.assertPermission(actor, 'video:manage_any');
     }
     const rows = await this.database.db.select().from(videos).where(eq(videos.id, id)).limit(1);
     const video = rows[0];
     if (!video) throw new AppError(ERROR_CODES.NOT_FOUND, '视频不存在', 404);
+    const restricted = input.restricted ?? video.restricted;
+    const restrictedSettings = await this.settings.getRestrictedSettings();
+    const blockedRegions = normalizeRegionList(restrictedSettings.blockedRegions);
+    // Clearing the restricted flag removes the inherited site list unless the
+    // administrator explicitly chooses a new per-video block policy.
+    const regionMode =
+      input.regionMode ?? (input.restricted === false ? 'inherit' : video.regionMode);
+    const regionCodes =
+      input.regionCodes === undefined ? video.regionCodes : normalizeRegionList(input.regionCodes);
     const [updated] = await this.database.db
       .update(videos)
       .set({
@@ -342,6 +412,11 @@ export class AdminService {
         featured: input.featured,
         recommendWeight: input.recommendWeight,
         blockReason: input.blockReason,
+        restricted: input.restricted,
+        regionMode: restricted ? 'block' : regionMode,
+        regionCodes: restricted ? blockedRegions : regionMode === 'block' ? regionCodes : [],
+        regionDenyBehavior: input.regionDenyBehavior,
+        regionDenyMessage: input.regionDenyMessage,
         publishedAt: input.status === 'published' && !video.publishedAt ? new Date() : undefined,
         deletedAt: input.status === 'deleted' ? new Date() : input.status ? null : undefined,
         updatedAt: new Date(),
@@ -749,7 +824,17 @@ export class AdminService {
       if (securityFields.length > 0) this.assertPermission(actor, 'settings:security');
       return;
     }
-    if (['upload', 'playback', 'danmaku', 'social', 'recommendation'].includes(key)) {
+    if (
+      [
+        'upload',
+        'playback',
+        'danmaku',
+        'social',
+        'recommendation',
+        'region',
+        'restricted',
+      ].includes(key)
+    ) {
       this.assertPermission(actor, 'settings:content');
       return;
     }
@@ -771,7 +856,15 @@ export class AdminService {
       groupKeys.push('site');
     }
     if (this.hasPermission(actor, 'settings:content')) {
-      groupKeys.push('upload', 'playback', 'danmaku', 'social', 'recommendation');
+      groupKeys.push(
+        'upload',
+        'playback',
+        'danmaku',
+        'social',
+        'recommendation',
+        'region',
+        'restricted',
+      );
     }
     if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail');
     if (this.hasPermission(actor, 'settings:security')) groupKeys.push('security');
@@ -910,9 +1003,21 @@ export class AdminService {
           'recommendation',
           'mail',
           'security',
+          'region',
+          'restricted',
         ].includes(key)
       ) {
         await this.settings.set(key, value, false);
+        if (key === 'restricted') {
+          const merged = await this.settings.getRestrictedSettings();
+          const blockedRegions = normalizeRegionList(merged.blockedRegions);
+          // The site list is authoritative for restricted content; refresh the
+          // materialised per-video policy so stale lists stop granting access.
+          await this.database.db
+            .update(videos)
+            .set({ regionMode: 'block', regionCodes: blockedRegions, updatedAt: new Date() })
+            .where(eq(videos.restricted, true));
+        }
       } else {
         continue;
       }

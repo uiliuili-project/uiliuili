@@ -16,6 +16,8 @@ export interface AuthUser {
   banned: boolean;
   mutedUntil: Date | null;
   coinBalance: number;
+  region: string;
+  showRestricted: boolean;
 }
 
 export interface RequestWithUser {

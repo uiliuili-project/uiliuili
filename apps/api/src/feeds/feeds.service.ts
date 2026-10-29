@@ -11,6 +11,7 @@ import {
 import { and, count, desc, eq, isNull, lte } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { videoRegionCondition } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
@@ -138,6 +139,7 @@ export class FeedsService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(videos.publishedAt))
@@ -167,6 +169,7 @@ export class FeedsService {
           eq(videos.visibility, 'public'),
           isNull(videos.deletedAt),
           lte(videos.publishedAt, new Date()),
+          videoRegionCondition(),
         ),
       )
       .orderBy(desc(watchHistories.updatedAt))
