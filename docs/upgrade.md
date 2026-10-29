@@ -13,6 +13,16 @@
 If migrations are pending, run `pnpm cli migrate`. If you downgrade the code,
 restore a database backup taken before the upgrade.
 
+## Region and restricted-content migration
+
+Migration `0004` adds `users.region`, `users.region_source`,
+`users.show_restricted`, and the video region fields. Existing accounts keep an
+empty region, so their next request resolves a country from the configured
+header, GeoIP database, or fallback. Administrators can correct individual
+accounts from **Users**. Existing videos remain unrestricted; mark a video as
+restricted or add a per-video block list from the creator center or the admin
+video editor.
+
 ## Recovering the owner
 
 Migration `0003` maps the previous `SUPER_ADMIN` account to the `OWNER` group

@@ -82,4 +82,8 @@ After installation, open the admin system page and verify:
 - FFmpeg availability;
 - storage write test;
 - optional mail test;
-- queue worker status.
+- queue worker status;
+- the reverse proxy or CDN sends the configured country header, or
+  `region.fallback` is set to the intended country;
+- **Settings → Regions and restricted content** lists the countries where
+  restricted content may not be published.

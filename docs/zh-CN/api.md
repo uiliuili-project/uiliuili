@@ -28,6 +28,14 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 
 `GET /api/v1/auth/setup-status` 返回 `{ needsOwner, claimRequired }`。尚未产生站长时，第一次注册会成为站长；从非本机地址发起的注册必须携带安装器生成的 `claimToken`，回环地址无需填写。
 
+## 地区
+
+- `GET /api/v1/region/options` — 国家/地区清单
+- `GET /api/v1/region/context` — 当前请求解析出的地区与限制级策略
+- `PATCH /api/v1/auth/preferences` — `{ showRestricted }`；仅当当前地区为无限制地区且已登录时可用
+
+创作中心的创建/更新和管理后台的视频更新都接受 `restricted`、`regionMode`、`regionCodes`、`regionDenyBehavior` 和 `regionDenyMessage`。限制级视频会忽略传入的 `regionCodes`，直接使用站点的 `blockedRegions` 清单。详情与播放接口在地区拒绝时返回 HTTP 451 和错误码 `REGION_RESTRICTED`；视频选择 `not_found` 时返回 404。
+
 ## 内容
 
 - `GET /api/v1/videos`

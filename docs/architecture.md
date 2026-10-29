@@ -69,6 +69,9 @@ owner exists. `owner:promote` is the recovery path.
   broadcast over Socket.IO.
 - Uploads use resumable chunks for local storage and multipart presigned URLs
   for S3.
+- Every request resolves a region into an async-local context. Video list
+  queries apply the region predicate in SQL, while detail and playback checks
+  return HTTP 451 or 404. See [configuration](configuration.md#regions-and-restricted-content).
 
 ## Data integrity
 

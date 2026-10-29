@@ -71,6 +71,46 @@ storage, transcoding, mail, OAuth, search, security, and audit retention.
 Secrets in the database are encrypted with `APP_KEY`. Back up `.env`; losing
 `APP_KEY` makes stored provider secrets unreadable.
 
+## Regions and restricted content
+
+Regions use ISO 3166-1 alpha-2 country codes only; there is no sub-country
+granularity. Every request resolves a region from:
+
+1. the signed-in account's stored region, recorded automatically at
+   registration and never editable by the user;
+2. the configured country header (`cf-ipcountry` by default), normally supplied
+   by a reverse proxy or CDN;
+3. an optional MaxMind `.mmdb` database, used when the `maxmind` package is
+   installed;
+4. the configured fallback region.
+
+Administrators may correct an account's region from **Users**; the correction is
+recorded with `regionSource = 'admin'`.
+
+Two settings groups control the feature:
+
+| Group | Fields | Purpose |
+| --- | --- | --- |
+| `region` | `fallback`, `header`, `geoipDatabase` | How the country is resolved |
+| `restricted` | `blockedRegions`, `defaultBehavior`, `defaultMessage` | Which countries may publish or play restricted content, and how denial is presented |
+
+`blockedRegions` is the authoritative list. A video marked as restricted is
+always stored with `regionMode = 'block'` and a copy of that list; saving the
+setting refreshes the stored policy of every restricted video. All other
+countries are unrestricted.
+
+In unrestricted countries each user has a personal **Show restricted content**
+preference, off by default. Restricted content always requires a signed-in
+account; anonymous detail requests receive a login-required 451 response. Staff
+with `video:review` or `video:manage_any`, and the uploader, bypass region checks
+for moderation and preview.
+
+Normal videos may also set `regionMode = 'block'` with their own `regionCodes`
+list. Denials use the site default or a per-video `regionDenyBehavior`
+(`message` or `not_found`) and message. List endpoints filter blocked videos in
+SQL; detail and playback endpoints return HTTP 451 with error code
+`REGION_RESTRICTED`, or 404 when the video opts into `not_found`.
+
 ## User groups and interfaces
 
 Each user row stores a `user_group` marker. Roles remain the source of truth for

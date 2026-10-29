@@ -69,4 +69,6 @@ pnpm cli install --config install.json
 - FFmpeg 是否可用；
 - 存储写入测试；
 - 可选的邮件测试；
-- 队列 worker 状态。
+- 队列 worker 状态；
+- 反向代理或 CDN 是否发送了配置的国家请求头，或 `region.fallback` 是否设置为预期的国家；
+- **设置 → 地区与限制级内容** 中是否列出了限制级内容不可发布的国家。

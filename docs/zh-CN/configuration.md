@@ -68,6 +68,31 @@
 数据库中的密钥使用 `APP_KEY` 加密。请务必备份 `.env`；丢失 `APP_KEY`
 会导致已保存的第三方密钥无法解密。
 
+## 地区与限制级内容
+
+地区只使用 ISO 3166-1 alpha-2 两位国家代码，不细分到国家以下。每次请求按以下顺序判定地区：
+
+1. 已登录账号在注册时自动记录的地区，用户不能修改；
+2. 配置的国家请求头（默认 `cf-ipcountry`），通常由反向代理或 CDN 提供；
+3. 可选 MaxMind `.mmdb` 数据库，需安装 `maxmind` 依赖；
+4. 配置的默认地区。
+
+管理员可以在**用户管理**中更正账号地区，更正后 `regionSource` 记为 `admin`。
+
+功能由两组设置控制：
+
+| 设置组 | 字段 | 作用 |
+| --- | --- | --- |
+| `region` | `fallback`、`header`、`geoipDatabase` | 地区判定方式 |
+| `restricted` | `blockedRegions`、`defaultBehavior`、`defaultMessage` | 哪些国家不能发布或播放限制级内容，以及拒绝时的展示 |
+
+`blockedRegions` 是唯一权威清单。标记为限制级的视频始终以
+`regionMode = 'block'` 存储该清单的副本；保存设置时会刷新所有限制级视频已存储的策略。未被勾选的国家均为无限制地区。
+
+在无限制地区，每个用户可以设置个人的**显示限制级内容**偏好，默认关闭。限制级内容始终要求登录；匿名访问详情页会返回需要登录的 451。拥有 `video:review` 或 `video:manage_any` 权限的工作人员以及投稿者本人可以绕过地区限制，用于审核和预览。
+
+普通视频也可以设置 `regionMode = 'block'` 并指定自己的 `regionCodes`。拒绝展示使用站点默认值，或使用单个视频的 `regionDenyBehavior`（`message` 或 `not_found`）与提示文案。列表接口在 SQL 层过滤被屏蔽的视频；详情与播放接口返回 HTTP 451 和错误码 `REGION_RESTRICTED`，视频选择 `not_found` 时返回 404。
+
 ## 用户组与界面
 
 每个用户记录都保存一个 `user_group` 标记。角色仍然是权限的唯一来源；角色变化时会重新计算该标记，升级迁移也会为已有账号补齐。

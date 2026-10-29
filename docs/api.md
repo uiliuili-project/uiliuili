@@ -36,6 +36,19 @@ no owner exists, the first registration becomes the owner. From a non-loopback
 address that request must include the installer's one-time `claimToken`;
 loopback registration does not need it.
 
+## Regions
+
+- `GET /api/v1/region/options` — country catalog
+- `GET /api/v1/region/context` — resolved region and restricted-content policy
+- `PATCH /api/v1/auth/preferences` — `{ showRestricted }`; allowed only when the
+  resolved region is unrestricted and the caller is signed in
+
+Studio create/update and admin video update accept `restricted`, `regionMode`,
+`regionCodes`, `regionDenyBehavior`, and `regionDenyMessage`. A restricted video
+ignores a supplied `regionCodes` and uses the site `blockedRegions` list. Region
+denials on detail and playback return HTTP 451 with error code
+`REGION_RESTRICTED`, or 404 when the video selects `not_found`.
+
 ## Content
 
 - `GET /api/v1/videos`
