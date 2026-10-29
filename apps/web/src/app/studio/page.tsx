@@ -5,9 +5,17 @@ import { StudioManage } from '@/components/StudioManage';
 import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatBytes, formatDate, formatDuration } from '@/lib/format';
-import type { StudioVideo } from '@/lib/types';
+import type { RegionContextInfo, RegionOption, StudioVideo } from '@/lib/types';
 import { type AuthUser, type Category, isStaffGroup } from '@uiliuili/shared';
-import { CheckCircle2, Clock, Film, Loader2, ShieldCheck, UploadCloud } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  Film,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  UploadCloud,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -44,6 +52,15 @@ export default function StudioPage() {
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public');
+  const [restricted, setRestricted] = useState(false);
+  const [regionMode, setRegionMode] = useState<'inherit' | 'block'>('inherit');
+  const [regionCodes, setRegionCodes] = useState<string[]>([]);
+  const [regionDenyBehavior, setRegionDenyBehavior] = useState<'default' | 'message' | 'not_found'>(
+    'default',
+  );
+  const [regionDenyMessage, setRegionDenyMessage] = useState('');
+  const [region, setRegion] = useState<RegionContextInfo | null>(null);
+  const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
   const [current, setCurrent] = useState<StudioVideo | null>(null);
@@ -65,13 +82,17 @@ export default function StudioPage() {
       .then(async (currentUser) => {
         setUser(currentUser);
         if (!currentUser) return;
-        const [studio, cats] = await Promise.all([
+        const [studio, cats, context, options] = await Promise.all([
           api.get<{ items: StudioVideo[] }>('/api/v1/studio/videos?limit=50'),
           api.get<{ items: Category[] }>('/api/v1/categories'),
+          api.get<RegionContextInfo>('/api/v1/region/context').catch(() => null),
+          api.get<{ items: RegionOption[] }>('/api/v1/region/options').catch(() => ({ items: [] })),
         ]);
         setVideos(studio.items);
         setCategories(cats.items);
         setCategoryId(cats.items[0]?.id ?? '');
+        setRegion(context);
+        setRegionOptions(options.items);
       })
       .catch((loadError) =>
         setError(loadError instanceof Error ? loadError.message : t('加载失败')),
@@ -98,6 +119,11 @@ export default function StudioPage() {
           .filter(Boolean)
           .slice(0, 12),
         visibility,
+        restricted: Boolean(region?.canUploadRestricted && restricted),
+        regionMode,
+        regionCodes,
+        regionDenyBehavior,
+        regionDenyMessage,
       });
       setCurrent(video);
       await loadVideos();
@@ -223,6 +249,11 @@ export default function StudioPage() {
         description,
         categoryId: categoryId || undefined,
         visibility,
+        restricted: Boolean(region?.canUploadRestricted && restricted),
+        regionMode,
+        regionCodes,
+        regionDenyBehavior,
+        regionDenyMessage,
       });
       setCurrent(updated);
       await loadVideos();
@@ -271,6 +302,11 @@ export default function StudioPage() {
   }
 
   const progress = file && uploadedBytes ? Math.round((uploadedBytes / file.size) * 100) : 0;
+  const regionLabel = (code: string) => {
+    const option = regionOptions.find((item) => item.code === code);
+    return option ? (locale === 'en-US' ? option.nameEn : option.name) : code;
+  };
+  const blockedLabels = (region?.blockedRegions ?? []).map(regionLabel).join('、');
 
   return (
     <div className="container-page py-6">
@@ -385,6 +421,107 @@ export default function StudioPage() {
               />
             </div>
 
+            {region?.canUploadRestricted && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[#fb7299]"
+                    checked={restricted}
+                    onChange={(event) => setRestricted(event.target.checked)}
+                  />
+                  {t('限制级内容')}
+                </label>
+                {restricted && (
+                  <p className="mt-2 text-xs leading-5 text-amber-700">
+                    {t('限制级内容只会在无限制地区显示，并自动禁止在以下地区播放：{0}', {
+                      0: blockedLabels || t('暂无'),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="regionMode">
+                  {t('地区限制')}{' '}
+                </label>
+                <select
+                  id="regionMode"
+                  value={restricted ? 'inherit' : regionMode}
+                  disabled={restricted}
+                  onChange={(event) =>
+                    setRegionMode(event.target.value === 'block' ? 'block' : 'inherit')
+                  }
+                  className="input disabled:opacity-60"
+                >
+                  <option value="inherit">{t('不额外限制')}</option>
+                  <option value="block">{t('禁止在指定国家播放')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="regionDenyBehavior">
+                  {t('拒绝方式')}{' '}
+                </label>
+                <select
+                  id="regionDenyBehavior"
+                  value={regionDenyBehavior}
+                  onChange={(event) =>
+                    setRegionDenyBehavior(event.target.value as 'default' | 'message' | 'not_found')
+                  }
+                  className="input"
+                >
+                  <option value="default">{t('跟随站点默认')}</option>
+                  <option value="message">{t('说明地区限制')}</option>
+                  <option value="not_found">{t('显示视频不存在')}</option>
+                </select>
+              </div>
+            </div>
+
+            {regionMode === 'block' && !restricted && (
+              <div>
+                <label className="label" htmlFor="regionCodes">
+                  {t('禁止播放的国家')}{' '}
+                </label>
+                <select
+                  id="regionCodes"
+                  multiple
+                  size={6}
+                  value={regionCodes}
+                  onChange={(event) =>
+                    setRegionCodes(
+                      Array.from(event.target.selectedOptions, (option) => option.value),
+                    )
+                  }
+                  className="input h-auto"
+                >
+                  {regionOptions.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {locale === 'en-US' ? option.nameEn : option.name} ({option.code})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted">
+                  {t('按住 Ctrl 或 Command 可选择多个国家。')}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="label" htmlFor="regionDenyMessage">
+                {t('拒绝提示文案')}{' '}
+              </label>
+              <input
+                id="regionDenyMessage"
+                value={regionDenyMessage}
+                onChange={(event) => setRegionDenyMessage(event.target.value)}
+                maxLength={200}
+                className="input"
+                placeholder={t('留空则使用站点默认文案')}
+              />
+            </div>
+
             {current ? (
               <div className="rounded-xl border border-line bg-canvas p-4">
                 <div className="text-sm font-medium">{current.title}</div>
@@ -482,6 +619,11 @@ export default function StudioPage() {
                     setTags('');
                     setFile(null);
                     setCover(null);
+                    setRestricted(false);
+                    setRegionMode('inherit');
+                    setRegionCodes([]);
+                    setRegionDenyBehavior('default');
+                    setRegionDenyMessage('');
                   }}
                   className="btn-ghost"
                 >
@@ -542,6 +684,12 @@ export default function StudioPage() {
                       )}
                       {t(statusLabels[video.status] ?? video.status)}
                     </span>
+                    {video.restricted && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                        <ShieldAlert className="h-3 w-3" />
+                        {t('限制级')}
+                      </span>
+                    )}
                     <span>{formatDate(video.createdAt, locale)}</span>
                   </div>
                   <div className="mt-2 flex gap-2 text-xs">
@@ -553,6 +701,16 @@ export default function StudioPage() {
                         setDescription(video.description);
                         setCategoryId(video.categoryId ?? '');
                         setVisibility(video.visibility as typeof visibility);
+                        setRestricted(video.restricted);
+                        setRegionMode(video.regionMode === 'block' ? 'block' : 'inherit');
+                        setRegionCodes(video.regionCodes ?? []);
+                        setRegionDenyBehavior(
+                          video.regionDenyBehavior === 'message' ||
+                            video.regionDenyBehavior === 'not_found'
+                            ? video.regionDenyBehavior
+                            : 'default',
+                        );
+                        setRegionDenyMessage(video.regionDenyMessage ?? '');
                       }}
                       className="text-brand hover:underline"
                     >

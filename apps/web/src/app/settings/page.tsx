@@ -4,9 +4,9 @@ import { useLocale, useT } from '@/components/I18nProvider';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import type { FollowGroup, FollowGroupsResponse } from '@/lib/types';
+import type { FollowGroup, FollowGroupsResponse, RegionContextInfo } from '@/lib/types';
 import type { AuthUser, PublicUser } from '@uiliuili/shared';
-import { BellRing, Monitor, Shield, ShieldOff, User, Users } from 'lucide-react';
+import { BellRing, Globe2, Monitor, Shield, ShieldOff, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [tab, setTab] = useState<
-    'profile' | 'security' | 'sessions' | 'groups' | 'blocked' | 'notifications'
+    'profile' | 'region' | 'security' | 'sessions' | 'groups' | 'blocked' | 'notifications'
   >('profile');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -35,6 +35,9 @@ export default function SettingsPage() {
   const [groupName, setGroupName] = useState('');
   const [blocked, setBlocked] = useState<PublicUser[]>([]);
   const [notificationState, setNotificationState] = useState('');
+  const [region, setRegion] = useState<RegionContextInfo | null>(null);
+  const [showRestricted, setShowRestricted] = useState(false);
+  const [savingPreference, setSavingPreference] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -47,6 +50,7 @@ export default function SettingsPage() {
         setDisplayName(current.displayName);
         setBio(current.bio ?? '');
         setAvatarUrl(current.avatarUrl ?? '');
+        setShowRestricted(current.showRestricted);
         return api.get<{ sessions: SessionItem[] }>('/api/v1/auth/sessions');
       })
       .then((data) => setSessions(data.sessions))
@@ -54,6 +58,10 @@ export default function SettingsPage() {
         setError(loadError instanceof Error ? loadError.message : t('加载失败')),
       )
       .finally(() => setLoading(false));
+    void api
+      .get<RegionContextInfo>('/api/v1/region/context')
+      .then(setRegion)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -143,6 +151,25 @@ export default function SettingsPage() {
     }
   };
 
+  const saveShowRestricted = async (next: boolean) => {
+    setMessage('');
+    setError('');
+    setSavingPreference(true);
+    try {
+      const data = await api.patch<{ user: AuthUser }>('/api/v1/auth/preferences', {
+        showRestricted: next,
+      });
+      setUser(data.user);
+      setShowRestricted(data.user.showRestricted);
+      setMessage(t('偏好已更新'));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('保存失败'));
+      setShowRestricted(user?.showRestricted ?? false);
+    } finally {
+      setSavingPreference(false);
+    }
+  };
+
   const saveProfile = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage('');
@@ -212,6 +239,7 @@ export default function SettingsPage() {
         <aside className="card h-fit p-2">
           {[
             { key: 'profile', label: t('个人资料'), icon: User },
+            { key: 'region', label: t('地区与限制级内容'), icon: Globe2 },
             { key: 'security', label: t('账号安全'), icon: Shield },
             { key: 'sessions', label: t('登录设备'), icon: Monitor },
             { key: 'groups', label: t('关注分组'), icon: Users },
@@ -287,6 +315,44 @@ export default function SettingsPage() {
                 {t('保存资料')}{' '}
               </button>
             </form>
+          )}
+
+          {tab === 'region' && (
+            <div className="max-w-xl space-y-5">
+              <div className="rounded-xl border border-line p-4">
+                <div className="text-sm font-medium">{t('当前地区')}</div>
+                <div className="mt-1 text-sm text-muted">
+                  {region?.region.code
+                    ? `${locale === 'en-US' ? region.region.nameEn : region.region.name}（${region.region.code}）`
+                    : t('未记录')}
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  {t('地区由系统根据 IP 和请求头自动判定，不能自行修改。如需更正请联系管理员。')}
+                </p>
+              </div>
+              <div className="rounded-xl border border-line p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">{t('显示限制级内容')}</div>
+                    <p className="mt-1 text-sm text-muted">
+                      {t('开启后可以浏览和播放限制级内容，仅无限制地区可用。')}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 accent-[#fb7299]"
+                    checked={showRestricted}
+                    disabled={!region?.unrestricted || savingPreference}
+                    onChange={(event) => void saveShowRestricted(event.target.checked)}
+                  />
+                </div>
+                {region && !region.unrestricted && (
+                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {t('当前地区不支持显示限制级内容。')}
+                  </p>
+                )}
+              </div>
+            </div>
           )}
 
           {tab === 'security' && (

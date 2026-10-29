@@ -3,7 +3,7 @@
 import { useLocale, useT } from '@/components/I18nProvider';
 import { formatCount, formatDuration, relativeTime } from '@/lib/format';
 import type { VideoCard as VideoCardType } from '@uiliuili/shared';
-import { MessageSquare, Play } from 'lucide-react';
+import { MessageSquare, Play, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 export function VideoCard({ video }: { video: VideoCardType }) {
@@ -26,6 +26,12 @@ export function VideoCard({ video }: { video: VideoCardType }) {
           <div className="flex h-full items-center justify-center text-sm text-muted">
             {t('暂无封面')}
           </div>
+        )}
+        {video.restricted && (
+          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <ShieldAlert className="h-3 w-3" />
+            {t('限制级')}
+          </span>
         )}
         <div className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-medium text-white">
           {formatDuration(video.durationSeconds)}

@@ -61,10 +61,35 @@ export interface StudioVideo {
   danmaku: number;
   sourceFilename: string | null;
   sourceSize: number;
+  restricted: boolean;
+  regionMode: string;
+  regionCodes: string[];
+  regionDenyBehavior: string;
+  regionDenyMessage: string;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
   playlistUrl: string | null;
+}
+
+export interface RegionOption {
+  code: string;
+  name: string;
+  nameEn: string;
+}
+
+/** Server-resolved region and restricted-content policy for the current request. */
+export interface RegionContextInfo {
+  region: { code: string; name: string; nameEn: string };
+  source: string;
+  unrestricted: boolean;
+  showRestricted: boolean;
+  restrictedAllowed: boolean;
+  canUploadRestricted: boolean;
+  canManageRegions: boolean;
+  blockedRegions: string[];
+  defaultBehavior: 'message' | 'not_found';
+  defaultMessage: string;
 }
 
 export interface FavoriteFolder {

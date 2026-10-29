@@ -2,12 +2,13 @@ import { AddToCollection } from '@/components/AddToCollection';
 import { CommentSection } from '@/components/CommentSection';
 import { DanmakuPlayer } from '@/components/DanmakuPlayer';
 import { VideoActions } from '@/components/VideoActions';
+import { ApiError } from '@/lib/api';
 import { formatCount, formatDate, relativeTime } from '@/lib/format';
 import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
-import type { SpaceProfile } from '@/lib/types';
-import type { VideoCard, VideoDetail } from '@uiliuili/shared';
-import { Calendar, Eye, Layers, MessageSquare } from 'lucide-react';
+import type { RegionContextInfo, SpaceProfile } from '@/lib/types';
+import type { AuthUser, VideoCard, VideoDetail } from '@uiliuili/shared';
+import { Calendar, Eye, Layers, MessageSquare, ShieldAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -38,6 +39,46 @@ export default async function VideoPage({ params }: PageProps) {
   try {
     video = await serverFetch<VideoDetail>(`/api/v1/videos/${id}`);
   } catch (error) {
+    if (error instanceof ApiError && error.status === 451) {
+      const [context, session] = await Promise.all([
+        serverFetchSafe<RegionContextInfo | null>('/api/v1/region/context', null),
+        serverFetchSafe<{ user: AuthUser } | null>('/api/v1/auth/me', null),
+      ]);
+      return (
+        <div className="container-page py-16">
+          <div className="card mx-auto max-w-xl p-10 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-xl font-semibold">{t('该内容在当前地区不可用')}</h1>
+            <p className="mt-2 text-sm text-muted">{error.message}</p>
+            {context?.region.code && (
+              <p className="mt-2 text-xs text-muted">
+                {t('当前地区：{0}（{1}）', {
+                  0: locale === 'en-US' ? context.region.nameEn : context.region.name,
+                  1: context.region.code,
+                })}
+              </p>
+            )}
+            {!session?.user && (
+              <p className="mt-4 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+                {t('限制级内容需要登录后才能观看。')}
+              </p>
+            )}
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {!session?.user && (
+                <Link href="/login" className="btn-primary">
+                  {t('去登录')}
+                </Link>
+              )}
+              <Link href="/" className="btn-ghost">
+                {t('返回首页')}
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="container-page py-16">
         <div className="card mx-auto max-w-xl p-10 text-center">

@@ -978,4 +978,71 @@ export const uiEn: Record<string, string> = {
   审核控制台: 'Review console',
   '安装器将写入 .env、创建数据库表并初始化站点。此操作会修改数据库。':
     'The installer writes .env, creates database tables, and initializes the site. This modifies the database.',
+  'GeoIP 数据库路径（可选）': 'GeoIP database path (optional)',
+  '“跟随站点默认”使用站点设置中的拒绝方式。':
+    '“Follow site default” uses the denial mode from the site settings.',
+  不额外限制: 'No additional restriction',
+  '仅对无限制地区有效。': 'Only available in unrestricted regions.',
+  保存地区设置: 'Save region settings',
+  偏好已更新: 'Preference updated',
+  内容级别: 'Content rating',
+  国家请求头: 'Country header',
+  地区: 'Region',
+  地区与限制级内容: 'Regions and restricted content',
+  '地区按国家自动判定，注册后用户不能自行修改。限制级内容只能发布到未被勾选的国家。':
+    'Region is detected by country and cannot be changed by users after registration. Restricted content can only be published to unchecked countries.',
+  '地区由系统根据 IP 和请求头自动判定，不能自行修改。如需更正请联系管理员。':
+    'Region is detected automatically from the IP and request headers and cannot be changed. Contact an administrator to correct it.',
+  '地区由系统根据 IP 和请求头自动判定，注册后不能自行修改。':
+    'Region is detected automatically from the IP and request headers and cannot be changed after registration.',
+  地区限制: 'Region restriction',
+  '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。':
+    'Enter a MaxMind .mmdb path and install the optional maxmind dependency to look up the IP when no country header is present.',
+  '开启后公开站显示维护提示，仅管理员可访问。':
+    'When enabled, the public site shows a maintenance notice and only administrators can access it.',
+  '开启后可以浏览和播放限制级内容，仅无限制地区可用。':
+    'When enabled, restricted content can be browsed and played. Only available in unrestricted regions.',
+  当前地区: 'Current region',
+  '当前地区不支持显示限制级内容。': 'Restricted content cannot be shown in the current region.',
+  '当前地区：{0}（{1}）': 'Current region: {0} ({1})',
+  拒绝提示文案: 'Denial message',
+  拒绝方式: 'Denial mode',
+  '按住 Ctrl 或 Command 可选择多个国家。': 'Hold Ctrl or Command to select multiple countries.',
+  搜索国家或地区代码: 'Search country or region code',
+  无法判断时的默认地区: 'Fallback region',
+  '既没有账号地区、也没有国家请求头时使用。':
+    'Used when neither an account region nor a country header is available.',
+  显示视频不存在: 'Show video not found',
+  显示限制级: 'Restricted visible',
+  显示限制级内容: 'Show restricted content',
+  普通内容: 'Standard content',
+  '普通内容也可以禁止在指定国家播放。':
+    'Standard content can also be blocked from playing in selected countries.',
+  暂无: 'None',
+  未记录: 'Not recorded',
+  '注册地区：{0}（{1}）': 'Registration region: {0} ({1})',
+  '注册时自动记录，用户不能修改；管理员可在这里更正。':
+    'Recorded automatically at registration and not editable by the user; administrators can correct it here.',
+  '由反向代理或 CDN 提供，值为 ISO 3166-1 两位国家代码。':
+    'Provided by a reverse proxy or CDN as a two-letter ISO 3166-1 country code.',
+  留空则使用站点默认文案: 'Leave blank to use the site default message',
+  禁止在指定国家播放: 'Block playback in selected countries',
+  禁止播放的国家: 'Countries where playback is blocked',
+  '被勾选的国家既不能上传限制级内容，也不能播放；其余国家均为无限制地区。':
+    'Checked countries can neither upload nor play restricted content; every other country is unrestricted.',
+  该内容在当前地区不可用: 'This content is unavailable in the current region',
+  说明地区限制: 'Explain the region restriction',
+  跟随站点默认: 'Follow site default',
+  限制级: 'Restricted',
+  限制级内容: 'Restricted content',
+  限制级内容不可发布的地区: 'Countries where restricted content cannot be published',
+  '限制级内容会自动使用站点“限制级内容不可发布的地区”清单。':
+    'Restricted content automatically uses the site “Countries where restricted content cannot be published” list.',
+  '限制级内容只会在无限制地区显示，并自动禁止在以下地区播放：{0}':
+    'Restricted content is only shown in unrestricted regions and is automatically blocked in: {0}',
+  '限制级内容只能在无限制地区发布和播放，地区清单由站点设置统一管理。':
+    'Restricted content can only be published and played in unrestricted regions; the country list is managed in the site settings.',
+  '限制级内容需要登录后才能观看。': 'Restricted content requires signing in before playback.',
+  默认拒绝方式: 'Default denial mode',
+  默认提示文案: 'Default denial message',
 };

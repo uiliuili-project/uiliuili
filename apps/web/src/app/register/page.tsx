@@ -3,6 +3,7 @@ import { useT } from '@/components/I18nProvider';
 
 import { AuthShell } from '@/components/AuthShell';
 import { api, ensureCsrf, getMe } from '@/lib/api';
+import type { RegionContextInfo } from '@/lib/types';
 import type { AuthUser } from '@uiliuili/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,6 +19,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [claimToken, setClaimToken] = useState('');
+  const [region, setRegion] = useState<RegionContextInfo | null>(null);
   const [setup, setSetup] = useState<{ needsOwner: boolean; claimRequired: boolean } | null>(null);
 
   useEffect(() => {
@@ -28,6 +30,10 @@ export default function RegisterPage() {
     void api
       .get<{ needsOwner: boolean; claimRequired: boolean }>('/api/v1/auth/setup-status')
       .then(setSetup)
+      .catch(() => undefined);
+    void api
+      .get<RegionContextInfo>('/api/v1/region/context')
+      .then(setRegion)
       .catch(() => undefined);
   }, [router]);
 
@@ -80,6 +86,17 @@ export default function RegisterPage() {
         {setup?.needsOwner && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
             {t('站点尚未设置站长。请先完成注册，再开放站点访问；该账号将成为站长。')}
+          </div>
+        )}
+        {region?.region.code && (
+          <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">
+            <div className="font-medium text-ink">
+              {t('注册地区：{0}（{1}）', {
+                0: region.region.name,
+                1: region.region.code,
+              })}
+            </div>
+            <p className="mt-1">{t('地区由系统根据 IP 和请求头自动判定，注册后不能自行修改。')}</p>
           </div>
         )}
         {error && (
