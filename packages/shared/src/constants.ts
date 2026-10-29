@@ -107,6 +107,22 @@ export type VideoStatus = (typeof VIDEO_STATUSES)[number];
 export const VIDEO_VISIBILITIES = ['public', 'unlisted', 'private'] as const;
 export type VideoVisibility = (typeof VIDEO_VISIBILITIES)[number];
 
+/**
+ * Region policy for videos. `inherit` follows the site restricted-content
+ * rules only; `block` additionally denies playback in the listed countries.
+ */
+export const VIDEO_REGION_MODES = ['inherit', 'block'] as const;
+export type VideoRegionMode = (typeof VIDEO_REGION_MODES)[number];
+
+/**
+ * How a denied playback is presented. `default` follows the site setting.
+ */
+export const REGION_DENY_BEHAVIORS = ['default', 'message', 'not_found'] as const;
+export type RegionDenyBehavior = (typeof REGION_DENY_BEHAVIORS)[number];
+
+export const REGION_SOURCES = ['registration', 'header', 'geoip', 'fallback', 'admin'] as const;
+export type RegionSource = (typeof REGION_SOURCES)[number];
+
 export const DANMAKU_MODES = ['scroll', 'top', 'bottom'] as const;
 export type DanmakuMode = (typeof DANMAKU_MODES)[number];
 
@@ -240,6 +256,21 @@ export const DEFAULT_SETTINGS = {
     sessionDays: 30,
     loginRateLimit: 10,
     installTokenRequired: true,
+  },
+  region: {
+    /** Country used when neither the account nor a country header resolves. */
+    fallback: 'CN',
+    /** Request header carrying the two-letter country code. */
+    header: 'cf-ipcountry',
+    /** Optional MaxMind GeoLite2/GeoIP2 country database path. */
+    geoipDatabase: '',
+  },
+  restricted: {
+    /** Countries where restricted content may not be published or played. */
+    blockedRegions: [] as string[],
+    /** `message` explains the region limit, `not_found` hides the video. */
+    defaultBehavior: 'message' as 'message' | 'not_found',
+    defaultMessage: '该内容在您所在的地区不可用',
   },
 } as const;
 

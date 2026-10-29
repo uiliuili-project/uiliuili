@@ -27,6 +27,10 @@ export interface AuthUser extends PublicUser {
   permissions: string[];
   /** Persisted user-group marker, kept in sync with the user's roles. */
   group: UserGroup;
+  /** Country (ISO 3166-1 alpha-2) resolved at registration, never user-editable. */
+  region: string;
+  /** Whether the user opted in to restricted content in unrestricted regions. */
+  showRestricted: boolean;
 }
 
 export interface Category {
@@ -53,6 +57,8 @@ export interface VideoCard {
   category: Category | null;
   uploader: PublicUser;
   tags: string[];
+  /** Restricted content is only shown to opted-in users in unrestricted regions. */
+  restricted?: boolean;
 }
 
 export interface VideoDetail extends VideoCard {
@@ -60,6 +66,11 @@ export interface VideoDetail extends VideoCard {
   status: string;
   visibility: string;
   featured: boolean;
+  restricted: boolean;
+  regionMode: string;
+  regionCodes: string[];
+  regionDenyBehavior: string;
+  regionDenyMessage: string;
   playlistUrl: string | null;
   renditions: Array<{
     quality: string;
@@ -220,5 +231,7 @@ export interface SiteSettingsPayload {
   recommendation: Record<string, unknown>;
   mail: Record<string, unknown>;
   security: Record<string, unknown>;
+  region?: Record<string, unknown>;
+  restricted?: Record<string, unknown>;
   auth?: Record<string, unknown>;
 }

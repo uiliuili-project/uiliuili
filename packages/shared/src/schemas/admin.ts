@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { USER_GROUPS, USER_ROLES, VIDEO_STATUSES } from '../constants';
+import { regionCodeSchema, videoRegionFieldsSchema } from './region';
 
 export const adminPaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -10,6 +11,7 @@ export const adminPaginationSchema = z.object({
 export const adminUserQuerySchema = adminPaginationSchema.extend({
   role: z.enum(USER_ROLES).optional(),
   group: z.enum(USER_GROUPS).optional(),
+  region: regionCodeSchema.optional(),
   banned: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
@@ -21,6 +23,8 @@ export const adminUserUpdateSchema = z.object({
   banned: z.boolean().optional(),
   mutedUntil: z.string().datetime().nullable().optional(),
   level: z.number().int().min(0).max(6).optional(),
+  region: regionCodeSchema.nullable().optional(),
+  showRestricted: z.boolean().optional(),
 });
 
 export const ownerTransferSchema = z.object({
@@ -31,18 +35,25 @@ export const ownerTransferSchema = z.object({
 export const adminVideoQuerySchema = adminPaginationSchema.extend({
   status: z.enum(VIDEO_STATUSES).optional(),
   categoryId: z.string().uuid().optional(),
+  region: regionCodeSchema.optional(),
+  restricted: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   featured: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
 });
 
-export const adminVideoUpdateSchema = z.object({
-  status: z.enum(VIDEO_STATUSES).optional(),
-  featured: z.boolean().optional(),
-  recommendWeight: z.number().min(-100).max(100).optional(),
-  blockReason: z.string().max(500).optional(),
-});
+export const adminVideoUpdateSchema = z
+  .object({
+    status: z.enum(VIDEO_STATUSES).optional(),
+    featured: z.boolean().optional(),
+    recommendWeight: z.number().min(-100).max(100).optional(),
+    blockReason: z.string().max(500).optional(),
+  })
+  .merge(videoRegionFieldsSchema.partial());
 
 export const adminDanmakuQuerySchema = adminPaginationSchema.extend({
   status: z.enum(['visible', 'hidden', 'pending', 'deleted']).optional(),

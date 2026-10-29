@@ -48,6 +48,11 @@ export const users = appSchema.table(
     banned: boolean('banned').default(false).notNull(),
     mutedUntil: timestamp('muted_until', { withTimezone: true }),
     coinBalance: integer('coin_balance').default(0).notNull(),
+    /** Country snapshot resolved automatically at registration. */
+    region: text('region').default('').notNull(),
+    regionSource: text('region_source').default('').notNull(),
+    /** Personal preference for showing restricted content in unrestricted regions. */
+    showRestricted: boolean('show_restricted').default(false).notNull(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     ...timestamps,
   },
@@ -233,6 +238,12 @@ export const videos = appSchema.table(
     commentCount: integer('comment_count').default(0).notNull(),
     danmakuCount: integer('danmaku_count').default(0).notNull(),
     completionRate: real('completion_rate').default(0).notNull(),
+    /** Restricted content may only be published/played in unrestricted regions. */
+    restricted: boolean('restricted').default(false).notNull(),
+    regionMode: text('region_mode').default('inherit').notNull(),
+    regionCodes: text('region_codes').array().default(sql`ARRAY[]::text[]`).notNull(),
+    regionDenyBehavior: text('region_deny_behavior').default('default').notNull(),
+    regionDenyMessage: text('region_deny_message').default('').notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps,
   },

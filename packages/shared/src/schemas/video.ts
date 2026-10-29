@@ -1,18 +1,21 @@
 import { z } from 'zod';
 import { DANMAKU_MODES, DANMAKU_POOLS, VIDEO_VISIBILITIES } from '../constants';
+import { videoRegionFieldsSchema } from './region';
 
 export const paginationSchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const videoCreateSchema = z.object({
-  title: z.string().min(1, '请输入标题').max(120),
-  description: z.string().max(5000).default(''),
-  categoryId: z.string().uuid().optional(),
-  tags: z.array(z.string().min(1).max(24)).max(12).default([]),
-  visibility: z.enum(VIDEO_VISIBILITIES).default('public'),
-});
+export const videoCreateSchema = z
+  .object({
+    title: z.string().min(1, '请输入标题').max(120),
+    description: z.string().max(5000).default(''),
+    categoryId: z.string().uuid().optional(),
+    tags: z.array(z.string().min(1).max(24)).max(12).default([]),
+    visibility: z.enum(VIDEO_VISIBILITIES).default('public'),
+  })
+  .merge(videoRegionFieldsSchema);
 
 export const videoUpdateSchema = videoCreateSchema.partial().extend({
   coverUrl: z.string().max(500).optional(),
