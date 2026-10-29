@@ -63,6 +63,7 @@ export function UsersPage() {
   const [q, setQ] = useState('');
   const [role, setRole] = useState<string | undefined>();
   const [group, setGroup] = useState<string | undefined>();
+  const [region, setRegion] = useState<string | undefined>();
   const [banned, setBanned] = useState<boolean | undefined>();
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,16 +75,30 @@ export function UsersPage() {
   const canTransfer = can(actor, 'owner:transfer');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users', page, limit, q, role, group, banned],
+    queryKey: ['admin-users', page, limit, q, role, group, region, banned],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (q) params.set('q', q);
       if (role) params.set('role', role);
       if (group) params.set('group', group);
+      if (region) params.set('region', region);
       if (banned !== undefined) params.set('banned', String(banned));
       return api.get<{ items: AdminUser[]; total: number }>(`/api/v1/admin/users?${params}`);
     },
   });
+
+  const regionOptions = useQuery({
+    queryKey: ['region-options'],
+    queryFn: () =>
+      api.get<{ items: Array<{ code: string; name: string; nameEn: string }> }>(
+        '/api/v1/region/options',
+      ),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const regionSelectOptions = (regionOptions.data?.items ?? []).map((item) => ({
+    value: item.code,
+    label: `${item.name} (${item.code})`,
+  }));
 
   const openEdit = (user: AdminUser) => {
     setEditing(user);
@@ -91,6 +106,8 @@ export function UsersPage() {
       role: user.roles[0] ?? 'USER',
       level: user.level,
       banned: user.banned,
+      region: user.region || undefined,
+      showRestricted: user.showRestricted,
     });
   };
 
@@ -102,6 +119,8 @@ export function UsersPage() {
       const payload: Record<string, unknown> = {
         level: values.level,
         banned: values.banned,
+        region: values.region || null,
+        showRestricted: Boolean(values.showRestricted),
       };
       if (canAssignRole) payload.role = values.role;
       await api.patch(`/api/v1/admin/users/${editing.id}`, payload);
@@ -208,6 +227,19 @@ export function UsersPage() {
             }}
           />
           <Select
+            placeholder={t('地区')}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            style={{ width: 180 }}
+            options={regionSelectOptions}
+            value={region}
+            onChange={(value) => {
+              setRegion(value);
+              setPage(1);
+            }}
+          />
+          <Select
             placeholder={t('状态')}
             allowClear
             style={{ width: 130 }}
@@ -277,6 +309,21 @@ export function UsersPage() {
             },
             { title: t('等级'), dataIndex: 'level', width: 80 },
             { title: t('硬币'), dataIndex: 'coinBalance', width: 80 },
+            {
+              title: t('地区'),
+              dataIndex: 'region',
+              width: 130,
+              render: (value: string, record) => (
+                <Space size={4} wrap>
+                  <Tag>
+                    {value
+                      ? (regionSelectOptions.find((item) => item.value === value)?.label ?? value)
+                      : t('未记录')}
+                  </Tag>
+                  {record.showRestricted && <Tag color="orange">{t('显示限制级')}</Tag>}
+                </Space>
+              ),
+            },
             {
               title: t('状态'),
               dataIndex: 'banned',
@@ -360,6 +407,27 @@ export function UsersPage() {
           </Form.Item>
           <Form.Item label={t('等级')} name="level">
             <InputNumber min={0} max={6} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            label={t('地区')}
+            name="region"
+            extra={t('注册时自动记录，用户不能修改；管理员可在这里更正。')}
+          >
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={regionSelectOptions}
+              placeholder={t('未记录')}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t('显示限制级内容')}
+            name="showRestricted"
+            valuePropName="checked"
+            extra={t('仅对无限制地区有效。')}
+          >
+            <Switch />
           </Form.Item>
           <Form.Item label={t('封禁账号')} name="banned" valuePropName="checked">
             <Switch />

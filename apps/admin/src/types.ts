@@ -99,6 +99,9 @@ export interface AdminUser {
   roles: string[];
   group: 'USER' | 'CREATOR' | 'REVIEWER' | 'ADMIN' | 'OWNER';
   level: number;
+  region: string;
+  regionSource: string;
+  showRestricted: boolean;
   banned: boolean;
   mutedUntil: string | null;
   coinBalance: number;
@@ -112,6 +115,11 @@ export interface AdminVideo {
   visibility: string;
   featured: boolean;
   recommendWeight: number;
+  restricted: boolean;
+  regionMode: string;
+  regionCodes: string[];
+  regionDenyBehavior: string;
+  regionDenyMessage: string;
   views: number;
   likes: number;
   comments: number;

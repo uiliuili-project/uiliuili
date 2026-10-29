@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Divider,
   Form,
   Input,
   InputNumber,
@@ -45,6 +46,7 @@ export function SettingsPage() {
   const [danmakuForm] = Form.useForm();
   const [socialForm] = Form.useForm();
   const [recommendForm] = Form.useForm();
+  const [regionForm] = Form.useForm();
   const [storageForm] = Form.useForm();
   const [mailForm] = Form.useForm();
   const [searchForm] = Form.useForm();
@@ -58,13 +60,26 @@ export function SettingsPage() {
 
   const canSeeTab = (key: string) => {
     if (key === 'site') return canSite;
-    if (key === 'content' || key === 'social') return canContent;
+    if (key === 'content' || key === 'social' || key === 'region') return canContent;
     if (key === 'storage' || key === 'mail' || key === 'search' || key === 'oauth') {
       return canIntegration;
     }
     if (key === 'security') return canSecurity;
     return false;
   };
+
+  const regionOptions = useQuery({
+    queryKey: ['region-options'],
+    queryFn: () =>
+      api.get<{ items: Array<{ code: string; name: string; nameEn: string }> }>(
+        '/api/v1/region/options',
+      ),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const regionSelectOptions = (regionOptions.data?.items ?? []).map((item) => ({
+    value: item.code,
+    label: `${item.name} (${item.code})`,
+  }));
 
   const query = useQuery({
     queryKey: ['admin-settings'],
@@ -89,6 +104,14 @@ export function SettingsPage() {
       blockedWords: (groups.danmaku?.blockedWords ?? []).join('\n'),
     });
     socialForm.setFieldsValue(groups.social ?? {});
+    regionForm.setFieldsValue({
+      fallback: groups.region?.fallback ?? 'CN',
+      header: groups.region?.header ?? 'cf-ipcountry',
+      geoipDatabase: groups.region?.geoipDatabase ?? '',
+      blockedRegions: groups.restricted?.blockedRegions ?? [],
+      defaultBehavior: groups.restricted?.defaultBehavior ?? 'message',
+      defaultMessage: groups.restricted?.defaultMessage ?? '该内容在您所在的地区不可用',
+    });
     recommendForm.setFieldsValue({
       ...(groups.recommendation ?? {}),
       ...(groups.recommendation?.weights ?? {}),
@@ -215,6 +238,21 @@ export function SettingsPage() {
           .split('\n')
           .map((item: string) => item.trim())
           .filter(Boolean),
+      },
+    });
+  };
+  const saveRegion = async () => {
+    const values = await regionForm.validateFields();
+    await save({
+      region: {
+        fallback: values.fallback,
+        header: values.header,
+        geoipDatabase: values.geoipDatabase ?? '',
+      },
+      restricted: {
+        blockedRegions: values.blockedRegions ?? [],
+        defaultBehavior: values.defaultBehavior,
+        defaultMessage: values.defaultMessage ?? '',
       },
     });
   };
@@ -835,6 +873,82 @@ export function SettingsPage() {
                       </Button>
                     </Card>
                   ))}
+                </Form>
+              ),
+            },
+            {
+              key: 'region',
+              label: t('地区与限制级内容'),
+              children: (
+                <Form form={regionForm} layout="vertical" style={{ maxWidth: 720 }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message={t(
+                      '地区按国家自动判定，注册后用户不能自行修改。限制级内容只能发布到未被勾选的国家。',
+                    )}
+                  />
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={t('无法判断时的默认地区')}
+                        name="fallback"
+                        extra={t('既没有账号地区、也没有国家请求头时使用。')}
+                      >
+                        <Select showSearch optionFilterProp="label" options={regionSelectOptions} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={t('国家请求头')}
+                        name="header"
+                        extra={t('由反向代理或 CDN 提供，值为 ISO 3166-1 两位国家代码。')}
+                      >
+                        <Input placeholder="cf-ipcountry" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Form.Item
+                    label={t('GeoIP 数据库路径（可选）')}
+                    name="geoipDatabase"
+                    extra={t(
+                      '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。',
+                    )}
+                  >
+                    <Input placeholder="/var/lib/GeoIP/GeoLite2-Country.mmdb" allowClear />
+                  </Form.Item>
+                  <Divider />
+                  <Form.Item
+                    label={t('限制级内容不可发布的地区')}
+                    name="blockedRegions"
+                    extra={t(
+                      '被勾选的国家既不能上传限制级内容，也不能播放；其余国家均为无限制地区。',
+                    )}
+                  >
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      options={regionSelectOptions}
+                      placeholder={t('搜索国家或地区代码')}
+                    />
+                  </Form.Item>
+                  <Form.Item label={t('默认拒绝方式')} name="defaultBehavior">
+                    <Select
+                      options={[
+                        { value: 'message', label: t('说明地区限制') },
+                        { value: 'not_found', label: t('显示视频不存在') },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label={t('默认提示文案')} name="defaultMessage">
+                    <Input.TextArea rows={3} maxLength={200} showCount />
+                  </Form.Item>
+                  <Button type="primary" loading={saving} onClick={() => void saveRegion()}>
+                    {t('保存地区设置')}
+                  </Button>
                 </Form>
               ),
             },
