@@ -312,6 +312,70 @@ export class AdminService {
       : null;
   }
 
+  async deleteUser(actor: AuthUser, id: string) {
+    const rows = await this.database.db.select().from(users).where(eq(users.id, id)).limit(1);
+    const user = rows[0];
+    if (!user) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
+    const targetRoles = (user.roles ?? []) as UserRole[];
+    const targetIsOwner = user.userGroup === 'OWNER' || targetRoles.includes('SUPER_ADMIN');
+    const targetIsAdmin = user.userGroup === 'ADMIN' || targetRoles.includes('ADMIN');
+    const actorIsOwner = actor.group === 'OWNER';
+
+    if (targetIsOwner) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '站长账号不能删除，请先转移站长身份', 403);
+    }
+    if (id === actor.id) {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '不能删除自己的账号', 400);
+    }
+    if (targetIsAdmin && !actorIsOwner) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, '不能删除其他管理员的账号', 403);
+    }
+
+    const videoRows = await this.database.db
+      .select({ id: videos.id })
+      .from(videos)
+      .where(eq(videos.uploaderId, id));
+
+    await this.database.db.delete(users).where(eq(users.id, id));
+
+    const prefixes = [
+      `users/${id}`,
+      ...videoRows.flatMap((video) => [`videos/${video.id}`, `covers/${video.id}`]),
+    ];
+    try {
+      const provider = await this.storage.provider();
+      for (const prefix of prefixes) {
+        await provider.deletePrefix(prefix).catch((error: unknown) => {
+          this.logger.warn(
+            `Failed to remove storage prefix ${prefix}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve storage provider while deleting user ${id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    await this.audit.record({
+      actorId: actor.id,
+      action: 'admin.user.delete',
+      targetType: 'user',
+      targetId: id,
+      before: {
+        username: user.username,
+        roles: user.roles,
+        group: user.userGroup,
+        videos: videoRows.length,
+      },
+    });
+    return { ok: true };
+  }
+
   async listVideos(query: {
     page: number;
     limit: number;

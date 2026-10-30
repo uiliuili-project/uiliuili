@@ -93,7 +93,7 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 所有管理接口都要求相应权限，完整清单见[架构](architecture.md)。主要路由：
 
 - `GET /api/v1/admin/dashboard`
-- `GET|PATCH /api/v1/admin/users`
+- `GET|PATCH|DELETE /api/v1/admin/users`
 - `GET|PATCH /api/v1/admin/videos`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`

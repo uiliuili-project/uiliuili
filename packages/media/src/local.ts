@@ -71,6 +71,12 @@ export class LocalStorageProvider implements StorageProvider {
     await fsp.rm(this.resolve(key), { force: true });
   }
 
+  async deletePrefix(prefix: string): Promise<void> {
+    const normalized = prefix.replace(/\/+$/, '');
+    if (!normalized) return;
+    await fsp.rm(this.resolve(`${normalized}/`), { recursive: true, force: true });
+  }
+
   publicUrl(key: string): string | null {
     return `${this.publicBasePath}/${normalizeKey(key)}`;
   }

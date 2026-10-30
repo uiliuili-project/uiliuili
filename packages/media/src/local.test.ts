@@ -32,6 +32,19 @@ describe('LocalStorageProvider', () => {
     expect(await provider.headObject('covers/1/test.txt')).toBeNull();
   });
 
+  it('deletes every object under a prefix', async () => {
+    const provider = createProvider();
+    await provider.putObject('videos/1/source/a.mp4', Buffer.from('a'));
+    await provider.putObject('videos/1/hls/index.m3u8', Buffer.from('b'));
+    await provider.putObject('videos/10/keep.mp4', Buffer.from('c'));
+
+    await provider.deletePrefix('videos/1');
+
+    expect(await provider.headObject('videos/1/source/a.mp4')).toBeNull();
+    expect(await provider.headObject('videos/1/hls/index.m3u8')).toBeNull();
+    expect((await provider.getBuffer('videos/10/keep.mp4')).toString()).toBe('c');
+  });
+
   it('assembles multipart uploads in order', async () => {
     const provider = createProvider();
     const init = await provider.initMultipart('videos/1/source.mp4', 'video/mp4');

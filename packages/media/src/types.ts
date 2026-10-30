@@ -19,6 +19,8 @@ export interface StorageProvider {
   getBuffer(key: string): Promise<Buffer>;
   headObject(key: string): Promise<{ size: number; contentType: string | null } | null>;
   deleteObject(key: string): Promise<void>;
+  /** Deletes every object whose key starts with the given prefix. */
+  deletePrefix(prefix: string): Promise<void>;
   publicUrl(key: string): string | null;
   signedUrl(key: string, expiresInSeconds: number): Promise<string>;
   readRange(

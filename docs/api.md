@@ -110,7 +110,7 @@ All admin routes require the corresponding permission and are listed in
 `docs/architecture.md`. Key routes:
 
 - `GET /api/v1/admin/dashboard`
-- `GET|PATCH /api/v1/admin/users`
+- `GET|PATCH|DELETE /api/v1/admin/users`
 - `GET|PATCH /api/v1/admin/videos`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`

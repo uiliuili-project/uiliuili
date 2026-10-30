@@ -26,6 +26,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The management console can delete a user again. The action keeps the same
+  owner/admin/self guards as editing, removes the account and all cascading
+  content in one operation, cleans the user's stored media, and writes an audit
+  entry.
 - Hide the installer entry point and every staff-console route from ordinary
   visitors: the public about page no longer links `/admin/install`, the
   installer redirects home once the instance is installed, non-staff accounts

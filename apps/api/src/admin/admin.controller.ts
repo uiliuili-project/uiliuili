@@ -83,6 +83,12 @@ export class AdminController {
     return this.admin.updateUser(actor, id, body);
   }
 
+  @Delete('users/:id')
+  @RequirePermissions('user:moderate')
+  async deleteUser(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    return this.admin.deleteUser(actor, id);
+  }
+
   @Post('owner/transfer')
   @RequirePermissions('owner:transfer')
   async transferOwner(

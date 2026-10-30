@@ -1,4 +1,4 @@
-import { CrownOutlined, EditOutlined, StopOutlined } from '@ant-design/icons';
+import { CrownOutlined, DeleteOutlined, EditOutlined, StopOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -72,6 +72,7 @@ export function UsersPage() {
   const [form] = Form.useForm();
 
   const canAssignRole = can(actor, 'user:assign_role');
+  const canModerate = can(actor, 'user:moderate');
   const canTransfer = can(actor, 'owner:transfer');
 
   const { data, isLoading } = useQuery({
@@ -140,6 +141,19 @@ export function UsersPage() {
         mutedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
       notification.success({ message: t('已禁言 24 小时') });
+      await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    } catch (error) {
+      notification.error({
+        message: error instanceof Error ? error.message : t('操作失败'),
+      });
+    }
+  };
+
+  const remove = async (user: AdminUser) => {
+    try {
+      await api.delete(`/api/v1/admin/users/${user.id}`);
+      notification.success({ message: t('用户已删除') });
+      if (editing?.id === user.id) setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     } catch (error) {
       notification.error({
@@ -345,13 +359,13 @@ export function UsersPage() {
             },
             {
               title: t('操作'),
-              width: 260,
+              width: 330,
               render: (_value, record) => (
                 <Space wrap>
                   <Button
                     size="small"
                     icon={<EditOutlined />}
-                    disabled={!editable(record)}
+                    disabled={!canModerate || !editable(record)}
                     onClick={() => openEdit(record)}
                   >
                     {t('编辑')}
@@ -360,11 +374,34 @@ export function UsersPage() {
                     size="small"
                     danger
                     icon={<StopOutlined />}
-                    disabled={!editable(record)}
+                    disabled={!canModerate || !editable(record)}
                     onClick={() => void mute(record)}
                   >
                     {t('禁言')}
                   </Button>
+                  {canModerate && (
+                    <Popconfirm
+                      title={t('删除用户')}
+                      description={t(
+                        '确定要永久删除用户「{0}」吗？该操作不可撤销，会同时删除其投稿、评论、弹幕、收藏等全部数据。',
+                        { 0: record.username },
+                      )}
+                      okText={t('删除')}
+                      cancelText={t('取消')}
+                      okButtonProps={{ danger: true }}
+                      disabled={!editable(record)}
+                      onConfirm={() => void remove(record)}
+                    >
+                      <Button
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        disabled={!editable(record)}
+                      >
+                        {t('删除')}
+                      </Button>
+                    </Popconfirm>
+                  )}
                   {canTransfer && record.group !== 'OWNER' && (
                     <Button
                       size="small"

@@ -4,8 +4,10 @@ import {
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -82,6 +84,35 @@ export class S3StorageProvider implements StorageProvider {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: joinKey(this.prefix, key) }),
     );
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    const normalized = prefix.replace(/^\/+|\/+$/g, '');
+    if (!normalized) return;
+    const keyPrefix = `${joinKey(this.prefix, normalized)}/`;
+    let continuationToken: string | undefined;
+    do {
+      const listed = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: keyPrefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      const objects = (listed.Contents ?? [])
+        .map((item) => item.Key)
+        .filter((key): key is string => Boolean(key))
+        .map((key) => ({ Key: key }));
+      if (objects.length > 0) {
+        await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: { Objects: objects, Quiet: true },
+          }),
+        );
+      }
+      continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+    } while (continuationToken);
   }
 
   publicUrl(key: string): string | null {

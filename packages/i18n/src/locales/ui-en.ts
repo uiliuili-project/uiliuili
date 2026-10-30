@@ -361,8 +361,12 @@ export const uiEn: Record<string, string> = {
   用户名: 'Username',
   用户名或邮箱: 'Username or email',
   用户已更新: 'User updated',
+  用户已删除: 'User deleted',
   用户总数: 'Total users',
   用户管理: 'Users',
+  删除用户: 'Delete user',
+  '确定要永久删除用户「{0}」吗？该操作不可撤销，会同时删除其投稿、评论、弹幕、收藏等全部数据。':
+    'Permanently delete the user "{0}"? This cannot be undone and also removes their videos, comments, danmaku, favorites, and other data.',
   '用逗号分隔，最多 12 个': 'Comma-separated, up to 12',
   登录: 'Log in',
   登录萌悠: 'Log in to MoeYou',
