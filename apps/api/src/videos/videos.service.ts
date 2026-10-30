@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   type DbUser,
   type DbVideo,
@@ -14,6 +14,7 @@ import {
   reports,
   tags,
   userFeedbacks,
+  userTagInterests,
   users,
   videoCoins,
   videoLikes,
@@ -59,6 +60,7 @@ import {
 } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
+import { InterestsService } from '../interests/interests.service';
 import {
   type VideoJoinRow,
   categoryPayload,
@@ -70,24 +72,34 @@ import {
 
 @Injectable()
 export class VideosService {
+  private readonly logger = new Logger(VideosService.name);
+
   constructor(
     private readonly database: DatabaseService,
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly queue: QueueService,
+    private readonly interests: InterestsService,
   ) {}
 
-  async list(query: {
-    cursor?: string;
-    limit: number;
-    category?: string;
-    tag?: string;
-    sort: 'new' | 'hot' | 'recommended';
-    q?: string;
-    author?: string;
-    excludeIds?: string[];
-    excludeUploaderIds?: string[];
-  }) {
+  async list(
+    query: {
+      cursor?: string;
+      limit: number;
+      category?: string;
+      tag?: string;
+      sort: 'new' | 'hot' | 'recommended';
+      q?: string;
+      author?: string;
+      excludeIds?: string[];
+      excludeUploaderIds?: string[];
+    },
+    options?: {
+      interestUserId?: string;
+      interestTagIds?: string[];
+      interestWeight?: number;
+    },
+  ) {
     const offset = decodeCursor(query.cursor);
     const conditions = [
       eq(videos.status, 'published'),
@@ -121,7 +133,7 @@ export class VideosService {
     const weights = recommendation.weights as Record<string, number>;
     const weight = (key: string, fallback: number) => Math.max(0, Number(weights[key] ?? fallback));
     const freshness = Math.max(0.1, Number(weights.freshness ?? 1.2));
-    const score = sql<number>`(
+    let score = sql<number>`(
       ${videos.viewCount} * ${weight('views', 0.06)}::double precision +
       ${videos.likeCount} * ${weight('likes', 0.24)}::double precision +
       ${videos.coinCount} * ${weight('coins', 0.28)}::double precision +
@@ -131,6 +143,24 @@ export class VideosService {
       ${videos.completionRate} * ${weight('completion', 0.08)}::double precision +
       CASE WHEN ${videos.featured} THEN 0.5 ELSE 0 END
     ) / (1 + EXTRACT(EPOCH FROM (now() - COALESCE(${videos.publishedAt}, ${videos.createdAt}))) / 86400 / ${freshness * 30}::double precision)`;
+
+    // Personalised boost from the user's learned tag affinity.
+    const interestTagIds = options?.interestTagIds ?? [];
+    const interestWeight = Math.max(0, Number(options?.interestWeight ?? 0));
+    if (options?.interestUserId && interestTagIds.length > 0 && interestWeight > 0) {
+      const tagIds = sql.join(
+        interestTagIds.map((tagId) => sql`${tagId}::uuid`),
+        sql`, `,
+      );
+      score = sql<number>`(${score} + COALESCE((
+        SELECT SUM(uti.score)
+        FROM ${userTagInterests} uti
+        INNER JOIN ${videoTags} vt ON vt.tag_id = uti.tag_id
+        WHERE vt.video_id = ${videos.id}
+          AND uti.user_id = ${options.interestUserId}::uuid
+          AND uti.tag_id IN (${tagIds})
+      ), 0) * ${interestWeight}::double precision)`;
+    }
 
     const rows = await this.database.db
       .select({ video: videos, uploader: users, category: categories })
@@ -699,6 +729,15 @@ export class VideosService {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
     if (input.partId) await this.getPart(id, input.partId);
+    const existingRows = await this.database.db
+      .select({
+        completed: watchHistories.completed,
+        tagSyncedAt: watchHistories.tagSyncedAt,
+      })
+      .from(watchHistories)
+      .where(and(eq(watchHistories.userId, viewer.id), eq(watchHistories.videoId, id)))
+      .limit(1);
+    const existing = existingRows[0];
     await this.database.db
       .insert(watchHistories)
       .values({
@@ -726,6 +765,27 @@ export class VideosService {
       durationMs: input.durationMs ?? 0,
       eventType: input.completed ? 'complete' : 'progress',
     });
+    const completedNow = input.completed ?? false;
+    const syncedAt = existing?.tagSyncedAt?.getTime() ?? 0;
+    const shouldLearnTags =
+      !existing ||
+      (completedNow && !existing.completed) ||
+      syncedAt === 0 ||
+      Date.now() - syncedAt >= 10 * 60 * 1000;
+    if (shouldLearnTags) {
+      const durationMs = input.durationMs || row.video.durationSeconds * 1000;
+      const depth = durationMs > 0 ? Math.min(1, Math.max(0, input.positionMs / durationMs)) : 0;
+      const weight = 0.2 + depth * 0.8 + (completedNow ? 0.5 : 0);
+      try {
+        await this.interests.recordWatch(viewer.id, id, weight);
+        await this.database.db
+          .update(watchHistories)
+          .set({ tagSyncedAt: new Date() })
+          .where(and(eq(watchHistories.userId, viewer.id), eq(watchHistories.videoId, id)));
+      } catch (error) {
+        this.logger.warn(`Unable to learn tag interests for ${viewer.id}: ${String(error)}`);
+      }
+    }
     if (input.completed) {
       await this.database.db
         .update(videos)

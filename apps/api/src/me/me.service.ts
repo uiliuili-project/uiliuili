@@ -18,6 +18,7 @@ import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { videoRegionCondition } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
+import { InterestsService } from '../interests/interests.service';
 import { publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -27,6 +28,7 @@ export class MeService {
     private readonly database: DatabaseService,
     private readonly settings: SettingsService,
     private readonly videos: VideosService,
+    private readonly interests: InterestsService,
   ) {}
 
   async history(userId: string, page: number, limit: number) {
@@ -356,6 +358,20 @@ export class MeService {
       page,
       limit,
     };
+  }
+
+  async tagInterests(userId: string) {
+    return { items: await this.interests.top(userId, 50) };
+  }
+
+  async removeTagInterest(userId: string, tagId: string) {
+    await this.interests.remove(userId, tagId);
+    return { ok: true };
+  }
+
+  async clearTagInterests(userId: string) {
+    await this.interests.clear(userId);
+    return { ok: true };
   }
 
   private async folderList(userId: string) {

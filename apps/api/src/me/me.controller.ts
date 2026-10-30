@@ -42,6 +42,21 @@ export class MeController {
     return this.me.favorites(user.id, folderId);
   }
 
+  @Get('tag-interests')
+  async tagInterests(@CurrentUser() user: AuthUser) {
+    return this.me.tagInterests(user.id);
+  }
+
+  @Delete('tag-interests')
+  async clearTagInterests(@CurrentUser() user: AuthUser) {
+    return this.me.clearTagInterests(user.id);
+  }
+
+  @Delete('tag-interests/:tagId')
+  async removeTagInterest(@CurrentUser() user: AuthUser, @Param('tagId') tagId: string) {
+    return this.me.removeTagInterest(user.id, tagId);
+  }
+
   @Post('favorites/folders')
   async createFolder(
     @CurrentUser() user: AuthUser,
