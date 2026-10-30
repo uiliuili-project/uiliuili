@@ -23,3 +23,11 @@ All notable changes to this project are documented here. The format follows
 - Admin upgrade center with database backups, advisory-locked migrations,
   maintenance mode, and an optional fixed restart command.
 - Site rebrand to 萌悠 (MoeYou); internal `uiliuili` identifiers are unchanged.
+
+### Fixed
+
+- Hide the installer entry point and every staff-console route from ordinary
+  visitors: the public about page no longer links `/admin/install`, the
+  installer redirects home once the instance is installed, non-staff accounts
+  are sent to the studio instead of the console, and the console responds with
+  `X-Robots-Tag: noindex`.
