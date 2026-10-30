@@ -91,7 +91,7 @@ export default async function HomePage({
           {isEmpty ? (
             <div className="card flex min-h-[360px] flex-col items-center justify-center p-10 text-center">
               <Sparkles className="mb-4 h-10 w-10 text-brand" />
-              <h1 className="text-2xl font-semibold">{t('欢迎来到 uiliuili')}</h1>
+              <h1 className="text-2xl font-semibold">{t('欢迎来到萌悠')}</h1>
               <p className="mt-2 max-w-lg text-sm text-muted">
                 {t('还没有已发布的视频。完成安装并上传第一支视频后，这里会自动出现推荐内容。')}
               </p>

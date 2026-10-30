@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let payload = { title: 'uiliuili', body: '', url: '/' };
+  let payload = { title: '萌悠', body: '', url: '/' };
   if (event.data) {
     try {
       payload = { ...payload, ...event.data.json() };

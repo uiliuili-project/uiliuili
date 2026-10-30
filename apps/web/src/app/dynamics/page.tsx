@@ -271,6 +271,11 @@ export default function DynamicsPage() {
                             {t('IP 属地：{0}', { 0: regionLabel(dynamic.ipRegion, locale) })}
                           </>
                         )}
+                        {dynamic.status === 'pending' && (
+                          <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+                            {t('待审核，仅自己可见')}
+                          </span>
+                        )}
                       </span>
                     </span>
                   </Link>

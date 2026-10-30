@@ -2,28 +2,53 @@
 
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { type AuthUser, consoleAreaForGroup } from '@uiliuili/shared';
+import { type AuthUser, type NavigationItem, consoleAreaForGroup } from '@uiliuili/shared';
 import {
   Bell,
+  BookOpen,
   Clapperboard,
   Clock,
+  Download,
+  ExternalLink,
+  Gamepad2,
+  Heart,
   Home,
+  Info,
+  Link2,
   LogOut,
   MessageSquare,
+  Music,
   Plus,
   Search,
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   Trophy,
   User,
   Users,
+  Video,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useT } from './I18nProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
+
+const NAV_ICONS = {
+  link: Link2,
+  home: Home,
+  video: Video,
+  star: Star,
+  heart: Heart,
+  book: BookOpen,
+  users: Users,
+  info: Info,
+  music: Music,
+  game: Gamepad2,
+  download: Download,
+  external: ExternalLink,
+} as const;
 
 export function Header() {
   const t = useT();
@@ -33,8 +58,21 @@ export function Header() {
   const [unread, setUnread] = useState(0);
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [siteName, setSiteName] = useState('uiliuili');
+  const [siteName, setSiteName] = useState('萌悠');
   const [siteLogo, setSiteLogo] = useState('');
+  const [customNav, setCustomNav] = useState<NavigationItem[]>([]);
+  const [countryBadge, setCountryBadge] = useState<{
+    code: string;
+    name: string;
+    source: string;
+  } | null>(null);
+  const [badgeConfig, setBadgeConfig] = useState<{
+    enabled: boolean;
+    showName: boolean;
+    hideForGuests: boolean;
+    trustedOnly: boolean;
+    blockedCountries: string[];
+  } | null>(null);
   const consoleArea = consoleAreaForGroup(user?.group);
   const isStaff = consoleArea !== null;
   const consoleLabel = t(consoleArea === 'review' ? 'nav.review' : 'nav.admin');
@@ -50,11 +88,35 @@ export function Header() {
 
   useEffect(() => {
     void api
-      .get<{ site: { name: string; logoUrl?: string } }>('/api/v1/settings')
+      .get<{
+        site: { name: string; logoUrl?: string };
+        navigation?: { header?: NavigationItem[] };
+        branding?: {
+          countryBadge?: {
+            enabled: boolean;
+            showName: boolean;
+            hideForGuests: boolean;
+            trustedOnly: boolean;
+            blockedCountries: string[];
+          };
+        };
+      }>('/api/v1/settings')
       .then((settings) => {
-        setSiteName(settings.site.name || 'uiliuili');
+        setSiteName(settings.site.name || '萌悠');
         setSiteLogo(settings.site.logoUrl || '');
+        setCustomNav(
+          (settings.navigation?.header ?? [])
+            .filter((item) => item.enabled)
+            .sort((left, right) => left.sort - right.sort),
+        );
+        setBadgeConfig(settings.branding?.countryBadge ?? null);
       })
+      .catch(() => undefined);
+    void api
+      .get<{
+        network: { code: string; name: string; source: string } | null;
+      }>('/api/v1/region/context')
+      .then((data) => setCountryBadge(data.network))
       .catch(() => undefined);
     void getMe().then((current) => {
       setUser(current);
@@ -81,15 +143,39 @@ export function Header() {
     router.push('/');
   };
 
+  const visibleCustomNav = customNav
+    .filter((item) => {
+      if (item.visibility === 'guest') return !user;
+      if (item.visibility === 'user') return Boolean(user);
+      if (item.visibility === 'staff') return isStaff;
+      return true;
+    })
+    .sort((left, right) => left.sort - right.sort);
+  const showCountryBadge = Boolean(
+    badgeConfig?.enabled &&
+      countryBadge &&
+      (!badgeConfig.hideForGuests || user) &&
+      (!badgeConfig.trustedOnly || ['header', 'geoip'].includes(countryBadge.source)) &&
+      !badgeConfig.blockedCountries.includes(countryBadge.code),
+  );
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
       <div className="container-page flex h-16 items-center gap-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
+        <Link href="/" className="relative flex shrink-0 items-center gap-2">
           {siteLogo ? (
             <img src={siteLogo} alt={siteName} className="h-9 w-9 rounded-xl object-cover" />
           ) : (
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-[#ff9db5] text-lg font-bold text-white">
-              u
+              萌
+            </span>
+          )}
+          {showCountryBadge && countryBadge && (
+            <span
+              title={badgeConfig?.showName ? countryBadge.name : countryBadge.code}
+              className="absolute -bottom-1 -right-1 rounded-md bg-ink px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm"
+            >
+              {countryBadge.code}
             </span>
           )}
           <span className="hidden text-lg font-bold tracking-tight sm:block">{siteName}</span>
@@ -108,6 +194,36 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+          {visibleCustomNav.map((item) => {
+            const Icon = NAV_ICONS[item.icon] ?? Link2;
+            const external = /^https?:\/\//i.test(item.href);
+            const className = cn(
+              'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink',
+              item.highlight && 'bg-brand-light text-brand-dark',
+            );
+            return external ? (
+              <a
+                key={item.id || item.href}
+                href={item.href}
+                target={item.newTab ? '_blank' : undefined}
+                rel="noopener noreferrer"
+                className={className}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </a>
+            ) : (
+              <Link
+                key={item.id || item.href}
+                href={item.href}
+                target={item.newTab ? '_blank' : undefined}
+                className={className}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <form onSubmit={submit} className="relative ml-auto w-full max-w-md">
@@ -253,6 +369,54 @@ export function Header() {
           )}
         </div>
       </div>
+      <nav className="container-page flex gap-1 overflow-x-auto pb-2 lg:hidden">
+        {navItems.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted',
+                pathname === item.href && 'bg-brand-light text-brand-dark',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label}
+            </Link>
+          );
+        })}
+        {visibleCustomNav.map((item) => {
+          const Icon = NAV_ICONS[item.icon] ?? Link2;
+          const external = /^https?:\/\//i.test(item.href);
+          const className = cn(
+            'flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted',
+            item.highlight && 'bg-brand-light text-brand-dark',
+          );
+          return external ? (
+            <a
+              key={item.id || item.href}
+              href={item.href}
+              target={item.newTab ? '_blank' : undefined}
+              rel="noopener noreferrer"
+              className={className}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label}
+            </a>
+          ) : (
+            <Link
+              key={item.id || item.href}
+              href={item.href}
+              target={item.newTab ? '_blank' : undefined}
+              className={className}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }

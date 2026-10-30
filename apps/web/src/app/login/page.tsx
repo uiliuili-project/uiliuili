@@ -53,7 +53,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title={t('登录 uiliuili')}
+      title={t('登录萌悠')}
       subtitle={t('继续观看、发弹幕、收藏和关注')}
       footer={
         <>

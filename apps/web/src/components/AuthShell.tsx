@@ -17,9 +17,9 @@ export function AuthShell({
         <div className="mb-6 text-center">
           <Link href="/" className="inline-flex items-center gap-2">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-[#ff9db5] text-xl font-bold text-white">
-              u
+              萌
             </span>
-            <span className="text-xl font-bold">uiliuili</span>
+            <span className="text-xl font-bold">萌悠</span>
           </Link>
           <h1 className="mt-5 text-2xl font-semibold">{title}</h1>
           {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}

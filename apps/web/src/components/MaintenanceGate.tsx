@@ -25,7 +25,7 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
         <div className="card max-w-lg p-10 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-[#ff9db5] text-xl font-bold text-white">
-            u
+            萌
           </div>
           <h1 className="mt-5 text-2xl font-semibold">
             {settings.site.name} {t('正在维护')}

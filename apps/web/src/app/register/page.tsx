@@ -21,6 +21,11 @@ export default function RegisterPage() {
   const [claimToken, setClaimToken] = useState('');
   const [region, setRegion] = useState<RegionContextInfo | null>(null);
   const [setup, setSetup] = useState<{ needsOwner: boolean; claimRequired: boolean } | null>(null);
+  const [legal, setLegal] = useState<{
+    requireConsent: boolean;
+    termsVersion: string;
+  } | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     void ensureCsrf();
@@ -35,12 +40,20 @@ export default function RegisterPage() {
       .get<RegionContextInfo>('/api/v1/region/context')
       .then(setRegion)
       .catch(() => undefined);
+    void api
+      .get<{ legal?: { requireConsent: boolean; termsVersion: string } }>('/api/v1/settings')
+      .then((data) => setLegal(data.legal ?? null))
+      .catch(() => undefined);
   }, [router]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (password !== confirm) {
       setError(t('两次输入的密码不一致'));
+      return;
+    }
+    if ((legal?.requireConsent ?? true) && !termsAccepted) {
+      setError(t('请阅读并同意用户协议和隐私政策'));
       return;
     }
     setLoading(true);
@@ -51,6 +64,7 @@ export default function RegisterPage() {
         email,
         password,
         claimToken: claimToken || undefined,
+        termsAccepted,
       });
       if (result.user.group === 'OWNER') {
         window.location.href = '/admin/';
@@ -71,7 +85,7 @@ export default function RegisterPage() {
       subtitle={
         setup?.needsOwner
           ? t('这是本站的第一个账号，注册后将自动成为站长并拥有全部管理权限。')
-          : t('加入 uiliuili，开始分享你的视频')
+          : t('加入萌悠，开始分享你的视频')
       }
       footer={
         <>
@@ -184,6 +198,36 @@ export default function RegisterPage() {
             required
           />
         </div>
+        {(legal?.requireConsent ?? true) && (
+          <label className="flex items-start gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(event) => setTermsAccepted(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[#fb7299]"
+            />
+            <span>
+              {t('我已阅读并同意')}{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                className="text-brand hover:underline"
+                rel="noreferrer"
+              >
+                {t('用户协议')}
+              </a>{' '}
+              {t('和')}{' '}
+              <a
+                href="/privacy"
+                target="_blank"
+                className="text-brand hover:underline"
+                rel="noreferrer"
+              >
+                {t('隐私政策')}
+              </a>
+            </span>
+          </label>
+        )}
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? t('创建中…') : t('创建账号')}
         </button>

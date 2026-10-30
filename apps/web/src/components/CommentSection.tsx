@@ -377,6 +377,11 @@ function CommentRow({
               {t('置顶')}
             </span>
           )}
+          {comment.status === 'pending' && (
+            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+              {t('待审核，仅自己可见')}
+            </span>
+          )}
           <span>{relativeTime(comment.createdAt, locale)}</span>
           {comment.ipRegion && (
             <span>{t('IP 属地：{0}', { 0: regionLabel(comment.ipRegion, locale) })}</span>

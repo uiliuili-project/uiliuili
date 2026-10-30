@@ -5,13 +5,23 @@ const serverBase = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001';
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly details: unknown;
 
-  constructor(status: number, message: string, code = 'UNKNOWN') {
+  constructor(status: number, message: string, code = 'UNKNOWN', details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
+}
+
+type CaptchaSolver = (action: string) => Promise<void>;
+let captchaSolver: CaptchaSolver | null = null;
+
+/** Registered by the global captcha gate so challenged requests can retry. */
+export function setCaptchaSolver(solver: CaptchaSolver | null): void {
+  captchaSolver = solver;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -23,12 +33,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
     data = text;
   }
   if (!response.ok) {
-    const body = data as { error?: { message?: string; code?: string } };
+    const body = data as { error?: { message?: string; code?: string; details?: unknown } };
     const t = createTranslator(normalizeLocale(readCookie(localeCookieName)));
     throw new ApiError(
       response.status,
       body?.error?.message ? t(body.error.message) : t('请求失败（{0}）', { 0: response.status }),
       body?.error?.code,
+      body?.error?.details,
     );
   }
   return data as T;
@@ -63,27 +74,38 @@ export async function clientFetch<T>(
       ? init.body
       : JSON.stringify(init.body)
   ) as BodyInit | undefined;
-  let response = await fetch(path, {
-    ...init,
-    method,
-    headers,
-    credentials: 'include',
-    body,
-  });
+  const send = () =>
+    fetch(path, {
+      ...init,
+      method,
+      headers,
+      credentials: 'include',
+      body,
+    });
+  let response = await send();
   if (response.status === 401 && !path.includes('/auth/refresh') && !path.includes('/auth/login')) {
     const refreshed = await fetch('/api/v1/auth/refresh', {
       method: 'POST',
       credentials: 'include',
       headers: { 'x-csrf-token': readCookie('ul_csrf') ?? '' },
     });
-    if (refreshed.ok) {
-      response = await fetch(path, {
-        ...init,
-        method,
-        headers,
-        credentials: 'include',
-        body,
-      });
+    if (refreshed.ok) response = await send();
+  }
+  if (response.status === 429 && captchaSolver) {
+    const snapshot = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (snapshot?.error?.code === 'CAPTCHA_REQUIRED') {
+      const action = String(snapshot.error?.details?.action ?? 'login');
+      try {
+        await captchaSolver(action);
+        // The verifier grants a short server-side pass, so replaying the same
+        // request succeeds without asking the caller to rebuild its payload.
+        response = await send();
+      } catch (error) {
+        if (error instanceof Error) throw error;
+      }
     }
   }
   return parseResponse<T>(response);
