@@ -101,6 +101,18 @@ export function AdminLayout() {
             permission: 'audit:read',
           },
           {
+            key: '/appeals',
+            icon: <SafetyCertificateOutlined />,
+            label: t('admin.appeals'),
+            permission: 'video:manage_any',
+          },
+          {
+            key: '/articles',
+            icon: <FileTextOutlined />,
+            label: t('admin.articles'),
+            permission: 'video:review',
+          },
+          {
             key: '/users',
             icon: <TeamOutlined />,
             label: t('admin.users'),

@@ -3,6 +3,8 @@ import { CaptchaChallenge } from './CaptchaChallenge';
 import { PermissionGate } from './PermissionGate';
 import { AdminLayout } from './pages/AdminLayout';
 import { AnnouncementsPage } from './pages/AnnouncementsPage';
+import { AppealsPage } from './pages/AppealsPage';
+import { ArticlesPage } from './pages/ArticlesPage';
 import { AuditPage } from './pages/AuditPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { CommentsPage } from './pages/CommentsPage';
@@ -57,6 +59,22 @@ export function App() {
             element={
               <PermissionGate permission="comment:manage">
                 <ReviewCommentsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="appeals"
+            element={
+              <PermissionGate permission="video:manage_any">
+                <AppealsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="articles"
+            element={
+              <PermissionGate permission="video:review">
+                <ArticlesPage />
               </PermissionGate>
             }
           />
