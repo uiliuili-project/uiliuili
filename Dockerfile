@@ -51,7 +51,7 @@ RUN pnpm --filter @uiliuili/cli deploy --prod /out/cli
 # the application image's Node dependencies.
 FROM ${NODE_IMAGE} AS runtime
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg tini ca-certificates \
+    && apt-get install -y --no-install-recommends ffmpeg tini ca-certificates postgresql-client \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data \
     && chown node:node /data
