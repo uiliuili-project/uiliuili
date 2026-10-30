@@ -88,7 +88,7 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
           )}
         </div>
         <div className="px-5 pb-6 sm:px-8">
-          <div className="-mt-10 flex flex-wrap items-end justify-between gap-4">
+          <div className="relative z-10 -mt-10 flex flex-wrap items-end justify-between gap-4">
             <div className="flex items-end gap-4">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-brand-light text-2xl font-semibold text-brand-dark shadow-card">
                 {profile.user.avatarUrl ? (
