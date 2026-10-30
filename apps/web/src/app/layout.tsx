@@ -4,16 +4,17 @@ import { Footer } from '@/components/Footer';
 import { GoogleAnalytics } from '@/components/GoogleAnalytics';
 import { Header } from '@/components/Header';
 import { I18nProvider } from '@/components/I18nProvider';
-import { MaintenanceGate } from '@/components/MaintenanceGate';
+import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { Providers } from '@/components/Providers';
 import { PwaRegister } from '@/components/PwaRegister';
 import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetchSafe } from '@/lib/server-api';
+import { isStaffGroup } from '@uiliuili/shared';
 import type { Metadata } from 'next';
 import './globals.css';
 
 interface LayoutSettings {
-  site?: { name?: string };
+  site?: { name?: string; maintenance?: boolean };
   customCode?: {
     headerEnabled?: boolean;
     headerHtml?: string;
@@ -60,6 +61,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   ]);
   const customCode = settings.customCode ?? {};
   const analytics = settings.analytics ?? {};
+  const siteName = settings.site?.name || '萌悠';
+  // Maintenance is enforced while rendering, so crawlers and clients without
+  // JavaScript see the notice too. Staff keep full access to the site.
+  const maintenance = Boolean(settings.site?.maintenance);
+  const viewer = maintenance
+    ? await serverFetchSafe<{ user?: { group?: string } } | null>('/api/v1/auth/me', null)
+    : null;
+  const staff = isStaffGroup(viewer?.user?.group);
   return (
     <html lang={locale}>
       <body>
@@ -73,20 +82,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 respectDnt={analytics.respectDnt}
               />
             ) : null}
-            <MaintenanceGate>
-              <PwaRegister />
-              <div className="flex min-h-screen flex-col">
-                <Header />
-                {customCode.headerEnabled && customCode.headerHtml ? (
-                  <CustomHtml html={customCode.headerHtml} />
-                ) : null}
-                <main className="flex-1">{children}</main>
-                {customCode.footerEnabled && customCode.footerHtml ? (
-                  <CustomHtml html={customCode.footerHtml} />
-                ) : null}
-                <Footer />
-              </div>
-            </MaintenanceGate>
+            {maintenance && !staff ? (
+              <MaintenanceScreen siteName={siteName} />
+            ) : (
+              <>
+                <PwaRegister />
+                <div className="flex min-h-screen flex-col">
+                  <Header />
+                  {customCode.headerEnabled && customCode.headerHtml ? (
+                    <CustomHtml html={customCode.headerHtml} />
+                  ) : null}
+                  <main className="flex-1">{children}</main>
+                  {customCode.footerEnabled && customCode.footerHtml ? (
+                    <CustomHtml html={customCode.footerHtml} />
+                  ) : null}
+                  <Footer />
+                </div>
+              </>
+            )}
           </Providers>
         </I18nProvider>
       </body>
