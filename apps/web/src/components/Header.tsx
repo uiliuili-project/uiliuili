@@ -60,6 +60,7 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState('萌悠');
   const [siteLogo, setSiteLogo] = useState('');
+  const [showSiteName, setShowSiteName] = useState(true);
   const [customNav, setCustomNav] = useState<NavigationItem[]>([]);
   const [countryBadge, setCountryBadge] = useState<{
     code: string;
@@ -93,6 +94,7 @@ export function Header() {
         site: { name: string; logoUrl?: string };
         navigation?: { header?: NavigationItem[] };
         branding?: {
+          showName?: boolean;
           countryBadge?: {
             enabled: boolean;
             showName: boolean;
@@ -105,6 +107,7 @@ export function Header() {
       .then((settings) => {
         setSiteName(settings.site.name || '萌悠');
         setSiteLogo(settings.site.logoUrl || '');
+        setShowSiteName(settings.branding?.showName ?? true);
         setCustomNav(
           (settings.navigation?.header ?? [])
             .filter((item) => item.enabled)
@@ -162,7 +165,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
-      <div className="container-page flex h-16 items-center gap-4">
+      <div className="container-page flex h-16 items-center gap-3 xl:gap-4">
         <Link href="/" className="relative flex shrink-0 items-center gap-2">
           {siteLogo ? (
             <img src={siteLogo} alt={siteName} className="h-9 w-9 rounded-xl object-cover" />
@@ -179,16 +182,20 @@ export function Header() {
               {countryBadge.code}
             </span>
           )}
-          <span className="hidden text-lg font-bold tracking-tight sm:block">{siteName}</span>
+          {showSiteName && (
+            <span className="hidden whitespace-nowrap text-lg font-bold tracking-tight sm:block">
+              {siteName}
+            </span>
+          )}
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="scrollbar-none hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink',
+                'shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink',
                 pathname === item.href && 'bg-brand-light text-brand-dark',
               )}
             >
@@ -199,7 +206,7 @@ export function Header() {
             const Icon = NAV_ICONS[item.icon] ?? Link2;
             const external = /^https?:\/\//i.test(item.href);
             const className = cn(
-              'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink',
+              'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink',
               item.highlight && 'bg-brand-light text-brand-dark',
             );
             return external ? (
@@ -210,7 +217,7 @@ export function Header() {
                 rel="noopener noreferrer"
                 className={className}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </a>
             ) : (
@@ -220,14 +227,17 @@ export function Header() {
                 target={item.newTab ? '_blank' : undefined}
                 className={className}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <form onSubmit={submit} className="relative ml-auto w-full max-w-md">
+        <form
+          onSubmit={submit}
+          className="relative ml-auto w-full min-w-0 max-w-md lg:ml-0 lg:w-56 lg:max-w-none lg:shrink-0 xl:w-64"
+        >
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             value={query}
@@ -243,7 +253,7 @@ export function Header() {
           </button>
         </form>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <LanguageSwitcher compact />
           {user ? (
             <>
