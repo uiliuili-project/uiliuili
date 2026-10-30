@@ -833,6 +833,7 @@ export class AdminService {
         'recommendation',
         'region',
         'restricted',
+        'privacy',
       ].includes(key)
     ) {
       this.assertPermission(actor, 'settings:content');
@@ -864,6 +865,7 @@ export class AdminService {
         'recommendation',
         'region',
         'restricted',
+        'privacy',
       );
     }
     if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail');
@@ -1005,6 +1007,7 @@ export class AdminService {
           'security',
           'region',
           'restricted',
+          'privacy',
         ].includes(key)
       ) {
         await this.settings.set(key, value, false);

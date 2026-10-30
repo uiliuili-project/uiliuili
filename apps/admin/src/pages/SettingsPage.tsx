@@ -111,10 +111,16 @@ export function SettingsPage() {
       blockedRegions: groups.restricted?.blockedRegions ?? [],
       defaultBehavior: groups.restricted?.defaultBehavior ?? 'message',
       defaultMessage: groups.restricted?.defaultMessage ?? '该内容在您所在的地区不可用',
+      ipLocation: groups.privacy?.ipLocation !== false,
     });
     recommendForm.setFieldsValue({
       ...(groups.recommendation ?? {}),
       ...(groups.recommendation?.weights ?? {}),
+      tagEnabled: groups.recommendation?.tagAffinity?.enabled !== false,
+      tagWeight: groups.recommendation?.tagAffinity?.weight ?? 0.6,
+      tagRatio: groups.recommendation?.tagAffinity?.ratio ?? 0.35,
+      tagDecay: groups.recommendation?.tagAffinity?.decayPerDay ?? 0.95,
+      tagMaxTags: groups.recommendation?.tagAffinity?.maxTags ?? 8,
     });
     if (storage) {
       storageForm.setFieldsValue({
@@ -254,6 +260,9 @@ export function SettingsPage() {
         defaultBehavior: values.defaultBehavior,
         defaultMessage: values.defaultMessage ?? '',
       },
+      privacy: {
+        ipLocation: Boolean(values.ipLocation),
+      },
     });
   };
   const saveSocial = async () => {
@@ -265,6 +274,13 @@ export function SettingsPage() {
         enabled: recommendation.enabled,
         explorationRatio: recommendation.explorationRatio,
         cacheSeconds: recommendation.cacheSeconds,
+        tagAffinity: {
+          enabled: Boolean(recommendation.tagEnabled),
+          weight: recommendation.tagWeight,
+          ratio: recommendation.tagRatio,
+          decayPerDay: recommendation.tagDecay,
+          maxTags: recommendation.tagMaxTags,
+        },
         weights: {
           views: recommendation.views,
           likes: recommendation.likes,
@@ -630,6 +646,52 @@ export function SettingsPage() {
                         <Form.Item label={t('缓存秒数')} name="cacheSeconds">
                           <InputNumber min={0} style={{ width: '100%' }} />
                         </Form.Item>
+                        <Divider orientation="left" plain>
+                          {t('标签兴趣推荐')}
+                        </Divider>
+                        <Form.Item
+                          label={t('启用标签兴趣推荐')}
+                          name="tagEnabled"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                        <Row gutter={12}>
+                          <Col span={12}>
+                            <Form.Item label={t('兴趣权重')} name="tagWeight">
+                              <InputNumber min={0} max={10} step={0.1} style={{ width: '100%' }} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item
+                              label={t('兴趣内容占比')}
+                              name="tagRatio"
+                              extra={t('首页推荐中按兴趣标签召回的比例，0 到 0.8。')}
+                            >
+                              <InputNumber
+                                min={0}
+                                max={0.8}
+                                step={0.05}
+                                style={{ width: '100%' }}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item label={t('每日衰减系数')} name="tagDecay">
+                              <InputNumber
+                                min={0.5}
+                                max={1}
+                                step={0.01}
+                                style={{ width: '100%' }}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item label={t('参与推荐的标签数')} name="tagMaxTags">
+                              <InputNumber min={1} max={50} style={{ width: '100%' }} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
                         <Row gutter={12}>
                           {[
                             'views',
@@ -917,6 +979,16 @@ export function SettingsPage() {
                     )}
                   >
                     <Input placeholder="/var/lib/GeoIP/GeoLite2-Country.mmdb" allowClear />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('显示 IP 属地')}
+                    name="ipLocation"
+                    valuePropName="checked"
+                    extra={t(
+                      '开启后在评论、动态和个人空间显示内容发布时的国家/地区，不显示具体 IP，也不影响地区访问控制。',
+                    )}
+                  >
+                    <Switch />
                   </Form.Item>
                   <Divider />
                   <Form.Item
