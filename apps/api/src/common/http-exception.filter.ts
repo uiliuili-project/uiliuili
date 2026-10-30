@@ -56,6 +56,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
         process.env.NODE_ENV === 'production' ? '服务器内部错误' : exception.message || message;
     }
 
+    if (status === 429) {
+      const retryAfter =
+        details && typeof details === 'object'
+          ? (details as Record<string, unknown>).retryAfter
+          : undefined;
+      if (retryAfter !== undefined) {
+        void reply.header('retry-after', String(Math.max(1, Number(retryAfter) || 1)));
+      }
+    }
+
     if (status >= 500) {
       this.logger.error(
         `${request.method} ${request.url} ${status} ${requestId}`,

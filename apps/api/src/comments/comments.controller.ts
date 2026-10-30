@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from '@nestjs/common';
 import {
   type CommentCreateInput,
   commentCreateSchema,
   commentListQuerySchema,
 } from '@uiliuili/shared';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, OptionalAuth, Public } from '../common/decorators';
@@ -37,8 +38,9 @@ export class CommentsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
     @Body(zodBody(commentCreateSchema)) body: CommentCreateInput,
+    @Req() request: FastifyRequest,
   ) {
-    return this.comments.create(id, user, body);
+    return this.comments.create(id, user, body, request.ip);
   }
 
   @Delete(':id/comments/:commentId')

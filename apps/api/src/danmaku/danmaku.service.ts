@@ -6,6 +6,7 @@ import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { CacheService } from '../common/cache.service';
 import { DatabaseService } from '../common/database.service';
+import { RateLimitService } from '../common/rate-limit.service';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
 import { VideosService } from '../videos/videos.service';
@@ -22,6 +23,7 @@ export class DanmakuService {
     private readonly videos: VideosService,
     private readonly storage: StorageService,
     private readonly bus: DanmakuBus,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   async segment(videoId: string, segment: number, viewer?: AuthUser, partId?: string) {
@@ -106,6 +108,7 @@ export class DanmakuService {
     if (blockedWords.some((word) => word && lower.includes(String(word).toLowerCase()))) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '弹幕包含不被允许的内容', 400);
     }
+    await this.rateLimit.check('danmaku', this.rateLimit.contextFrom(user, ip));
 
     const lastKey = `danmaku:last:${user.id}`;
     const last = Number((await this.cache.get(lastKey)) ?? 0);

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import {
   dynamicCreateSchema,
   dynamicListQuerySchema,
@@ -10,6 +10,7 @@ import {
   topicListQuerySchema,
   topicUpdateSchema,
 } from '@uiliuili/shared';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, OptionalAuth, Public, RequirePermissions } from '../common/decorators';
@@ -44,8 +45,9 @@ export class SocialController {
   async createDynamic(
     @CurrentUser() viewer: AuthUser,
     @Body(zodBody(dynamicCreateSchema)) body: z.infer<typeof dynamicCreateSchema>,
+    @Req() request: FastifyRequest,
   ) {
-    return this.social.createDynamic(viewer, body);
+    return this.social.createDynamic(viewer, body, request.ip);
   }
 
   @Delete('dynamics/:id')

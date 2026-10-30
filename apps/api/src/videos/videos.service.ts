@@ -834,7 +834,11 @@ export class VideosService {
   }
 
   async getCategories() {
-    return this.database.db.select().from(categories).orderBy(categories.sort);
+    return this.database.db
+      .select()
+      .from(categories)
+      .where(eq(categories.visible, true))
+      .orderBy(categories.sort);
   }
 
   async enqueueIndex(videoId: string): Promise<void> {

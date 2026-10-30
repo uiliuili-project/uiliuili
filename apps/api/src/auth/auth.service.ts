@@ -67,10 +67,15 @@ export class AuthService {
       email: string;
       password: string;
       claimToken?: string;
+      termsAccepted?: boolean;
     },
     meta: SessionMeta = {},
   ): Promise<IssuedTokens> {
     const site = await this.settings.getSite();
+    const legal = await this.settings.getLegalSettings();
+    if (legal.requireConsent && !input.termsAccepted) {
+      throw new Error('请阅读并同意用户协议和隐私政策');
+    }
     const email = input.email.trim().toLowerCase();
     const username = input.username.trim();
     const social = await this.settings.getSocialSettings();
@@ -130,6 +135,8 @@ export class AuthService {
           coinBalance: Number(social.dailyCoins ?? 2),
           region: meta.region ?? '',
           regionSource: meta.regionSource ?? '',
+          termsAcceptedAt: input.termsAccepted ? new Date() : null,
+          termsVersion: input.termsAccepted ? String(legal.termsVersion ?? '1') : '',
         })
         .returning();
       if (!created) throw new Error('注册失败');

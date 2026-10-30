@@ -27,8 +27,8 @@ import { AppError, ERROR_CODES } from '@uiliuili/shared';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuthUser, RequestWithUser } from '../common/auth-user';
-import { CacheService } from '../common/cache.service';
 import { CurrentUser, Public } from '../common/decorators';
+import { RateLimitService } from '../common/rate-limit.service';
 import { RegionService } from '../common/region.service';
 import { SettingsService } from '../common/settings.service';
 import { zodBody } from '../common/zod';
@@ -45,7 +45,7 @@ export class AuthController {
     private readonly oauth: OAuthService,
     private readonly settings: SettingsService,
     private readonly region: RegionService,
-    private readonly cache: CacheService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   @Public()
@@ -84,10 +84,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const attempts = await this.cache.increment(`register:${request.ip ?? 'unknown'}`, 300);
-    if (attempts > 5) {
-      throw new AppError(ERROR_CODES.RATE_LIMITED, '注册过于频繁，请稍后再试', 429);
-    }
+    await this.rateLimit.check('register', this.rateLimit.contextFrom(null, request.ip));
     try {
       const region = await this.region.resolveForRegistration(request);
       const tokens = await this.auth.register(body, {
@@ -110,12 +107,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const security = await this.settings.getSecuritySettings();
-    const limit = Number(security.loginRateLimit ?? 10);
-    const attempts = await this.cache.increment(`login:${request.ip ?? 'unknown'}`, 60);
-    if (attempts > limit) {
-      throw new AppError(ERROR_CODES.RATE_LIMITED, '登录尝试过于频繁，请稍后再试', 429);
-    }
+    await this.rateLimit.check('login', this.rateLimit.contextFrom(null, request.ip));
     try {
       const tokens = await this.auth.login(body.identifier, body.password, {
         ip: request.ip,
@@ -170,11 +162,9 @@ export class AuthController {
     @CurrentUser() user: AuthUser,
     @Body() body: Buffer,
     @Headers('content-type') contentType: string,
+    @Req() request: FastifyRequest,
   ) {
-    const attempts = await this.cache.increment(`cover:${user.id}`, 3600);
-    if (attempts > 20) {
-      throw new AppError(ERROR_CODES.RATE_LIMITED, '上传过于频繁，请稍后再试', 429);
-    }
+    await this.rateLimit.check('cover', this.rateLimit.contextFrom(user, request.ip));
     const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body ?? []);
     return {
       user: await this.auth.setCover(
@@ -219,7 +209,9 @@ export class AuthController {
   @Post('password/forgot')
   async forgotPassword(
     @Body(zodBody(forgotPasswordSchema)) body: z.infer<typeof forgotPasswordSchema>,
+    @Req() request: FastifyRequest,
   ) {
+    await this.rateLimit.check('forgotPassword', this.rateLimit.contextFrom(null, request.ip));
     await this.auth.requestPasswordReset(body.email);
     return { ok: true, message: '如果该邮箱存在，我们已经发送了重置链接' };
   }

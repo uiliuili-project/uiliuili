@@ -52,7 +52,7 @@ export class SettingsService {
   async getGroup<T extends Record<string, unknown>>(key: string, fallback: T): Promise<T> {
     const stored = await this.get<Partial<T> | null>(key, null);
     if (!stored) return fallback;
-    return { ...fallback, ...stored };
+    return mergeDefaults(fallback, stored);
   }
 
   async set(key: string, value: unknown, isSecret = false): Promise<void> {
@@ -149,6 +149,54 @@ export class SettingsService {
     return this.getGroup('privacy', DEFAULT_SETTINGS.privacy);
   }
 
+  async getBrandingSettings() {
+    return this.getGroup('branding', DEFAULT_SETTINGS.branding);
+  }
+
+  async getNavigationSettings() {
+    return this.getGroup('navigation', DEFAULT_SETTINGS.navigation);
+  }
+
+  async getCustomCodeSettings() {
+    return this.getGroup('customCode', DEFAULT_SETTINGS.customCode);
+  }
+
+  async getAnalyticsSettings() {
+    return this.getGroup('analytics', DEFAULT_SETTINGS.analytics);
+  }
+
+  async getLegalSettings() {
+    return this.getGroup('legal', DEFAULT_SETTINGS.legal);
+  }
+
+  async getCaptchaSettings() {
+    return this.getGroup('captcha', DEFAULT_SETTINGS.captcha);
+  }
+
+  async getCaptchaConfig() {
+    return this.getSecret<{ secretKey: string }>('captcha_config', { secretKey: '' });
+  }
+
+  async getRateLimitSettings() {
+    return this.getGroup('rateLimit', DEFAULT_SETTINGS.rateLimit);
+  }
+
+  async getAiModerationSettings() {
+    return this.getGroup('aiModeration', DEFAULT_SETTINGS.aiModeration);
+  }
+
+  async getAiConfig() {
+    return this.getSecret<{ baseUrl: string; model: string; apiKey: string }>('ai_config', {
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      apiKey: '',
+    });
+  }
+
+  async getReviewSettings() {
+    return this.getGroup('review', DEFAULT_SETTINGS.review);
+  }
+
   async getPublicSettings() {
     const cached = await this.cacheService.get('settings:public');
     if (cached) return JSON.parse(cached) as Record<string, unknown>;
@@ -165,6 +213,12 @@ export class SettingsService {
       restricted,
       search,
       storage,
+      branding,
+      navigation,
+      customCode,
+      analytics,
+      legal,
+      captcha,
     ] = await Promise.all([
       this.getGroup('site', DEFAULT_SETTINGS.site),
       this.getGroup('upload', DEFAULT_SETTINGS.upload),
@@ -178,6 +232,12 @@ export class SettingsService {
       this.getGroup('restricted', DEFAULT_SETTINGS.restricted),
       this.getGroup('search', { driver: 'postgres' }),
       this.getGroup('storage', { driver: 'local' }),
+      this.getGroup('branding', DEFAULT_SETTINGS.branding),
+      this.getGroup('navigation', DEFAULT_SETTINGS.navigation),
+      this.getGroup('customCode', DEFAULT_SETTINGS.customCode),
+      this.getGroup('analytics', DEFAULT_SETTINGS.analytics),
+      this.getGroup('legal', DEFAULT_SETTINGS.legal),
+      this.getGroup('captcha', DEFAULT_SETTINGS.captcha),
     ]);
     const payload = {
       site: {
@@ -212,8 +272,20 @@ export class SettingsService {
         defaultBehavior: restricted.defaultBehavior,
         defaultMessage: restricted.defaultMessage,
       },
-      search,
-      storage,
+      /** Only non-sensitive hints; credentials never leave the admin API. */
+      search: { driver: String(search.driver ?? 'postgres') },
+      storage: { driver: String(storage.driver ?? 'local') },
+      branding,
+      navigation,
+      customCode,
+      analytics,
+      legal,
+      captcha: {
+        enabled: Boolean(captcha.enabled && captcha.siteKey),
+        provider: captcha.provider,
+        siteKey: captcha.siteKey,
+        minScore: captcha.minScore,
+      },
     };
     await this.cacheService.set('settings:public', JSON.stringify(payload), 60);
     return payload;
@@ -260,4 +332,23 @@ export class SettingsService {
   invalidate(): void {
     this.cache.clear();
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Stored settings are partial by nature: new fields are added over time and
+ * old rows do not contain them. Merging nested objects keeps the defaults for
+ * every missing key instead of dropping a whole nested group.
+ */
+function mergeDefaults<T extends Record<string, unknown>>(fallback: T, stored: Partial<T>): T {
+  const merged: Record<string, unknown> = { ...fallback };
+  for (const [key, value] of Object.entries(stored)) {
+    if (value === undefined) continue;
+    const base = merged[key];
+    merged[key] = isPlainObject(base) && isPlainObject(value) ? mergeDefaults(base, value) : value;
+  }
+  return merged as T;
 }

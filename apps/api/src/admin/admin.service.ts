@@ -1,7 +1,12 @@
+import { execFile } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  aiModerationLogs,
   announcements,
   appInstance,
   auditLogs,
@@ -10,24 +15,33 @@ import {
   comments,
   danmaku,
   notifications,
+  readMigrations,
   reports,
+  runMigrations,
   siteSettings,
   tags,
   users,
   videoTags,
   videos,
 } from '@uiliuili/db';
+import { runtimeRoot } from '@uiliuili/installer';
 import { checkFfmpeg } from '@uiliuili/media';
 import {
+  APP_VERSION,
   AppError,
+  DEFAULT_SETTINGS,
   ERROR_CODES,
   type Permission,
+  SETTINGS_GROUP_SCHEMAS,
   type UserRole,
+  aiConfigSchema,
   announcementCreateSchema,
+  captchaConfigSchema,
   categoryCreateSchema,
   categoryUpdateSchema,
   mailConfigSchema,
   normalizeRegionList,
+  sanitizeRichHtml,
   searchConfigSchema,
   storageConfigSchema,
   userGroupForRoles,
@@ -42,6 +56,11 @@ import { DatabaseService } from '../common/database.service';
 import { QueueService } from '../common/queue.service';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
+import { config } from '../config';
+import { AiModerationService } from '../moderation/ai-moderation.service';
+
+const execFileAsync = promisify(execFile);
+const BACKUP_KEEP = 5;
 
 type StorageConfig = z.infer<typeof storageConfigSchema>;
 type SearchConfig = z.infer<typeof searchConfigSchema>;
@@ -57,6 +76,7 @@ export class AdminService {
     private readonly queue: QueueService,
     private readonly audit: AuditService,
     private readonly cache: CacheService,
+    private readonly moderation: AiModerationService,
   ) {}
 
   async dashboard() {
@@ -550,10 +570,24 @@ export class AdminService {
     };
     const status = statusMap[action];
     if (!status) throw new AppError(ERROR_CODES.BAD_REQUEST, '不支持的操作', 400);
+    const rows = await this.database.db.select().from(comments).where(eq(comments.id, id)).limit(1);
+    const existing = rows[0];
+    if (!existing) throw new AppError(ERROR_CODES.NOT_FOUND, '评论不存在', 404);
     await this.database.db
       .update(comments)
       .set({ status, updatedAt: new Date(), deletedAt: status === 'deleted' ? new Date() : null })
       .where(eq(comments.id, id));
+    if (existing.status !== 'visible' && status === 'visible') {
+      await this.database.db
+        .update(videos)
+        .set({ commentCount: sql`${videos.commentCount} + 1` })
+        .where(eq(videos.id, existing.videoId));
+    } else if (existing.status === 'visible' && status !== 'visible') {
+      await this.database.db
+        .update(videos)
+        .set({ commentCount: sql`GREATEST(0, ${videos.commentCount} - 1)` })
+        .where(eq(videos.id, existing.videoId));
+    }
     await this.audit.record({
       actorId,
       action: `admin.comment.${action}`,
@@ -562,6 +596,58 @@ export class AdminService {
       after: { status },
     });
     return { ok: true, status };
+  }
+
+  async listModerationLogs(query: {
+    page: number;
+    limit: number;
+    decision?: string;
+    targetType?: string;
+  }) {
+    const conditions = [];
+    if (query.decision) conditions.push(eq(aiModerationLogs.decision, query.decision));
+    if (query.targetType) conditions.push(eq(aiModerationLogs.targetType, query.targetType));
+    const where = conditions.length ? and(...conditions) : undefined;
+    const offset = (query.page - 1) * query.limit;
+    const [rows, total] = await Promise.all([
+      this.database.db
+        .select({
+          id: aiModerationLogs.id,
+          targetType: aiModerationLogs.targetType,
+          targetId: aiModerationLogs.targetId,
+          excerpt: aiModerationLogs.excerpt,
+          allowed: aiModerationLogs.allowed,
+          decision: aiModerationLogs.decision,
+          reason: aiModerationLogs.reason,
+          categories: aiModerationLogs.categories,
+          model: aiModerationLogs.model,
+          latencyMs: aiModerationLogs.latencyMs,
+          cached: aiModerationLogs.cached,
+          error: aiModerationLogs.error,
+          createdAt: aiModerationLogs.createdAt,
+          username: users.username,
+        })
+        .from(aiModerationLogs)
+        .leftJoin(users, eq(users.id, aiModerationLogs.userId))
+        .where(where)
+        .orderBy(desc(aiModerationLogs.createdAt))
+        .limit(query.limit)
+        .offset(offset),
+      this.database.db.select({ value: count() }).from(aiModerationLogs).where(where),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total: Number(total[0]?.value ?? 0),
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  async testModeration(content: string) {
+    return this.moderation.test(content);
   }
 
   async listReports(query: {
@@ -694,6 +780,13 @@ export class AdminService {
   }
 
   async deleteCategory(actorId: string, id: string) {
+    const [used] = await this.database.db
+      .select({ value: count() })
+      .from(videos)
+      .where(eq(videos.categoryId, id));
+    if (Number(used?.value ?? 0) > 0) {
+      throw new AppError(ERROR_CODES.CONFLICT, '该分区下仍有视频，请先把视频迁移到其他分区', 409);
+    }
     await this.database.db.delete(categories).where(eq(categories.id, id));
     await this.audit.record({
       actorId,
@@ -824,6 +917,10 @@ export class AdminService {
       if (securityFields.length > 0) this.assertPermission(actor, 'settings:security');
       return;
     }
+    if (['branding', 'navigation', 'customCode', 'analytics', 'legal'].includes(key)) {
+      this.assertPermission(actor, 'settings:site');
+      return;
+    }
     if (
       [
         'upload',
@@ -834,16 +931,28 @@ export class AdminService {
         'region',
         'restricted',
         'privacy',
+        'rateLimit',
+        'review',
       ].includes(key)
     ) {
       this.assertPermission(actor, 'settings:content');
       return;
     }
-    if (['storage_config', 'search_config', 'redis_config', 'mail_config', 'mail'].includes(key)) {
+    if (
+      [
+        'storage_config',
+        'search_config',
+        'redis_config',
+        'mail_config',
+        'mail',
+        'aiModeration',
+        'ai_config',
+      ].includes(key)
+    ) {
       this.assertPermission(actor, 'settings:integration');
       return;
     }
-    if (key === 'security') {
+    if (['security', 'captcha', 'captcha_config'].includes(key)) {
       this.assertPermission(actor, 'settings:security');
     }
   }
@@ -856,6 +965,9 @@ export class AdminService {
     ) {
       groupKeys.push('site');
     }
+    if (this.hasPermission(actor, 'settings:site')) {
+      groupKeys.push('branding', 'navigation', 'customCode', 'analytics', 'legal');
+    }
     if (this.hasPermission(actor, 'settings:content')) {
       groupKeys.push(
         'upload',
@@ -866,19 +978,17 @@ export class AdminService {
         'region',
         'restricted',
         'privacy',
+        'rateLimit',
+        'review',
       );
     }
-    if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail');
-    if (this.hasPermission(actor, 'settings:security')) groupKeys.push('security');
+    if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail', 'aiModeration');
+    if (this.hasPermission(actor, 'settings:security')) groupKeys.push('security', 'captcha');
 
     const groups = await Promise.all(
       groupKeys.map(async (key) => {
-        const rows = await this.database.db
-          .select()
-          .from(siteSettings)
-          .where(eq(siteSettings.key, key))
-          .limit(1);
-        return [key, (rows[0]?.value ?? {}) as Record<string, unknown>] as const;
+        const defaults = (DEFAULT_SETTINGS as Record<string, Record<string, unknown>>)[key] ?? {};
+        return [key, await this.settings.getGroup(key, defaults)] as const;
       }),
     );
 
@@ -890,14 +1000,20 @@ export class AdminService {
         search: null,
         redis: null,
         oauth: [],
+        aiConfig: null,
+        captchaConfig: this.hasPermission(actor, 'settings:security')
+          ? { secretKey: '********' }
+          : null,
       };
     }
 
-    const [storage, mail, search, redis] = await Promise.all([
+    const [storage, mail, search, redis, aiConfig, captchaConfig] = await Promise.all([
       this.settings.getStorageConfig(),
       this.settings.getSecret<Record<string, unknown> | null>('mail_config', null),
       this.settings.getSearchConfig(),
       this.settings.getRedisConfig(),
+      this.settings.getAiConfig(),
+      this.settings.getCaptchaConfig(),
     ]);
     const providers = [];
     for (const provider of ['github', 'google', 'oidc']) {
@@ -924,6 +1040,12 @@ export class AdminService {
         search.driver === 'meilisearch' ? { ...search, key: search.key ? '********' : '' } : search,
       redis: redis ? { url: maskRedisUrl(redis.url) } : null,
       oauth: providers,
+      aiConfig: {
+        baseUrl: aiConfig.baseUrl,
+        model: aiConfig.model,
+        apiKey: aiConfig.apiKey ? '********' : '',
+      },
+      captchaConfig: { secretKey: captchaConfig.secretKey ? '********' : '' },
     };
   }
 
@@ -995,6 +1117,30 @@ export class AdminService {
         const hasRedis = Boolean(merged && (merged as { url?: string }).url);
         await this.settings.set(key, hasRedis ? merged : null, true);
         await this.settings.set('cache', { driver: hasRedis ? 'redis' : 'memory' }, false);
+      } else if (key === 'captcha_config') {
+        const existing = await this.settings.getCaptchaConfig();
+        const parsed = captchaConfigSchema.parse(mergeMasked(value, existing));
+        await this.settings.set(key, parsed, true);
+      } else if (key === 'ai_config') {
+        const existing = await this.settings.getAiConfig();
+        const parsed = aiConfigSchema.parse(mergeMasked(value, existing));
+        await this.settings.set(key, parsed, true);
+      } else if (key in SETTINGS_GROUP_SCHEMAS) {
+        const schema = SETTINGS_GROUP_SCHEMAS[key as keyof typeof SETTINGS_GROUP_SCHEMAS];
+        const existing = await this.settings.getGroup<Record<string, unknown>>(key, {});
+        const merged = mergeMasked(value, existing);
+        const parsed = schema.parse(merged) as Record<string, unknown>;
+        if (key === 'legal') {
+          parsed.termsHtml = sanitizeRichHtml(String(parsed.termsHtml ?? ''));
+          parsed.privacyHtml = sanitizeRichHtml(String(parsed.privacyHtml ?? ''));
+          const previousTerms = String(existing.termsHtml ?? '');
+          const previousPrivacy = String(existing.privacyHtml ?? '');
+          if (previousTerms !== parsed.termsHtml || previousPrivacy !== parsed.privacyHtml) {
+            const current = Number.parseInt(String(parsed.termsVersion ?? '1'), 10);
+            parsed.termsVersion = String(Number.isFinite(current) ? current + 1 : 2);
+          }
+        }
+        await this.settings.set(key, parsed, false);
       } else if (
         [
           'site',
@@ -1137,18 +1283,207 @@ export class AdminService {
       const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
         headers: { 'User-Agent': 'uiliuili', Accept: 'application/vnd.github+json' },
       });
-      if (!response.ok) return { available: false, current: '0.1.0', latest: null };
+      if (!response.ok) return { available: false, current: APP_VERSION, latest: null };
       const data = (await response.json()) as { tag_name?: string; html_url?: string };
       const latest = (data.tag_name ?? '').replace(/^v/, '');
       return {
-        available: Boolean(latest && latest !== '0.1.0'),
-        current: '0.1.0',
+        available: Boolean(latest && latest !== APP_VERSION),
+        current: APP_VERSION,
         latest,
         url: data.html_url,
       };
     } catch {
-      return { available: false, current: '0.1.0', latest: null };
+      return { available: false, current: APP_VERSION, latest: null };
     }
+  }
+
+  /** Reports applied and pending migrations plus the last database backups. */
+  async upgradeStatus() {
+    const [instance, appliedRows] = await Promise.all([
+      this.database.db.select().from(appInstance).limit(1),
+      this.database.db.execute<{ name: string }>(
+        sql`SELECT name FROM "uiliuili"."schema_migrations" ORDER BY name`,
+      ),
+    ]);
+    const applied = new Set(appliedRows.map((row) => row.name));
+    const all = readMigrations();
+    const pending = all.filter((migration) => !applied.has(migration.name)).map((m) => m.name);
+    const site = await this.settings.getSite();
+    return {
+      currentVersion: instance[0]?.version ?? '0.1.0',
+      appVersion: APP_VERSION,
+      maintenance: Boolean(site.maintenance),
+      pending,
+      appliedCount: applied.size,
+      totalCount: all.length,
+      backups: await this.listBackups(),
+      restartConfigured: Boolean(process.env.UPGRADE_RESTART_CMD?.trim()),
+    };
+  }
+
+  private backupDirectory(): string {
+    return path.join(runtimeRoot(), 'storage', 'backups');
+  }
+
+  private async listBackups(): Promise<Array<{ name: string; bytes: number; createdAt: string }>> {
+    const directory = this.backupDirectory();
+    try {
+      const entries = await fs.promises.readdir(directory);
+      const backups = await Promise.all(
+        entries
+          .filter((name) => name.endsWith('.dump'))
+          .map(async (name) => {
+            const stat = await fs.promises.stat(path.join(directory, name));
+            return {
+              name,
+              bytes: stat.size,
+              createdAt: stat.mtime.toISOString(),
+            };
+          }),
+      );
+      return backups.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    } catch {
+      return [];
+    }
+  }
+
+  async createBackup(actorId: string) {
+    if (!config.databaseUrl) {
+      throw new AppError(ERROR_CODES.INTERNAL_ERROR, '未配置数据库连接，无法备份', 500);
+    }
+    const directory = this.backupDirectory();
+    await fs.promises.mkdir(directory, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const dumpName = `db-${stamp}.dump`;
+    const dumpPath = path.join(directory, dumpName);
+    try {
+      await execFileAsync(
+        'pg_dump',
+        ['--no-owner', '--format=custom', '--file', dumpPath, config.databaseUrl],
+        { maxBuffer: 8 * 1024 * 1024 },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`pg_dump failed: ${message}`);
+      throw new AppError(
+        ERROR_CODES.INTERNAL_ERROR,
+        '数据库备份失败：服务器缺少 pg_dump 或数据库不可访问。Docker 镜像需安装 postgresql-client。',
+        500,
+        { message: message.slice(0, 500) },
+      );
+    }
+    const stateDirectory = runtimeRoot();
+    for (const [source, name] of [
+      [path.join(stateDirectory, '.env'), `env-${stamp}.txt`],
+      [path.join(stateDirectory, 'config', 'instance.json'), `instance-${stamp}.json`],
+    ] as const) {
+      try {
+        await fs.promises.copyFile(source, path.join(directory, name));
+      } catch {
+        // The backup still contains the database when optional state files are absent.
+      }
+    }
+    await this.pruneBackups();
+    await this.audit.record({
+      actorId,
+      action: 'admin.system.backup',
+      targetType: 'system',
+      targetId: dumpName,
+      after: { dumpName },
+    });
+    return { ok: true, name: dumpName, backups: await this.listBackups() };
+  }
+
+  private async pruneBackups(): Promise<void> {
+    const directory = this.backupDirectory();
+    let dumps: string[] = [];
+    try {
+      const entries = await fs.promises.readdir(directory);
+      dumps = entries
+        .filter((name) => name.endsWith('.dump'))
+        .sort()
+        .reverse();
+    } catch {
+      return;
+    }
+    const stale = dumps.slice(BACKUP_KEEP);
+    for (const name of stale) {
+      const stamp = name.replace(/^db-/, '').replace(/\.dump$/, '');
+      await Promise.all(
+        [`db-${stamp}.dump`, `env-${stamp}.txt`, `instance-${stamp}.json`].map((file) =>
+          fs.promises.rm(path.join(directory, file), { force: true }).catch(() => undefined),
+        ),
+      );
+    }
+  }
+
+  async applyUpgrade(actorId: string, confirm: string, backup = true) {
+    if (confirm.trim() !== APP_VERSION) {
+      throw new AppError(
+        ERROR_CODES.BAD_REQUEST,
+        `请准确输入当前版本号 ${APP_VERSION} 以确认升级`,
+        400,
+      );
+    }
+    if (!config.databaseUrl) {
+      throw new AppError(ERROR_CODES.INTERNAL_ERROR, '未配置数据库连接，无法执行迁移', 500);
+    }
+    if (backup) await this.createBackup(actorId);
+    const site = (await this.settings.getSite()) as Record<string, unknown>;
+    await this.settings.set('site', { ...site, maintenance: true }, false);
+    let applied: string[] = [];
+    try {
+      applied = await runMigrations(config.databaseUrl);
+      await this.database.db
+        .update(appInstance)
+        .set({ version: APP_VERSION, updatedAt: new Date() })
+        .where(ne(appInstance.id, '00000000-0000-0000-0000-000000000000'));
+    } catch (error) {
+      await this.settings.set('site', { ...site, maintenance: false }, false);
+      throw new AppError(
+        ERROR_CODES.UPGRADE_REQUIRED,
+        error instanceof Error ? `数据库迁移失败：${error.message}` : '数据库迁移失败',
+        500,
+      );
+    }
+    await this.settings.set('site', { ...site, maintenance: false }, false);
+    const restartCommand = process.env.UPGRADE_RESTART_CMD?.trim() ?? '';
+    let restartTriggered = false;
+    if (restartCommand) {
+      try {
+        await execFileAsync('sh', ['-c', restartCommand], { timeout: 30_000 });
+        restartTriggered = true;
+      } catch (error) {
+        this.logger.warn(`UPGRADE_RESTART_CMD failed: ${String(error)}`);
+      }
+    }
+    await this.audit.record({
+      actorId,
+      action: 'admin.system.upgrade',
+      targetType: 'system',
+      targetId: APP_VERSION,
+      after: { applied, restartTriggered },
+    });
+    return {
+      ok: true,
+      applied,
+      version: APP_VERSION,
+      restartRequired: true,
+      restartTriggered,
+    };
+  }
+
+  async setMaintenance(actorId: string, enabled: boolean) {
+    const site = (await this.settings.getSite()) as Record<string, unknown>;
+    await this.settings.set('site', { ...site, maintenance: enabled }, false);
+    await this.audit.record({
+      actorId,
+      action: 'admin.system.maintenance',
+      targetType: 'system',
+      targetId: enabled ? 'on' : 'off',
+      after: { enabled },
+    });
+    return { ok: true, maintenance: enabled };
   }
 
   async listJobs(query: { page: number; limit: number; status?: string; queue?: string }) {

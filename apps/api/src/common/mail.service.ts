@@ -40,7 +40,7 @@ export class MailService {
     const url = `${site.url}/verify-email?token=${encodeURIComponent(token)}`;
     return this.send(
       to,
-      '验证你的 uiliuili 邮箱',
+      `${site.name} 邮箱验证`,
       `请打开以下链接完成邮箱验证：\n${url}\n\n如果不是你本人操作，请忽略这封邮件。`,
     );
   }
@@ -50,7 +50,7 @@ export class MailService {
     const url = `${site.url}/reset-password?token=${encodeURIComponent(token)}`;
     return this.send(
       to,
-      '重置你的 uiliuili 密码',
+      `${site.name} 密码重置`,
       `请打开以下链接重置密码：\n${url}\n\n链接将在 1 小时后过期。`,
     );
   }

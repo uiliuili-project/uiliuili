@@ -38,6 +38,17 @@ const auditQuerySchema = z.object({
   q: z.string().max(100).optional(),
 });
 
+const moderationLogQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  decision: z.enum(['allow', 'reject', 'pending', 'flag']).optional(),
+  targetType: z.enum(['comment', 'dynamic']).optional(),
+});
+
+const moderationTestSchema = z.object({
+  content: z.string().min(1).max(10_000),
+});
+
 const oauthSchema = z.object({
   enabled: z.boolean().default(false),
   clientId: z.string().default(''),
@@ -133,6 +144,22 @@ export class AdminController {
     @Body(zodBody(moderationActionSchema)) body: z.infer<typeof moderationActionSchema>,
   ) {
     return this.admin.moderateComment(actor.id, id, body.action);
+  }
+
+  @Get('moderation/logs')
+  @RequirePermissions('comment:manage')
+  async moderationLogs(
+    @Query(zodQuery(moderationLogQuerySchema)) query: z.infer<typeof moderationLogQuerySchema>,
+  ) {
+    return this.admin.listModerationLogs(query);
+  }
+
+  @Post('moderation/test')
+  @RequirePermissions('settings:integration')
+  async testModeration(
+    @Body(zodBody(moderationTestSchema)) body: z.infer<typeof moderationTestSchema>,
+  ) {
+    return this.admin.testModeration(body.content);
   }
 
   @Get('reports')
@@ -250,6 +277,33 @@ export class AdminController {
   @RequirePermissions('system:view')
   async checkUpdate() {
     return this.admin.checkUpdate();
+  }
+
+  @Get('system/upgrade')
+  @RequirePermissions('system:view')
+  async upgradeStatus() {
+    return this.admin.upgradeStatus();
+  }
+
+  @Post('system/upgrade/backup')
+  @RequirePermissions('system:update')
+  async createBackup(@CurrentUser() actor: AuthUser) {
+    return this.admin.createBackup(actor.id);
+  }
+
+  @Post('system/upgrade')
+  @RequirePermissions('system:update')
+  async applyUpgrade(
+    @CurrentUser() actor: AuthUser,
+    @Body() body: { confirm?: string; backup?: boolean },
+  ) {
+    return this.admin.applyUpgrade(actor.id, String(body.confirm ?? ''), body.backup !== false);
+  }
+
+  @Post('system/maintenance')
+  @RequirePermissions('system:update')
+  async setMaintenance(@CurrentUser() actor: AuthUser, @Body() body: { enabled?: boolean }) {
+    return this.admin.setMaintenance(actor.id, Boolean(body.enabled));
   }
 
   @Get('jobs')

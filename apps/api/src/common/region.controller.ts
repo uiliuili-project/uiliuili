@@ -21,6 +21,7 @@ export class RegionController {
   context(@CurrentUser() user?: AuthUser) {
     const context = currentRegionContext();
     const option = regionOption(context.code);
+    const networkOption = regionOption(context.networkCode);
     const unrestricted = Boolean(context.code) && !context.blockedRegions.includes(context.code);
     return {
       region: {
@@ -28,6 +29,15 @@ export class RegionController {
         name: option?.name ?? context.code,
         nameEn: option?.nameEn ?? context.code,
       },
+      /** Network country used for the optional badge beside the logo. */
+      network: context.networkCode
+        ? {
+            code: context.networkCode,
+            name: networkOption?.name ?? context.networkCode,
+            nameEn: networkOption?.nameEn ?? context.networkCode,
+            source: context.networkSource,
+          }
+        : null,
       source: context.source,
       unrestricted,
       showRestricted: context.showRestricted,

@@ -9,11 +9,14 @@ import {
   videos,
 } from '@uiliuili/db';
 import { AppError, type CommentCreateInput, type CommentItem, ERROR_CODES } from '@uiliuili/shared';
-import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { grantExperience } from '../common/experience';
+import { RateLimitService } from '../common/rate-limit.service';
 import { currentRegionContext } from '../common/region-context';
+import { SettingsService } from '../common/settings.service';
+import { AiModerationService } from '../moderation/ai-moderation.service';
 import { decodeCursor, encodeCursor, publicUser } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -24,6 +27,9 @@ export class CommentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly videos: VideosService,
+    private readonly settings: SettingsService,
+    private readonly rateLimit: RateLimitService,
+    private readonly moderation: AiModerationService,
   ) {}
 
   async list(
@@ -42,7 +48,12 @@ export class CommentsService {
         and(
           eq(comments.videoId, videoId),
           isNull(comments.parentId),
-          eq(comments.status, 'visible'),
+          viewer
+            ? or(
+                eq(comments.status, 'visible'),
+                and(eq(comments.status, 'pending'), eq(comments.userId, viewer.id)),
+              )
+            : eq(comments.status, 'visible'),
         ),
       )
       .orderBy(
@@ -60,7 +71,17 @@ export class CommentsService {
             .select({ comment: comments, user: users })
             .from(comments)
             .innerJoin(users, eq(users.id, comments.userId))
-            .where(and(eq(comments.status, 'visible'), inArray(comments.parentId, ids)))
+            .where(
+              and(
+                viewer
+                  ? or(
+                      eq(comments.status, 'visible'),
+                      and(eq(comments.status, 'pending'), eq(comments.userId, viewer.id)),
+                    )
+                  : eq(comments.status, 'visible'),
+                inArray(comments.parentId, ids),
+              ),
+            )
             .orderBy(asc(comments.createdAt))
             .limit(500)
         : Promise.resolve([]),
@@ -128,7 +149,12 @@ export class CommentsService {
         and(
           eq(comments.videoId, videoId),
           eq(comments.parentId, commentId),
-          eq(comments.status, 'visible'),
+          viewer
+            ? or(
+                eq(comments.status, 'visible'),
+                and(eq(comments.status, 'pending'), eq(comments.userId, viewer.id)),
+              )
+            : eq(comments.status, 'visible'),
         ),
       )
       .orderBy(asc(comments.createdAt))
@@ -165,7 +191,7 @@ export class CommentsService {
     };
   }
 
-  async create(videoId: string, viewer: AuthUser, input: CommentCreateInput) {
+  async create(videoId: string, viewer: AuthUser, input: CommentCreateInput, ip?: string) {
     const row = await this.videos.getRow(videoId);
     this.videos.assertCanView(row.video, viewer);
     if (row.video.status !== 'published') {
@@ -173,6 +199,28 @@ export class CommentsService {
     }
     const content = input.content.split('\u0000').join('').trim();
     if (!content) throw new AppError(ERROR_CODES.BAD_REQUEST, '评论不能为空', 400);
+    await this.rateLimit.check('comment', this.rateLimit.contextFrom(viewer, ip));
+    const [review, verdict] = await Promise.all([
+      this.settings.getReviewSettings(),
+      this.moderation.moderate('comment', content.slice(0, 1000), { userId: viewer.id }),
+    ]);
+    if (verdict.decision === 'reject') {
+      throw new AppError(
+        ERROR_CODES.AI_MODERATION_BLOCKED,
+        '评论包含不被允许的内容，请修改后再试',
+        400,
+        { categories: verdict.categories },
+      );
+    }
+    const pending = Boolean(review.comments) || verdict.decision === 'pending';
+    const moderationRecord = {
+      source: 'ai',
+      decision: verdict.decision,
+      reason: verdict.reason,
+      categories: verdict.categories,
+      model: verdict.model,
+      at: new Date().toISOString(),
+    };
     let parentUserId: string | null = null;
     if (input.parentId) {
       const parentRows = await this.database.db
@@ -195,9 +243,20 @@ export class CommentsService {
         parentId: input.parentId ?? null,
         content: content.slice(0, 1000),
         ipRegion: region.ipLocationEnabled ? region.networkCode || null : null,
+        status: pending ? 'pending' : 'visible',
+        moderation: moderationRecord,
       })
       .returning();
     if (!created) throw new AppError(ERROR_CODES.INTERNAL_ERROR, '发布评论失败', 500);
+    if (pending) {
+      const userRows = await this.database.db
+        .select()
+        .from(users)
+        .where(eq(users.id, viewer.id))
+        .limit(1);
+      if (!userRows[0]) throw new AppError(ERROR_CODES.NOT_FOUND, '用户不存在', 404);
+      return this.toItem(created, userRows[0], row.video.uploaderId, [], false, 0);
+    }
     await this.database.db
       .update(videos)
       .set({ commentCount: sql`${videos.commentCount} + 1` })
@@ -387,6 +446,11 @@ export class CommentsService {
       upLiked: comment.upLiked,
       isUploader: comment.userId === uploaderId,
       ipRegion: currentRegionContext().ipLocationEnabled ? comment.ipRegion : null,
+      status: comment.status,
+      moderationReason:
+        comment.moderation && typeof comment.moderation.reason === 'string'
+          ? comment.moderation.reason
+          : null,
       user: publicUser(user),
       replies,
       replyCount,

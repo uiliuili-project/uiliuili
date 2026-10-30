@@ -9,6 +9,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import {
   presignPartsSchema,
@@ -20,6 +21,7 @@ import {
   videoPartUpdateSchema,
   videoUpdateSchema,
 } from '@uiliuili/shared';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
@@ -65,8 +67,9 @@ export class StudioController {
   async create(
     @CurrentUser() user: AuthUser,
     @Body(zodBody(videoCreateSchema)) body: z.infer<typeof videoCreateSchema>,
+    @Req() request: FastifyRequest,
   ) {
-    return this.studio.create(user.id, body);
+    return this.studio.create(user.id, body, request.ip);
   }
 
   @Get('videos/:id')

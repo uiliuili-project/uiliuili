@@ -25,6 +25,7 @@ import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { QueueService } from '../common/queue.service';
+import { RateLimitService } from '../common/rate-limit.service';
 import { currentRegionContext } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
@@ -37,6 +38,7 @@ export class StudioService {
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly queue: QueueService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   async list(userId: string, page = 1, limit = 20) {
@@ -83,7 +85,12 @@ export class StudioService {
     };
   }
 
-  async create(userId: string, input: VideoCreateInput) {
+  async create(userId: string, input: VideoCreateInput, ip?: string) {
+    await this.rateLimit.check('upload', {
+      userId,
+      ip,
+      staff: false,
+    });
     await this.validateCategory(input.categoryId);
     const policy = await this.regionPolicy(input);
     const [created] = await this.database.db

@@ -27,6 +27,10 @@ export async function runCleanup(db: Db): Promise<void> {
     WHERE created_at < now() - interval '30 days'
   `);
   await db.execute(sql`
+    DELETE FROM "uiliuili"."ai_moderation_logs"
+    WHERE created_at < now() - interval '90 days'
+  `);
+  await db.execute(sql`
     DELETE FROM "uiliuili"."background_jobs"
     WHERE status IN ('completed', 'cancelled') AND updated_at < now() - interval '7 days'
   `);

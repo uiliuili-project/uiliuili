@@ -28,7 +28,10 @@ import {
 import { and, count, desc, eq, gte, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { RateLimitService } from '../common/rate-limit.service';
 import { currentRegionContext, videoRegionCondition } from '../common/region-context';
+import { SettingsService } from '../common/settings.service';
+import { AiModerationService } from '../moderation/ai-moderation.service';
 import { decodeCursor, encodeCursor, publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -37,6 +40,9 @@ export class SocialService {
   constructor(
     private readonly database: DatabaseService,
     private readonly videos: VideosService,
+    private readonly settings: SettingsService,
+    private readonly rateLimit: RateLimitService,
+    private readonly moderation: AiModerationService,
   ) {}
 
   async dynamicList(
@@ -50,7 +56,7 @@ export class SocialService {
     },
   ) {
     const offset = decodeCursor(query.cursor);
-    const conditions = [eq(dynamics.visibility, 'public')];
+    const conditions = [eq(dynamics.visibility, 'public'), eq(dynamics.status, 'visible')];
     if (query.feed === 'following') {
       if (!viewer) return { items: [], nextCursor: null };
       const followingRows = await this.database.db
@@ -71,6 +77,12 @@ export class SocialService {
         .limit(1);
       if (!owner[0]) return { items: [], nextCursor: null };
       if (viewer?.id !== owner[0].id) conditions.push(eq(dynamics.visibility, 'public'));
+      else {
+        conditions[1] = or(
+          eq(dynamics.status, 'visible'),
+          and(eq(dynamics.status, 'pending'), eq(dynamics.userId, owner[0].id)),
+        ) as (typeof conditions)[number];
+      }
       conditions.push(eq(dynamics.userId, owner[0].id));
     }
     if (query.feed === 'topic') {
@@ -117,6 +129,7 @@ export class SocialService {
     const offset = decodeCursor(query.cursor);
     const conditions = [
       eq(dynamics.visibility, 'public'),
+      eq(dynamics.status, 'visible'),
       eq(users.banned, false),
       sql`jsonb_array_length(${dynamics.images}) > 0`,
     ];
@@ -173,7 +186,23 @@ export class SocialService {
       topicId?: string;
       visibility: string;
     },
+    ip?: string,
   ) {
+    await this.rateLimit.check('dynamic', this.rateLimit.contextFrom(viewer, ip));
+    const content = input.content.trim().slice(0, 2000);
+    const [review, verdict] = await Promise.all([
+      this.settings.getReviewSettings(),
+      this.moderation.moderate('dynamic', content, { userId: viewer.id }),
+    ]);
+    if (verdict.decision === 'reject') {
+      throw new AppError(
+        ERROR_CODES.AI_MODERATION_BLOCKED,
+        '动态包含不被允许的内容，请修改后再试',
+        400,
+        { categories: verdict.categories },
+      );
+    }
+    const pending = Boolean(review.dynamics) || verdict.decision === 'pending';
     if (input.videoId) {
       const row = await this.videos.getRow(input.videoId);
       this.videos.assertCanView(row.video, viewer);
@@ -190,7 +219,7 @@ export class SocialService {
       .insert(dynamics)
       .values({
         userId: viewer.id,
-        content: input.content.trim().slice(0, 2000),
+        content,
         images: input.images.slice(0, 9),
         ipRegion: currentRegionContext().ipLocationEnabled
           ? currentRegionContext().networkCode || null
@@ -198,6 +227,15 @@ export class SocialService {
         videoId: input.videoId ?? null,
         topicId: input.topicId ?? null,
         visibility: input.visibility,
+        status: pending ? 'pending' : 'visible',
+        moderation: {
+          source: 'ai',
+          decision: verdict.decision,
+          reason: verdict.reason,
+          categories: verdict.categories,
+          model: verdict.model,
+          at: new Date().toISOString(),
+        },
       })
       .returning();
     if (!created) throw new AppError(ERROR_CODES.INTERNAL_ERROR, '发布动态失败', 500);
@@ -665,6 +703,11 @@ export class SocialService {
       likeCount: dynamic.likeCount,
       liked,
       ipRegion: currentRegionContext().ipLocationEnabled ? dynamic.ipRegion : null,
+      status: dynamic.status,
+      moderationReason:
+        dynamic.moderation && typeof dynamic.moderation.reason === 'string'
+          ? dynamic.moderation.reason
+          : null,
       user: publicUser(user),
       video,
       topic: topic ? this.toTopic(topic) : null,
