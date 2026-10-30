@@ -43,7 +43,7 @@ describe('buildInstallConfigFromEnv', () => {
 
   it('does not require administrator credentials', () => {
     const config = buildInstallConfigFromEnv(baseEnv);
-    expect(config.site.name).toBe('uiliuili');
+    expect(config.site.name).toBe('萌悠');
     expect('admin' in config).toBe(false);
   });
 

@@ -1,6 +1,6 @@
 export const zhCN = {
   common: {
-    appName: 'uiliuili',
+    appName: '萌悠',
     loading: '加载中…',
     retry: '重试',
     save: '保存',
@@ -61,7 +61,7 @@ export const zhCN = {
     review: '审核中心',
   },
   auth: {
-    loginTitle: '登录 uiliuili',
+    loginTitle: '登录萌悠',
     registerTitle: '创建账号',
     identifier: '用户名或邮箱',
     username: '用户名',
@@ -200,8 +200,8 @@ export const zhCN = {
     system: '跟随系统',
   },
   install: {
-    title: '安装 uiliuili',
-    welcome: '欢迎使用 uiliuili',
+    title: '安装萌悠',
+    welcome: '欢迎使用萌悠',
     welcomeText: '这是一个开源、自托管的弹幕视频平台。跟随几步即可完成配置。',
     start: '开始安装',
     environment: '环境检查',
@@ -248,9 +248,9 @@ export const zhCN = {
     insecure: '当前通过非 HTTPS 访问安装器，生产环境请启用 HTTPS。',
   },
   about: {
-    title: '关于 uiliuili',
+    title: '关于萌悠',
     intro:
-      'uiliuili 是一个开源、自托管的弹幕视频社区。它包含视频上传、FFmpeg HLS 转码、Canvas 弹幕播放器、评论、关注、收藏、投币、通知、搜索、推荐和可视化管理后台。',
+      '萌悠是一个开源、自托管的弹幕视频社区。它包含视频上传、FFmpeg HLS 转码、Canvas 弹幕播放器、评论、关注、收藏、投币、通知、搜索、推荐和可视化管理后台。',
     runtime:
       '项目以 MIT 许可证开源。运行时只需要 Node.js、PostgreSQL 和 FFmpeg；Redis、Meilisearch、S3、SMTP 与 OAuth 都是可选增强。',
     installer: '安装向导',

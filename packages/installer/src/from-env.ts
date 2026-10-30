@@ -118,7 +118,7 @@ function mailFromEnv(env: NodeJS.ProcessEnv): MailConfig | undefined {
     secure: bool(env.MAIL_SECURE, false),
     user: optional(env.MAIL_USER) ?? '',
     password: env.MAIL_PASSWORD ?? '',
-    fromName: optional(env.MAIL_FROM_NAME) ?? 'uiliuili',
+    fromName: optional(env.MAIL_FROM_NAME) ?? '萌悠',
     fromAddress: optional(env.MAIL_FROM_ADDRESS) ?? '',
     verificationRequired: bool(env.MAIL_VERIFICATION_REQUIRED, false),
   };
@@ -143,7 +143,7 @@ export function buildInstallConfigFromEnv(env: NodeJS.ProcessEnv = process.env):
     locale,
     database: databaseFromEnv(env),
     site: {
-      name: optional(env.SITE_NAME) ?? 'uiliuili',
+      name: optional(env.SITE_NAME) ?? '萌悠',
       description: optional(env.SITE_DESCRIPTION) ?? '一个自托管的弹幕视频站',
       url: optional(env.APP_URL) ?? 'http://localhost:3000',
       timezone: optional(env.SITE_TIMEZONE) ?? 'Asia/Shanghai',

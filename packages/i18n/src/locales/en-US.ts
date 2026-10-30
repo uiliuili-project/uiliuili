@@ -2,7 +2,7 @@ import type { MessageTree } from './zh-CN';
 
 export const enUS = {
   common: {
-    appName: 'uiliuili',
+    appName: 'MoeYou',
     loading: 'Loading…',
     retry: 'Retry',
     save: 'Save',
@@ -63,7 +63,7 @@ export const enUS = {
     review: 'Review',
   },
   auth: {
-    loginTitle: 'Log in to uiliuili',
+    loginTitle: 'Log in to MoeYou',
     registerTitle: 'Create an account',
     identifier: 'Username or email',
     username: 'Username',
@@ -202,8 +202,8 @@ export const enUS = {
     system: 'System',
   },
   install: {
-    title: 'Install uiliuili',
-    welcome: 'Welcome to uiliuili',
+    title: 'Install MoeYou',
+    welcome: 'Welcome to MoeYou',
     welcomeText:
       'An open-source, self-hosted danmaku video platform. Follow a few steps to get set up.',
     start: 'Start installation',
@@ -253,9 +253,9 @@ export const enUS = {
     insecure: 'The installer is being accessed over HTTP. Enable HTTPS in production.',
   },
   about: {
-    title: 'About uiliuili',
+    title: 'About MoeYou',
     intro:
-      'uiliuili is an open-source, self-hosted danmaku video community with uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin console.',
+      'MoeYou is an open-source, self-hosted danmaku video community with uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin console.',
     runtime:
       'The project is released under the MIT license. The runtime only needs Node.js, PostgreSQL, and FFmpeg; Redis, Meilisearch, S3, SMTP, and OAuth are optional enhancements.',
     installer: 'Installer',

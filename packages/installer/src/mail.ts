@@ -16,8 +16,8 @@ export async function testMail(config: MailConfig, to: string): Promise<void> {
   await transport.sendMail({
     from: `"${config.fromName}" <${config.fromAddress}>`,
     to,
-    subject: 'uiliuili SMTP 测试',
-    text: '这是一封来自 uiliuili 安装器的测试邮件。如果你收到它，SMTP 配置正确。',
+    subject: '萌悠 SMTP 测试',
+    text: '这是一封来自萌悠安装器的测试邮件。如果你收到它，SMTP 配置正确。',
   });
 }
 
