@@ -35,6 +35,18 @@
       }
     }
   },
+  "overrides": [
+    {
+      "include": ["apps/web/src/app/terms/page.tsx", "apps/web/src/app/privacy/page.tsx"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          }
+        }
+      }
+    }
+  ],
   "files": {
     "ignore": [
       "node_modules",
