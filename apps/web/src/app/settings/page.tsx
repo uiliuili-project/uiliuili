@@ -328,7 +328,13 @@ export default function SettingsPage() {
         <aside className="card h-fit p-2">
           {[
             { key: 'profile', label: t('个人资料'), icon: User },
-            { key: 'region', label: t('地区与限制级内容'), icon: Globe2 },
+            {
+              key: 'region',
+              // Restricted regions have nothing to configure, so the tab only
+              // shows the region itself.
+              label: t(region && !region.unrestricted ? '地区' : '地区与限制级内容'),
+              icon: Globe2,
+            },
             { key: 'recommend', label: t('推荐偏好'), icon: Sparkles },
             { key: 'security', label: t('账号安全'), icon: Shield },
             { key: 'sessions', label: t('登录设备'), icon: Monitor },
@@ -462,28 +468,25 @@ export default function SettingsPage() {
                   {t('地区由系统根据 IP 和请求头自动判定，不能自行修改。如需更正请联系管理员。')}
                 </p>
               </div>
-              <div className="rounded-xl border border-line p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-medium">{t('显示限制级内容')}</div>
-                    <p className="mt-1 text-sm text-muted">
-                      {t('开启后可以浏览和播放限制级内容，仅无限制地区可用。')}
-                    </p>
+              {(!region || region.unrestricted) && (
+                <div className="rounded-xl border border-line p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-medium">{t('显示限制级内容')}</div>
+                      <p className="mt-1 text-sm text-muted">
+                        {t('开启后可以浏览和播放限制级内容，仅无限制地区可用。')}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-5 w-5 accent-[#fb7299]"
+                      checked={showRestricted}
+                      disabled={!region?.unrestricted || savingPreference}
+                      onChange={(event) => void saveShowRestricted(event.target.checked)}
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 accent-[#fb7299]"
-                    checked={showRestricted}
-                    disabled={!region?.unrestricted || savingPreference}
-                    onChange={(event) => void saveShowRestricted(event.target.checked)}
-                  />
                 </div>
-                {region && !region.unrestricted && (
-                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    {t('当前地区不支持显示限制级内容。')}
-                  </p>
-                )}
-              </div>
+              )}
             </div>
           )}
 

@@ -31,3 +31,5 @@ All notable changes to this project are documented here. The format follows
   installer redirects home once the instance is installed, non-staff accounts
   are sent to the studio instead of the console, and the console responds with
   `X-Robots-Tag: noindex`.
+- In account settings, a region blocked by the site policy now only shows the
+  resolved region; the restricted-content switch is not offered there.
