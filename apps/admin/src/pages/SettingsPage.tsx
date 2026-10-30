@@ -121,6 +121,7 @@ export function SettingsPage() {
       fallback: groups.region?.fallback ?? 'CN',
       header: groups.region?.header ?? 'cf-ipcountry',
       geoipDatabase: groups.region?.geoipDatabase ?? '',
+      provinceHeader: groups.region?.provinceHeader ?? '',
       blockedRegions: groups.restricted?.blockedRegions ?? [],
       defaultBehavior: groups.restricted?.defaultBehavior ?? 'message',
       defaultMessage: groups.restricted?.defaultMessage ?? '该内容在您所在的地区不可用',
@@ -287,6 +288,7 @@ export function SettingsPage() {
         fallback: values.fallback,
         header: values.header,
         geoipDatabase: values.geoipDatabase ?? '',
+        provinceHeader: (values.provinceHeader ?? '').trim(),
       },
       restricted: {
         blockedRegions: values.blockedRegions ?? [],
@@ -1644,17 +1646,26 @@ export function SettingsPage() {
                     label={t('GeoIP 数据库路径（可选）')}
                     name="geoipDatabase"
                     extra={t(
-                      '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。',
+                      '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。使用 GeoLite2-City 时中国地区还能显示到省份。',
                     )}
                   >
-                    <Input placeholder="/var/lib/GeoIP/GeoLite2-Country.mmdb" allowClear />
+                    <Input placeholder="/var/lib/GeoIP/GeoLite2-City.mmdb" allowClear />
+                  </Form.Item>
+                  <Form.Item
+                    label={t('省份请求头（可选）')}
+                    name="provinceHeader"
+                    extra={t(
+                      '由 CDN 提供 ISO 3166-2 省份代码，例如 x-vercel-ip-country-region；留空则只使用 GeoIP 数据库。',
+                    )}
+                  >
+                    <Input placeholder="x-vercel-ip-country-region" allowClear />
                   </Form.Item>
                   <Form.Item
                     label={t('显示 IP 属地')}
                     name="ipLocation"
                     valuePropName="checked"
                     extra={t(
-                      '开启后在评论、动态和个人空间显示内容发布时的国家/地区，不显示具体 IP，也不影响地区访问控制。',
+                      '开启后在评论、动态和个人空间显示内容发布时的国家/地区，中国地区精确到省份；不显示具体 IP，也不影响地区访问控制。',
                     )}
                   >
                     <Switch />

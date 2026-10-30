@@ -362,7 +362,12 @@ export const DEFAULT_SETTINGS = {
     fallback: 'CN',
     /** Request header carrying the two-letter country code. */
     header: 'cf-ipcountry',
-    /** Optional MaxMind GeoLite2/GeoIP2 country database path. */
+    /**
+     * Optional header carrying a subdivision code, used only to show a
+     * province for mainland China. Leave empty to rely on the GeoIP database.
+     */
+    provinceHeader: '',
+    /** Optional MaxMind GeoLite2/GeoIP2 database path. */
     geoipDatabase: '',
   },
   restricted: {

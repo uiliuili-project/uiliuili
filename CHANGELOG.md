@@ -33,3 +33,7 @@ All notable changes to this project are documented here. The format follows
   `X-Robots-Tag: noindex`.
 - In account settings, a region blocked by the site policy now only shows the
   resolved region; the restricted-content switch is not offered there.
+- IP location for Chinese content resolves to the province (for example 浙江)
+  when a MaxMind GeoLite2-City database or a `region.provinceHeader` is
+  configured; other countries and unknown provinces keep showing the country.
+  Provinces are display-only and never affect region policy.

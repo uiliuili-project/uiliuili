@@ -70,7 +70,7 @@
 
 ## 地区与限制级内容
 
-地区只使用 ISO 3166-1 alpha-2 两位国家代码，不细分到国家以下。每次请求按以下顺序判定地区：
+访问控制只使用 ISO 3166-1 alpha-2 两位国家代码；省份仅用于中国地区的 IP 属地展示，不参与限制判定。每次请求按以下顺序判定地区：
 
 1. 已登录账号在注册时自动记录的地区，用户不能修改；
 2. 配置的国家请求头（默认 `cf-ipcountry`），通常由反向代理或 CDN 提供；
@@ -83,7 +83,7 @@
 
 | 设置组 | 字段 | 作用 |
 | --- | --- | --- |
-| `region` | `fallback`、`header`、`geoipDatabase` | 地区判定方式 |
+| `region` | `fallback`、`header`、`provinceHeader`、`geoipDatabase` | 地区判定方式，以及中国省份请求头 |
 | `restricted` | `blockedRegions`、`defaultBehavior`、`defaultMessage` | 哪些国家不能发布或播放限制级内容，以及拒绝时的展示 |
 
 `blockedRegions` 是唯一权威清单。标记为限制级的视频始终以
@@ -95,14 +95,21 @@
 
 ## IP 属地展示
 
-评论和动态在发布时保存一份国家代码快照（`ip_region`）。它按**网络地区**解析，与用于访问控制的账号地区是两套独立逻辑：
+评论和动态在发布时保存一份地区快照（`ip_region`）。它按**网络地区**解析，与用于访问控制的账号地区是两套独立逻辑：
 
 1. 配置的国家请求头（默认 `cf-ipcountry`）；
 2. 可选 MaxMind `.mmdb` 数据库（已安装时）；
 3. 已登录账号存储的地区；
 4. 配置的默认地区。
 
-只保存 ISO 3166-1 alpha-2 国家代码，不保存原始 IP，也不细分到国家以下。功能启用前的历史内容不会回填，因此不会显示属地。
+中国地区的属地会精确到省份，需要满足以下任一条件：
+
+- GeoIP 数据库使用 MaxMind **GeoLite2-City**（含 `subdivisions`），并按上面的顺序生效；
+- 配置了 `region.provinceHeader`（例如 Vercel 的 `x-vercel-ip-country-region`），由 CDN 提供 ISO 3166-2 省份代码。
+
+此时 `ip_region` 与 `users.last_region` 保存为 `CN-<省份代码>`（如 `CN-ZJ`），页面显示“浙江”；没有省份数据时仍只显示“中国”。其他国家和地区仍只显示国家名称。省份不参与任何访问控制。
+
+不保存原始 IP。功能启用前的历史内容不会回填，因此不会显示属地。
 
 `privacy.ipLocation`（默认开启，位于**设置 → 地区**）控制是否展示。关闭后接口不再返回评论、动态的 `ipRegion` 和个人资料的 `lastRegion`，但不会删除已保存的值；重新开启即恢复展示。个人空间展示账号最近一次请求解析出的网络地区（`users.lastRegion`），仅在已登录请求时刷新，且只用于展示。
 

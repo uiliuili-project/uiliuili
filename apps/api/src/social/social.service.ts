@@ -24,6 +24,7 @@ import {
   type RankingItem,
   type TopicInfo,
   type VideoCard,
+  composeIpRegion,
 } from '@uiliuili/shared';
 import { and, count, desc, eq, gte, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
@@ -215,14 +216,15 @@ export class SocialService {
         .limit(1);
       if (!topicRows[0]) throw new AppError(ERROR_CODES.BAD_REQUEST, '话题不存在', 400);
     }
+    const region = currentRegionContext();
     const [created] = await this.database.db
       .insert(dynamics)
       .values({
         userId: viewer.id,
         content,
         images: input.images.slice(0, 9),
-        ipRegion: currentRegionContext().ipLocationEnabled
-          ? currentRegionContext().networkCode || null
+        ipRegion: region.ipLocationEnabled
+          ? composeIpRegion(region.networkCode, region.networkProvince) || null
           : null,
         videoId: input.videoId ?? null,
         topicId: input.topicId ?? null,

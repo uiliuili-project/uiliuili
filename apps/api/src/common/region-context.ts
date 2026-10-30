@@ -14,6 +14,11 @@ export interface RegionContextValue {
    * than the account. Used only for the IP-location label.
    */
   networkCode: string;
+  /**
+   * ISO 3166-2 subdivision resolved for the network country. Only mainland
+   * China provinces are kept, for a province-level IP-location label.
+   */
+  networkProvince: string;
   networkSource: string;
   /** Whether IP location may be stored and displayed. */
   ipLocationEnabled: boolean;
@@ -32,6 +37,7 @@ export const FALLBACK_REGION_CONTEXT: RegionContextValue = {
   code: '',
   source: 'fallback',
   networkCode: '',
+  networkProvince: '',
   networkSource: 'fallback',
   ipLocationEnabled: false,
   showRestricted: false,

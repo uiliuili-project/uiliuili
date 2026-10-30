@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CN_PROVINCE_OPTIONS,
+  composeIpRegion,
   isRegionBlocked,
   isRegionCode,
+  normalizeProvinceCode,
   normalizeRegionCode,
   normalizeRegionList,
+  provinceOption,
   regionLabel,
 } from './regions';
 import { normalizeVideoRegionPolicy } from './schemas/region';
@@ -20,6 +24,22 @@ describe('regions', () => {
     expect(normalizeRegionCode('')).toBe('');
     expect(normalizeRegionCode(null)).toBe('');
     expect(isRegionCode('CHN')).toBe(false);
+  });
+
+  it('labels Chinese provinces while keeping country-level access control', () => {
+    expect(CN_PROVINCE_OPTIONS).toHaveLength(34);
+    expect(composeIpRegion('CN', 'ZJ')).toBe('CN-ZJ');
+    expect(composeIpRegion('cn', 'cn-zj')).toBe('CN-ZJ');
+    expect(composeIpRegion('CN', '')).toBe('CN');
+    expect(composeIpRegion('US', 'ZJ')).toBe('US');
+    expect(provinceOption('hk')?.name).toBe('香港');
+    expect(normalizeProvinceCode('CN-HK')).toBe('HK');
+    expect(normalizeProvinceCode('ZZ')).toBe('');
+    expect(regionLabel('CN-ZJ')).toBe('浙江');
+    expect(regionLabel('CN-ZJ', 'en-US')).toBe('Zhejiang');
+    expect(regionLabel('CN-XX')).toBe('中国');
+    expect(regionLabel('CN')).toBe('中国');
+    expect(isRegionCode('CN-ZJ')).toBe(false);
   });
 
   it('deduplicates and sorts a region list, dropping unknown codes', () => {

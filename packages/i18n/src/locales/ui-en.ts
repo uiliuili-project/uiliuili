@@ -976,6 +976,9 @@ export const uiEn: Record<string, string> = {
   '安装器将写入 .env、创建数据库表并初始化站点。此操作会修改数据库。':
     'The installer writes .env, creates database tables, and initializes the site. This modifies the database.',
   'GeoIP 数据库路径（可选）': 'GeoIP database path (optional)',
+  '省份请求头（可选）': 'Province header (optional)',
+  '由 CDN 提供 ISO 3166-2 省份代码，例如 x-vercel-ip-country-region；留空则只使用 GeoIP 数据库。':
+    'A CDN header carrying an ISO 3166-2 province code, for example x-vercel-ip-country-region. Leave empty to rely on the GeoIP database only.',
   '“跟随站点默认”使用站点设置中的拒绝方式。':
     '“Follow site default” uses the denial mode from the site settings.',
   不额外限制: 'No additional restriction',
@@ -993,8 +996,8 @@ export const uiEn: Record<string, string> = {
   '地区由系统根据 IP 和请求头自动判定，注册后不能自行修改。':
     'Region is detected automatically from the IP and request headers and cannot be changed after registration.',
   地区限制: 'Region restriction',
-  '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。':
-    'Enter a MaxMind .mmdb path and install the optional maxmind dependency to look up the IP when no country header is present.',
+  '填写 MaxMind .mmdb 文件路径并安装可选依赖 maxmind 后，在没有国家请求头时按 IP 查询。使用 GeoLite2-City 时中国地区还能显示到省份。':
+    'Enter a MaxMind .mmdb path and install the optional maxmind dependency to look up the IP when no country header is present. GeoLite2-City also resolves Chinese provinces.',
   '开启后公开站显示维护提示，仅管理员可访问。':
     'When enabled, the public site shows a maintenance notice and only administrators can access it.',
   '开启后可以浏览和播放限制级内容，仅无限制地区可用。':
@@ -1090,8 +1093,8 @@ export const uiEn: Record<string, string> = {
   每日衰减系数: 'Daily decay factor',
   参与推荐的标签数: 'Tags used for recommendations',
   '显示 IP 属地': 'Show IP location',
-  '开启后在评论、动态和个人空间显示内容发布时的国家/地区，不显示具体 IP，也不影响地区访问控制。':
-    'When enabled, comments, moments, and profiles show the country or region at publish time. No raw IP is stored, and region access control is unaffected.',
+  '开启后在评论、动态和个人空间显示内容发布时的国家/地区，中国地区精确到省份；不显示具体 IP，也不影响地区访问控制。':
+    'When enabled, comments, moments, and profiles show the country or region at publish time, down to the province in China. No raw IP is stored, and region access control is unaffected.',
   排序失败: 'Failed to reorder',
   图标: 'Icon',
   可见: 'Visible',

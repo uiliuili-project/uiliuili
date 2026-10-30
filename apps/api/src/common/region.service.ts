@@ -4,20 +4,19 @@ import { users } from '@uiliuili/db';
 import {
   REGION_OPTIONS,
   type RegionSource,
+  composeIpRegion,
+  normalizeProvinceCode,
   normalizeRegionCode,
   normalizeRegionList,
 } from '@uiliuili/shared';
 import { eq } from 'drizzle-orm';
 import type { RequestWithUser } from './auth-user';
 import { DatabaseService } from './database.service';
+import { type GeoipReader, geoipLocation } from './geoip';
 import type { RegionContextValue } from './region-context';
 import { SettingsService } from './settings.service';
 
-interface CountryResponse {
-  country?: { iso_code?: string };
-}
-
-type MaxmindReader = { get(ip: string): CountryResponse | null };
+type MaxmindReader = GeoipReader;
 interface MaxmindModule {
   open<T>(path: string): Promise<T>;
 }
@@ -55,8 +54,14 @@ export class RegionService {
     const blockedRegions = normalizeRegionList(restricted.blockedRegions);
     const accountRegion = normalizeRegionCode(request.user?.region);
     const resolved = accountRegion
-      ? { code: accountRegion, source: 'registration' as const }
-      : await this.resolveCode(request, region.header, region.geoipDatabase, region.fallback);
+      ? { code: accountRegion, source: 'registration' as const, province: '' }
+      : await this.resolveCode(
+          request,
+          region.header,
+          region.provinceHeader,
+          region.geoipDatabase,
+          region.fallback,
+        );
     const ipLocationEnabled = (privacy as { ipLocation?: boolean }).ipLocation !== false;
     // IP location reflects the current network, never the immutable account
     // region, so it is resolved without the account precedence.
@@ -64,12 +69,13 @@ export class RegionService {
       ? await this.resolveCode(
           request,
           region.header,
+          region.provinceHeader,
           region.geoipDatabase,
           accountRegion || region.fallback,
         )
-      : { code: '', source: 'disabled' as const };
+      : { code: '', source: 'disabled' as const, province: '' };
     if (ipLocationEnabled && request.user && network.code) {
-      this.touchLastRegion(request.user.id, network.code);
+      this.touchLastRegion(request.user.id, composeIpRegion(network.code, network.province));
     }
     return this.buildContext(
       resolved.code,
@@ -81,6 +87,7 @@ export class RegionService {
         defaultMessage: restricted.defaultMessage || '该内容在您所在的地区不可用',
       },
       network.code,
+      network.province,
       network.source,
       ipLocationEnabled,
     );
@@ -108,7 +115,16 @@ export class RegionService {
     request: Pick<RequestWithUser, 'headers' | 'ip'>,
   ): Promise<{ code: string; source: RegionSource }> {
     const region = await this.settings.getRegionSettings();
-    return this.resolveCode(request, region.header, region.geoipDatabase, region.fallback);
+    const resolved = await this.resolveCode(
+      request,
+      region.header,
+      region.provinceHeader,
+      region.geoipDatabase,
+      region.fallback,
+    );
+    // Account regions stay country-level; only IP-location labels use a
+    // province, so the registration path deliberately drops it.
+    return { code: resolved.code, source: resolved.source };
   }
 
   async resolveForRegistration(
@@ -120,14 +136,33 @@ export class RegionService {
   private async resolveCode(
     request: Pick<RequestWithUser, 'headers' | 'ip'>,
     headerName: string,
+    provinceHeader: string,
     geoipDatabase: string,
     fallback: string,
-  ): Promise<{ code: string; source: RegionSource }> {
+  ): Promise<{ code: string; source: RegionSource; province: string }> {
+    const headerProvince = normalizeProvinceCode(this.headerValue(request.headers, provinceHeader));
     const fromHeader = this.fromHeader(request.headers, headerName);
-    if (fromHeader) return { code: fromHeader, source: 'header' };
+    if (fromHeader) {
+      return {
+        code: fromHeader,
+        source: 'header',
+        province: fromHeader === 'CN' ? headerProvince : '',
+      };
+    }
     const fromGeoip = await this.fromGeoip(request.ip, geoipDatabase);
-    if (fromGeoip) return { code: fromGeoip, source: 'geoip' };
-    return { code: normalizeRegionCode(fallback), source: 'fallback' };
+    if (fromGeoip.code) {
+      return {
+        code: fromGeoip.code,
+        source: 'geoip',
+        province: fromGeoip.code === 'CN' ? headerProvince || fromGeoip.province : '',
+      };
+    }
+    const fallbackCode = normalizeRegionCode(fallback);
+    return {
+      code: fallbackCode,
+      source: 'fallback',
+      province: fallbackCode === 'CN' ? headerProvince : '',
+    };
   }
 
   private buildContext(
@@ -140,6 +175,7 @@ export class RegionService {
       defaultMessage: string;
     },
     networkCode: string,
+    networkProvince: string,
     networkSource: string,
     ipLocationEnabled: boolean,
   ): RegionContextValue {
@@ -154,6 +190,7 @@ export class RegionService {
       code,
       source,
       networkCode,
+      networkProvince: networkCode === 'CN' ? networkProvince : '',
       networkSource,
       ipLocationEnabled,
       showRestricted,
@@ -163,6 +200,16 @@ export class RegionService {
       defaultBehavior: policy.defaultBehavior,
       defaultMessage: policy.defaultMessage,
     };
+  }
+
+  private headerValue(
+    headers: Record<string, string | string[] | undefined>,
+    headerName: string,
+  ): string {
+    const name = (headerName || '').trim().toLowerCase();
+    if (!name) return '';
+    const value = headers[name] ?? headers[name.replace(/_/g, '-')];
+    return (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
   }
 
   private fromHeader(
@@ -175,16 +222,18 @@ export class RegionService {
     return normalizeRegionCode(raw);
   }
 
-  private async fromGeoip(ip: string | undefined, databasePath: string): Promise<string> {
-    if (!ip || !databasePath) return '';
+  private async fromGeoip(
+    ip: string | undefined,
+    databasePath: string,
+  ): Promise<{ code: string; province: string }> {
+    if (!ip || !databasePath) return { code: '', province: '' };
     const reader = await this.reader(databasePath);
-    if (!reader) return '';
+    if (!reader) return { code: '', province: '' };
     try {
-      const result = reader.get(ip);
-      return normalizeRegionCode(result?.country?.iso_code);
+      return geoipLocation(reader.get(ip));
     } catch (error) {
       this.logger.warn(`GeoIP lookup failed for ${ip}: ${String(error)}`);
-      return '';
+      return { code: '', province: '' };
     }
   }
 

@@ -98,8 +98,9 @@ Secrets in the database are encrypted with `APP_KEY`. Back up `.env`; losing
 
 ## Regions and restricted content
 
-Regions use ISO 3166-1 alpha-2 country codes only; there is no sub-country
-granularity. Every request resolves a region from:
+Access control uses ISO 3166-1 alpha-2 country codes only. A province is kept
+for the IP-location label of Chinese content and never affects region policy.
+Every request resolves a region from:
 
 1. the signed-in account's stored region, recorded automatically at
    registration and never editable by the user;
@@ -116,7 +117,7 @@ Two settings groups control the feature:
 
 | Group | Fields | Purpose |
 | --- | --- | --- |
-| `region` | `fallback`, `header`, `geoipDatabase` | How the country is resolved |
+| `region` | `fallback`, `header`, `provinceHeader`, `geoipDatabase` | How the country is resolved, plus an optional Chinese province header |
 | `restricted` | `blockedRegions`, `defaultBehavior`, `defaultMessage` | Which countries may publish or play restricted content, and how denial is presented |
 
 `blockedRegions` is the authoritative list. A video marked as restricted is
@@ -138,8 +139,8 @@ SQL; detail and playback endpoints return HTTP 451 with error code
 
 ## IP location display
 
-Comments and dynamics store a country-code snapshot (`ip_region`) taken when
-they are published. It is resolved from the request's network region, which is
+Comments and dynamics store a region snapshot (`ip_region`) taken when they are
+published. It is resolved from the request's network region, which is
 deliberately separate from the account-based region used for access control:
 
 1. the configured country header (`cf-ipcountry` by default);
@@ -147,9 +148,21 @@ deliberately separate from the account-based region used for access control:
 3. the signed-in account's stored region;
 4. the configured fallback region.
 
-Only the ISO 3166-1 alpha-2 code is stored. Raw IP addresses and sub-country
-regions are never persisted, and existing rows are not backfilled, so content
-published before the feature was enabled shows no label.
+Chinese content publishes a province-level location when one can be resolved:
+
+- the GeoIP database is MaxMind **GeoLite2-City** (it carries `subdivisions`) and
+  resolves through the order above; or
+- `region.provinceHeader` is set (for example Vercel's
+  `x-vercel-ip-country-region`) and the CDN supplies an ISO 3166-2 province
+  code.
+
+`ip_region` and `users.last_region` then hold `CN-<province>` (such as
+`CN-ZJ`) and the UI shows “Zhejiang”; without province data the label stays at
+the country level. Other countries always show their country name. Provinces
+never take part in access control.
+
+Raw IP addresses are never persisted, and existing rows are not backfilled, so
+content published before the feature was enabled shows no label.
 
 The `privacy.ipLocation` setting (default on, **Settings → Regions**) controls
 display. When it is off the API omits `ipRegion` from comments and dynamics and

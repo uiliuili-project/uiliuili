@@ -1,6 +1,7 @@
 /**
- * Country-level region data. Regions are restricted to ISO 3166-1 alpha-2
- * country codes; there is deliberately no sub-country granularity.
+ * Country-level region data. Access control is restricted to ISO 3166-1
+ * alpha-2 country codes; provinces exist only as a display detail for the IP
+ * location label of mainland China content.
  */
 export interface RegionOption {
   code: string;
@@ -294,9 +295,98 @@ export function regionOption(code: string | null | undefined): RegionOption | un
   return REGION_OPTIONS.find((option) => option.code === normalized);
 }
 
+/**
+ * Province labels for mainland China. The code is the ISO 3166-2:CN
+ * subdivision code, which is also what MaxMind databases report. Provinces are
+ * display-only: they never take part in access control.
+ */
+export interface ProvinceOption {
+  code: string;
+  name: string;
+  nameEn: string;
+}
+
+export const CN_PROVINCE_OPTIONS: ProvinceOption[] = [
+  { code: 'BJ', name: '北京', nameEn: 'Beijing' },
+  { code: 'TJ', name: '天津', nameEn: 'Tianjin' },
+  { code: 'HE', name: '河北', nameEn: 'Hebei' },
+  { code: 'SX', name: '山西', nameEn: 'Shanxi' },
+  { code: 'NM', name: '内蒙古', nameEn: 'Inner Mongolia' },
+  { code: 'LN', name: '辽宁', nameEn: 'Liaoning' },
+  { code: 'JL', name: '吉林', nameEn: 'Jilin' },
+  { code: 'HL', name: '黑龙江', nameEn: 'Heilongjiang' },
+  { code: 'SH', name: '上海', nameEn: 'Shanghai' },
+  { code: 'JS', name: '江苏', nameEn: 'Jiangsu' },
+  { code: 'ZJ', name: '浙江', nameEn: 'Zhejiang' },
+  { code: 'AH', name: '安徽', nameEn: 'Anhui' },
+  { code: 'FJ', name: '福建', nameEn: 'Fujian' },
+  { code: 'JX', name: '江西', nameEn: 'Jiangxi' },
+  { code: 'SD', name: '山东', nameEn: 'Shandong' },
+  { code: 'HA', name: '河南', nameEn: 'Henan' },
+  { code: 'HB', name: '湖北', nameEn: 'Hubei' },
+  { code: 'HN', name: '湖南', nameEn: 'Hunan' },
+  { code: 'GD', name: '广东', nameEn: 'Guangdong' },
+  { code: 'GX', name: '广西', nameEn: 'Guangxi' },
+  { code: 'HI', name: '海南', nameEn: 'Hainan' },
+  { code: 'CQ', name: '重庆', nameEn: 'Chongqing' },
+  { code: 'SC', name: '四川', nameEn: 'Sichuan' },
+  { code: 'GZ', name: '贵州', nameEn: 'Guizhou' },
+  { code: 'YN', name: '云南', nameEn: 'Yunnan' },
+  { code: 'XZ', name: '西藏', nameEn: 'Tibet' },
+  { code: 'SN', name: '陕西', nameEn: 'Shaanxi' },
+  { code: 'GS', name: '甘肃', nameEn: 'Gansu' },
+  { code: 'QH', name: '青海', nameEn: 'Qinghai' },
+  { code: 'NX', name: '宁夏', nameEn: 'Ningxia' },
+  { code: 'XJ', name: '新疆', nameEn: 'Xinjiang' },
+  { code: 'TW', name: '台湾', nameEn: 'Taiwan' },
+  { code: 'HK', name: '香港', nameEn: 'Hong Kong' },
+  { code: 'MO', name: '澳门', nameEn: 'Macao' },
+];
+
+const CN_PROVINCE_MAP = new Map(CN_PROVINCE_OPTIONS.map((province) => [province.code, province]));
+
+export function provinceOption(code: string | null | undefined): ProvinceOption | undefined {
+  if (!code) return undefined;
+  return CN_PROVINCE_MAP.get(code.trim().toUpperCase());
+}
+
+/**
+ * Accepts a bare subdivision code (`ZJ`), an ISO 3166-2 value (`CN-ZJ`) or a
+ * value with an underscore separator, and returns the known province code.
+ */
+export function normalizeProvinceCode(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const code = value
+    .trim()
+    .toUpperCase()
+    .replace(/^CN[-_ ]/, '');
+  return CN_PROVINCE_MAP.has(code) ? code : '';
+}
+
+/**
+ * The value stored in `ip_region` and `users.last_region`: the country code,
+ * or `CN-<province>` when the network location is in China and the province is
+ * known.
+ */
+export function composeIpRegion(
+  country: string | null | undefined,
+  province?: string | null,
+): string {
+  const code = normalizeRegionCode(country);
+  if (code !== 'CN') return code;
+  const subdivision = normalizeProvinceCode(province);
+  return subdivision ? `CN-${subdivision}` : code;
+}
+
 export function regionLabel(code: string | null | undefined, locale = 'zh-CN'): string {
-  const option = regionOption(code);
-  if (!option) return code?.trim().toUpperCase() ?? '';
+  const value = typeof code === 'string' ? code.trim().toUpperCase() : '';
+  if (value.startsWith('CN-')) {
+    const province = provinceOption(value.slice(3));
+    if (province) return locale.toLowerCase().startsWith('en') ? province.nameEn : province.name;
+    return regionLabel('CN', locale);
+  }
+  const option = regionOption(value);
+  if (!option) return value;
   return locale.toLowerCase().startsWith('en') ? option.nameEn : option.name;
 }
 

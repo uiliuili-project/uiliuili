@@ -8,7 +8,13 @@ import {
   users,
   videos,
 } from '@uiliuili/db';
-import { AppError, type CommentCreateInput, type CommentItem, ERROR_CODES } from '@uiliuili/shared';
+import {
+  AppError,
+  type CommentCreateInput,
+  type CommentItem,
+  ERROR_CODES,
+  composeIpRegion,
+} from '@uiliuili/shared';
 import { and, asc, count, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
@@ -242,7 +248,9 @@ export class CommentsService {
         userId: viewer.id,
         parentId: input.parentId ?? null,
         content: content.slice(0, 1000),
-        ipRegion: region.ipLocationEnabled ? region.networkCode || null : null,
+        ipRegion: region.ipLocationEnabled
+          ? composeIpRegion(region.networkCode, region.networkProvince) || null
+          : null,
         status: pending ? 'pending' : 'visible',
         moderation: moderationRecord,
       })
