@@ -1108,6 +1108,20 @@ export function SettingsPage() {
                               <Form.Item
                                 name={['actions', action, 'hard']}
                                 style={{ marginBottom: 0 }}
+                                dependencies={[['actions', action, 'soft']]}
+                                rules={[
+                                  ({ getFieldValue }) => ({
+                                    validator(_, value) {
+                                      const soft = Number(
+                                        getFieldValue(['actions', action, 'soft']) ?? 0,
+                                      );
+                                      if (Number(value) > soft || soft === 0) {
+                                        return Promise.resolve();
+                                      }
+                                      return Promise.reject(new Error(t('硬阈值必须大于软阈值')));
+                                    },
+                                  }),
+                                ]}
                               >
                                 <InputNumber min={1} style={{ width: '100%' }} />
                               </Form.Item>

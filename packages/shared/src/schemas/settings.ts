@@ -98,11 +98,18 @@ export const captchaVerifySchema = z.object({
   action: z.enum(CAPTCHA_ACTIONS).default('login'),
 });
 
-const rateActionSchema = z.object({
-  windowSeconds: z.number().int().min(5).max(86_400).default(60),
-  soft: z.number().int().min(0).max(10_000).default(0),
-  hard: z.number().int().min(1).max(10_000).default(10),
-});
+const rateActionSchema = z
+  .object({
+    windowSeconds: z.number().int().min(5).max(86_400).default(60),
+    soft: z.number().int().min(0).max(10_000).default(0),
+    hard: z.number().int().min(1).max(10_000).default(10),
+  })
+  // The hard limit is evaluated first, so a soft threshold at or above it could
+  // never trigger the captcha step. Zero disables the soft threshold.
+  .refine((value) => value.soft === 0 || value.hard > value.soft, {
+    message: '硬阈值必须大于软阈值（软阈值为 0 表示不启用）',
+    path: ['hard'],
+  });
 
 export const rateLimitSettingsSchema = z.object({
   enabled: z.boolean().default(true),

@@ -1169,6 +1169,7 @@ export const uiEn: Record<string, string> = {
   '窗口（秒）': 'Window (seconds)',
   软阈值: 'Soft threshold',
   硬阈值: 'Hard threshold',
+  硬阈值必须大于软阈值: 'The hard limit must be greater than the soft limit',
   图片上传: 'Image upload',
   封面上传: 'Cover upload',
   注册: 'Sign-up',
