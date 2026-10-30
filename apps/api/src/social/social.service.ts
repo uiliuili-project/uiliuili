@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   type DbDynamic,
   type DbUser,
+  blocks,
   categories,
   conversations,
   directMessages,
@@ -24,10 +25,10 @@ import {
   type TopicInfo,
   type VideoCard,
 } from '@uiliuili/shared';
-import { and, count, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
-import { videoRegionCondition } from '../common/region-context';
+import { currentRegionContext, videoRegionCondition } from '../common/region-context';
 import { decodeCursor, encodeCursor, publicUser, videoCard } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -108,6 +109,61 @@ export class SocialService {
     };
   }
 
+  /** Image-only dynamics for the home waterfall mode. */
+  async moments(
+    viewer: AuthUser | undefined,
+    query: { cursor?: string; limit: number; sort: 'latest' | 'hot' },
+  ) {
+    const offset = decodeCursor(query.cursor);
+    const conditions = [
+      eq(dynamics.visibility, 'public'),
+      eq(users.banned, false),
+      sql`jsonb_array_length(${dynamics.images}) > 0`,
+    ];
+    if (viewer) {
+      const blockedRows = await this.database.db
+        .select({ id: blocks.blockedUserId })
+        .from(blocks)
+        .where(eq(blocks.userId, viewer.id));
+      const blockedIds = blockedRows.map((row) => row.id);
+      if (blockedIds.length > 0) conditions.push(notInArray(dynamics.userId, blockedIds));
+    }
+    const rows = await this.database.db
+      .select({ dynamic: dynamics, user: users, topic: topics })
+      .from(dynamics)
+      .innerJoin(users, eq(users.id, dynamics.userId))
+      .leftJoin(topics, eq(topics.id, dynamics.topicId))
+      .where(and(...conditions))
+      .orderBy(
+        ...(query.sort === 'hot'
+          ? [desc(dynamics.likeCount), desc(dynamics.createdAt)]
+          : [desc(dynamics.createdAt)]),
+      )
+      .limit(query.limit)
+      .offset(offset);
+    const likedSet = viewer
+      ? await this.likedDynamics(
+          viewer.id,
+          rows.map((row) => row.dynamic.id),
+        )
+      : new Set<string>();
+    const videoMap = await this.videoCardsFor(
+      rows.map((row) => row.dynamic.videoId).filter((id): id is string => Boolean(id)),
+    );
+    return {
+      items: rows.map((row) =>
+        this.toDynamic(
+          row.dynamic,
+          row.user,
+          row.topic,
+          row.dynamic.videoId ? (videoMap.get(row.dynamic.videoId) ?? null) : null,
+          likedSet.has(row.dynamic.id),
+        ),
+      ),
+      nextCursor: rows.length === query.limit ? encodeCursor(offset + query.limit) : null,
+    };
+  }
+
   async createDynamic(
     viewer: AuthUser,
     input: {
@@ -136,6 +192,9 @@ export class SocialService {
         userId: viewer.id,
         content: input.content.trim().slice(0, 2000),
         images: input.images.slice(0, 9),
+        ipRegion: currentRegionContext().ipLocationEnabled
+          ? currentRegionContext().networkCode || null
+          : null,
         videoId: input.videoId ?? null,
         topicId: input.topicId ?? null,
         visibility: input.visibility,
@@ -605,6 +664,7 @@ export class SocialService {
       createdAt: dynamic.createdAt.toISOString(),
       likeCount: dynamic.likeCount,
       liked,
+      ipRegion: currentRegionContext().ipLocationEnabled ? dynamic.ipRegion : null,
       user: publicUser(user),
       video,
       topic: topic ? this.toTopic(topic) : null,

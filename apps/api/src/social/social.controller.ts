@@ -3,6 +3,7 @@ import {
   dynamicCreateSchema,
   dynamicListQuerySchema,
   messageSendSchema,
+  momentListQuerySchema,
   pushSubscriptionSchema,
   rankingQuerySchema,
   topicCreateSchema,
@@ -27,6 +28,16 @@ export class SocialController {
     @CurrentUser() viewer?: AuthUser,
   ) {
     return this.social.dynamicList(viewer, query);
+  }
+
+  @Public()
+  @OptionalAuth()
+  @Get('feed/moments')
+  async moments(
+    @Query(zodQuery(momentListQuerySchema)) query: z.infer<typeof momentListQuerySchema>,
+    @CurrentUser() viewer?: AuthUser,
+  ) {
+    return this.social.moments(viewer, query);
   }
 
   @Post('dynamics')
