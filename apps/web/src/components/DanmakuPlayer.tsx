@@ -1009,66 +1009,73 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         </div>
       )}
 
-      <div className="mt-3 rounded-xl2 border border-line bg-white p-2">
-        <div className="flex flex-wrap items-center gap-2 px-2 pb-2 text-xs text-muted">
-          <select
-            value={sendMode}
-            onChange={(event) => setSendMode(event.target.value as typeof sendMode)}
-            className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
-            title={t('弹幕类型')}
-          >
-            <option value="scroll">{t('滚动')}</option>
-            <option value="top">{t('顶部')}</option>
-            <option value="bottom">{t('底部')}</option>
-          </select>
-          <select
-            value={sendPool}
-            onChange={(event) => setSendPool(event.target.value as typeof sendPool)}
-            className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
-            title={t('弹幕池')}
-          >
-            <option value="normal">{t('普通弹幕')}</option>
-            <option value="subtitle">{t('字幕弹幕')}</option>
-            <option value="special">{t('特殊弹幕')}</option>
-          </select>
-          <div className="flex items-center gap-1">
-            {COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setSendColor(color)}
-                className={cn(
-                  'h-4 w-4 rounded-full border',
-                  sendColor === color ? 'border-brand ring-2 ring-brand/30' : 'border-line',
-                )}
-                style={{ backgroundColor: color }}
-                aria-label={color}
-              />
-            ))}
+      {video.allowDanmaku === false ? (
+        <div className="mt-3 flex items-center gap-2 rounded-xl2 border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
+          <MessageSquare className="h-4 w-4" />
+          {t('作者已关闭这篇稿件的弹幕。')}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl2 border border-line bg-white p-2">
+          <div className="flex flex-wrap items-center gap-2 px-2 pb-2 text-xs text-muted">
+            <select
+              value={sendMode}
+              onChange={(event) => setSendMode(event.target.value as typeof sendMode)}
+              className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
+              title={t('弹幕类型')}
+            >
+              <option value="scroll">{t('滚动')}</option>
+              <option value="top">{t('顶部')}</option>
+              <option value="bottom">{t('底部')}</option>
+            </select>
+            <select
+              value={sendPool}
+              onChange={(event) => setSendPool(event.target.value as typeof sendPool)}
+              className="rounded border border-line bg-white px-1.5 py-1 text-xs outline-none"
+              title={t('弹幕池')}
+            >
+              <option value="normal">{t('普通弹幕')}</option>
+              <option value="subtitle">{t('字幕弹幕')}</option>
+              <option value="special">{t('特殊弹幕')}</option>
+            </select>
+            <div className="flex items-center gap-1">
+              {COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setSendColor(color)}
+                  className={cn(
+                    'h-4 w-4 rounded-full border',
+                    sendColor === color ? 'border-brand ring-2 ring-brand/30' : 'border-line',
+                  )}
+                  style={{ backgroundColor: color }}
+                  aria-label={color}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={sendText}
+              onChange={(event) => setSendText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void sendDanmaku();
+              }}
+              maxLength={100}
+              placeholder={t('发个弹幕见证当下')}
+              className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => void sendDanmaku()}
+              disabled={sending || !sendText.trim()}
+              className="btn-primary h-9 rounded-full px-4"
+            >
+              <Send className="h-4 w-4" />
+              {t('发送')}{' '}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={sendText}
-            onChange={(event) => setSendText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void sendDanmaku();
-            }}
-            maxLength={100}
-            placeholder={t('发个弹幕见证当下')}
-            className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => void sendDanmaku()}
-            disabled={sending || !sendText.trim()}
-            className="btn-primary h-9 rounded-full px-4"
-          >
-            <Send className="h-4 w-4" />
-            {t('发送')}{' '}
-          </button>
-        </div>
-      </div>
+      )}
       {(message || error) && (
         <p className={cn('mt-2 text-xs', error ? 'text-red-500' : 'text-muted')}>
           {error ?? message}

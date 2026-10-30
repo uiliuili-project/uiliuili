@@ -62,6 +62,11 @@ export interface StudioVideo {
   danmaku: number;
   sourceFilename: string | null;
   sourceSize: number;
+  contentType: string;
+  sourceUrl: string;
+  aiGenerated: boolean;
+  allowComments: boolean;
+  allowDanmaku: boolean;
   restricted: boolean;
   regionMode: string;
   regionCodes: string[];
@@ -169,6 +174,81 @@ export interface StudioStats {
   completions: number;
   completionRate: number;
   rangeDays: number;
+  sources: Array<{ key: string; value: number }>;
+  devices: Array<{ key: string; value: number }>;
+  countries: Array<{ key: string; value: number }>;
+}
+
+export interface StudioAnalytics {
+  rangeDays: number;
+  totals: {
+    views: number;
+    likes: number;
+    coins: number;
+    favorites: number;
+    comments: number;
+    danmaku: number;
+    followers: number;
+    gained: number;
+    lost: number;
+  };
+  daily: Array<{
+    day: string;
+    views: number;
+    completions: number;
+    uniqueViewers: number;
+    likes: number;
+    coins: number;
+    favorites: number;
+    comments: number;
+    danmaku: number;
+    followersGained: number;
+    followersLost: number;
+  }>;
+  sources: Array<{ key: string; value: number }>;
+  devices: Array<{ key: string; value: number }>;
+  countries: Array<{ key: string; value: number }>;
+  topVideos: Array<{ id: string; title: string; coverUrl: string | null; views: number }>;
+}
+
+export interface StudioArticle {
+  id: string;
+  title: string;
+  summary: string;
+  content?: string;
+  coverUrl: string | null;
+  categoryId: string | null;
+  status: string;
+  visibility: string;
+  allowComments: boolean;
+  viewCount: number;
+  likeCount: number;
+  favoriteCount: number;
+  commentCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorName?: string;
+  authorUsername?: string;
+}
+
+export interface StudioCollaborator {
+  userId: string;
+  role: string;
+  status: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  createdAt: string;
+}
+
+export interface StudioHistoryEntry {
+  id: string;
+  fromStatus: string;
+  toStatus: string;
+  reason: string;
+  createdAt: string;
+  actor: string | null;
 }
 
 export interface NotificationItem {

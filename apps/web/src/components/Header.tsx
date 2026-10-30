@@ -82,6 +82,7 @@ export function Header() {
     { href: '/trending', label: t('nav.trending'), icon: Users },
     { href: '/following', label: t('nav.following'), icon: Users },
     { href: '/dynamics', label: t('nav.dynamics'), icon: Sparkles },
+    { href: '/columns', label: t('nav.columns'), icon: BookOpen },
     { href: '/rankings', label: t('nav.rankings'), icon: Trophy },
     { href: '/history', label: t('nav.history'), icon: Clock },
   ];

@@ -1,745 +1,287 @@
 'use client';
-import { useLocale, useT } from '@/components/I18nProvider';
-import { StudioManage } from '@/components/StudioManage';
 
-import { api, csrfHeader, ensureCsrf, getMe } from '@/lib/api';
-import { cn } from '@/lib/cn';
-import { formatBytes, formatDate, formatDuration } from '@/lib/format';
-import type { RegionContextInfo, RegionOption, StudioVideo } from '@/lib/types';
-import { type AuthUser, type Category, isStaffGroup } from '@uiliuili/shared';
+import { useT } from '@/components/I18nProvider';
+import { api } from '@/lib/api';
+import { formatCount, relativeTime } from '@/lib/format';
+import type { StudioVideo } from '@/lib/types';
+import type { AuthUser } from '@uiliuili/shared';
 import {
-  CheckCircle2,
-  Clock,
+  ArrowUpRight,
+  BarChart3,
+  BookOpen,
   Film,
-  Loader2,
-  ShieldAlert,
-  ShieldCheck,
-  UploadCloud,
+  MessageSquare,
+  Play,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-interface InitUpload {
-  mode: 'local' | 's3';
-  uploadId: string;
-  storageKey: string;
-  partSize: number;
-  totalChunks: number;
-  parts?: Array<{ partNumber: number; url: string | null }>;
+interface Analytics {
+  rangeDays: number;
+  totals: {
+    views: number;
+    likes: number;
+    coins: number;
+    favorites: number;
+    comments: number;
+    danmaku: number;
+    followers: number;
+    gained: number;
+    lost: number;
+  };
+  daily: Array<{ day: string; views: number; completions: number }>;
+  topVideos: Array<{ id: string; title: string; coverUrl: string | null; views: number }>;
 }
 
-const statusLabels: Record<string, string> = {
-  draft: '草稿',
-  uploading: '上传中',
-  processing: '转码中',
-  ready: '待发布',
-  pending_review: '审核中',
-  published: '已发布',
-  blocked: '已下架',
-  failed: '处理失败',
-  deleted: '已删除',
-};
+interface CommentRow {
+  id: string;
+  videoTitle: string;
+  content: string;
+  createdAt: string;
+  displayName: string;
+}
 
-export default function StudioPage() {
+interface Growth {
+  level: number;
+  experience: number;
+  progress: number;
+  nextLevelExperience: number | null;
+  badges: Array<{ code: string; label: string }>;
+}
+
+export default function StudioOverviewPage() {
   const t = useT();
-  const locale = useLocale();
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [videos, setVideos] = useState<StudioVideo[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [growth, setGrowth] = useState<Growth | null>(null);
+  const [pendingInvites, setPendingInvites] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [tags, setTags] = useState('');
-  const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public');
-  const [restricted, setRestricted] = useState(false);
-  const [regionMode, setRegionMode] = useState<'inherit' | 'block'>('inherit');
-  const [regionCodes, setRegionCodes] = useState<string[]>([]);
-  const [regionDenyBehavior, setRegionDenyBehavior] = useState<'default' | 'message' | 'not_found'>(
-    'default',
-  );
-  const [regionDenyMessage, setRegionDenyMessage] = useState('');
-  const [region, setRegion] = useState<RegionContextInfo | null>(null);
-  const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [current, setCurrent] = useState<StudioVideo | null>(null);
-  const [uploadedBytes, setUploadedBytes] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const pollRef = useRef<number | null>(null);
-
-  const loadVideos = async () => {
-    const data = await api.get<{ items: StudioVideo[] }>('/api/v1/studio/videos?limit=50');
-    setVideos(data.items);
-  };
 
   useEffect(() => {
-    void ensureCsrf();
-    void getMe()
-      .then(async (currentUser) => {
-        setUser(currentUser);
-        if (!currentUser) return;
-        const [studio, cats, context, options] = await Promise.all([
-          api.get<{ items: StudioVideo[] }>('/api/v1/studio/videos?limit=50'),
-          api.get<{ items: Category[] }>('/api/v1/categories'),
-          api.get<RegionContextInfo>('/api/v1/region/context').catch(() => null),
-          api.get<{ items: RegionOption[] }>('/api/v1/region/options').catch(() => ({ items: [] })),
-        ]);
+    void Promise.all([
+      api.get<{ items: StudioVideo[] }>('/api/v1/studio/videos?limit=6'),
+      api.get<Analytics>('/api/v1/studio/analytics?days=30'),
+      api.get<{ items: CommentRow[] }>('/api/v1/studio/comments?limit=5'),
+      api.get<Growth>('/api/v1/studio/growth'),
+      api.get<{ pending: unknown[] }>('/api/v1/studio/collaborations'),
+    ])
+      .then(([studio, stats, inbox, level, collab]) => {
         setVideos(studio.items);
-        setCategories(cats.items);
-        setCategoryId(cats.items[0]?.id ?? '');
-        setRegion(context);
-        setRegionOptions(options.items);
+        setAnalytics(stats);
+        setComments(inbox.items);
+        setGrowth(level);
+        setPendingInvites(collab.pending.length);
       })
       .catch((loadError) =>
         setError(loadError instanceof Error ? loadError.message : t('加载失败')),
       )
       .finally(() => setLoading(false));
-    return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    };
-  }, []);
+  }, [t]);
 
-  const createDraft = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setCreating(true);
-    setError('');
-    setMessage('');
-    try {
-      const video = await api.post<StudioVideo>('/api/v1/studio/videos', {
-        title,
-        description,
-        categoryId: categoryId || undefined,
-        tags: tags
-          .split(/[,，\s]+/)
-          .map((tag) => tag.trim())
-          .filter(Boolean)
-          .slice(0, 12),
-        visibility,
-        restricted: Boolean(region?.canUploadRestricted && restricted),
-        regionMode,
-        regionCodes,
-        regionDenyBehavior,
-        regionDenyMessage,
-      });
-      setCurrent(video);
-      await loadVideos();
-      setMessage(t('稿件已创建，请选择视频文件上传'));
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : t('创建失败'));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const uploadVideo = async () => {
-    if (!current || !file) return;
-    setUploading(true);
-    setError('');
-    setMessage('');
-    setUploadedBytes(0);
-    try {
-      const init = await api.post<InitUpload>(`/api/v1/studio/videos/${current.id}/upload`, {
-        filename: file.name,
-        size: file.size,
-        contentType: file.type || 'application/octet-stream',
-        chunks: Math.ceil(file.size / (8 * 1024 * 1024)),
-      });
-      const total = init.totalChunks;
-      if (init.mode === 'local') {
-        for (let index = 0; index < total; index += 1) {
-          const start = index * init.partSize;
-          const end = Math.min(file.size, start + init.partSize);
-          const chunk = file.slice(start, end);
-          const response = await fetch(
-            `/api/v1/studio/uploads/${init.uploadId}/parts/${index + 1}`,
-            {
-              method: 'PUT',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/octet-stream',
-                ...csrfHeader(),
-              },
-              body: chunk,
-            },
-          );
-          if (!response.ok) {
-            const body = (await response.json().catch(() => null)) as {
-              error?: { message?: string };
-            } | null;
-            throw new Error(body?.error?.message ?? t('分片 {0} 上传失败', { 0: index + 1 }));
-          }
-          setUploadedBytes(end);
-        }
-        await api.post(`/api/v1/studio/uploads/${init.uploadId}/complete`, {});
-      } else {
-        const parts: Array<{ partNumber: number; etag: string }> = [];
-        for (let index = 0; index < total; index += 1) {
-          const start = index * init.partSize;
-          const end = Math.min(file.size, start + init.partSize);
-          const chunk = file.slice(start, end);
-          const url = init.parts?.[index]?.url;
-          if (!url) throw new Error(t('缺少 S3 分片上传地址'));
-          const response = await fetch(url, {
-            method: 'PUT',
-            body: chunk,
-          });
-          if (!response.ok) throw new Error(t('S3 分片 {0} 上传失败', { 0: index + 1 }));
-          parts.push({ partNumber: index + 1, etag: response.headers.get('ETag') ?? '' });
-          setUploadedBytes(end);
-        }
-        await api.post(`/api/v1/studio/uploads/${init.uploadId}/complete`, { parts });
-      }
-      if (cover) await uploadCover(current.id, cover);
-      setMessage(t('上传完成，正在转码…'));
-      setFile(null);
-      await pollStatus(current.id);
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : t('上传失败'));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const uploadCover = async (videoId: string, coverFile: File) => {
-    const response = await fetch(`/api/v1/studio/videos/${videoId}/cover`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: {
-        'Content-Type': coverFile.type,
-        ...csrfHeader(),
-      },
-      body: coverFile,
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      throw new Error(body?.error?.message ?? t('封面上传失败'));
-    }
-  };
-
-  const pollStatus = async (videoId: string) => {
-    if (pollRef.current) window.clearInterval(pollRef.current);
-    pollRef.current = window.setInterval(async () => {
-      try {
-        const video = await api.get<StudioVideo>(`/api/v1/studio/videos/${videoId}`);
-        setCurrent(video);
-        if (['ready', 'pending_review', 'published', 'failed'].includes(video.status)) {
-          if (pollRef.current) window.clearInterval(pollRef.current);
-          pollRef.current = null;
-          await loadVideos();
-          setMessage(
-            video.status === 'failed' ? t('转码失败，请检查后台队列或重新上传') : t('视频处理完成'),
-          );
-        }
-      } catch {}
-    }, 3000);
-  };
-
-  const saveMetadata = async (video: StudioVideo) => {
-    setError('');
-    setMessage('');
-    try {
-      const updated = await api.patch<StudioVideo>(`/api/v1/studio/videos/${video.id}`, {
-        title,
-        description,
-        categoryId: categoryId || undefined,
-        visibility,
-        restricted: Boolean(region?.canUploadRestricted && restricted),
-        regionMode,
-        regionCodes,
-        regionDenyBehavior,
-        regionDenyMessage,
-      });
-      setCurrent(updated);
-      await loadVideos();
-      setMessage(t('稿件信息已保存'));
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t('保存失败'));
-    }
-  };
-
-  const publish = async (video: StudioVideo) => {
-    setError('');
-    setMessage('');
-    try {
-      const updated = await api.post<StudioVideo>(`/api/v1/studio/videos/${video.id}/publish`, {});
-      setCurrent(updated);
-      await loadVideos();
-      setMessage(updated.status === 'pending_review' ? t('已提交审核') : t('视频已发布'));
-    } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : t('发布失败'));
-    }
-  };
-
-  const remove = async (video: StudioVideo) => {
-    if (!window.confirm(t('确定删除稿件「{0}」吗？', { 0: video.title }))) return;
-    await api.delete(`/api/v1/studio/videos/${video.id}`);
-    if (current?.id === video.id) setCurrent(null);
-    await loadVideos();
-  };
+  const maxViews = useMemo(
+    () => Math.max(1, ...(analytics?.daily.map((item) => item.views) ?? [1])),
+    [analytics],
+  );
 
   if (loading) {
-    return <div className="container-page py-16 text-sm text-muted">{t('加载中…')}</div>;
+    return <div className="card p-10 text-sm text-muted">{t('加载中…')}</div>;
   }
 
-  if (!user) {
-    return (
-      <div className="container-page py-16">
-        <div className="card mx-auto max-w-md p-10 text-center">
-          <h1 className="text-xl font-semibold">{t('请先登录')}</h1>
-          <p className="mt-2 text-sm text-muted">{t('登录后即可上传视频')}</p>
-          <Link href="/login" className="btn-primary mt-6">
-            {t('去登录')}{' '}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const progress = file && uploadedBytes ? Math.round((uploadedBytes / file.size) * 100) : 0;
-  const regionLabel = (code: string) => {
-    const option = regionOptions.find((item) => item.code === code);
-    return option ? (locale === 'en-US' ? option.nameEn : option.name) : code;
-  };
-  const blockedLabels = (region?.blockedRegions ?? []).map(regionLabel).join('、');
+  const cards = [
+    { label: '30 日播放', value: analytics?.totals.views ?? 0, icon: Play },
+    { label: '新增粉丝', value: analytics?.totals.followers ?? 0, icon: Users },
+    {
+      label: '互动',
+      value: (analytics?.totals.likes ?? 0) + (analytics?.totals.comments ?? 0),
+      icon: MessageSquare,
+    },
+    { label: '稿件总数', value: videos.length, icon: Film },
+  ];
 
   return (
-    <div className="container-page py-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{t('创作中心')}</h1>
-          <p className="mt-1 text-sm text-muted">{t('上传、管理你的视频稿件')}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/space/${user.username}`} className="btn-ghost">
-            {t('查看我的空间')}{' '}
-          </Link>
-          {isStaffGroup(user.group) && (
-            <a href="/admin/" className="btn-soft">
-              <ShieldCheck className="h-4 w-4" />
-              {t(user.group === 'REVIEWER' ? '审核中心' : '管理后台')}
-            </a>
-          )}
-        </div>
+    <div className="space-y-5">
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="card p-4">
+              <div className="flex items-center justify-between text-sm text-muted">
+                <span>{t(card.label)}</span>
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="mt-2 text-2xl font-semibold">{formatCount(card.value)}</div>
+            </div>
+          );
+        })}
       </div>
 
-      {(message || error) && (
-        <div
-          className={cn(
-            'mb-4 rounded-xl px-4 py-3 text-sm',
-            error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700',
-          )}
-        >
-          {error || message}
-        </div>
-      )}
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section className="card p-5">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-semibold">
-            <Film className="h-4 w-4 text-brand" />
-            {t('新建稿件')}{' '}
-          </h2>
-          <form onSubmit={createDraft} className="space-y-4">
-            <div>
-              <label className="label" htmlFor="title">
-                {t('标题')}{' '}
-              </label>
-              <input
-                id="title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                maxLength={120}
-                className="input"
-                placeholder={t('给视频起个吸引人的标题')}
-                required
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="description">
-                {t('简介')}{' '}
-              </label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={4}
-                maxLength={5000}
-                className="input resize-none"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="category">
-                  {t('分区')}{' '}
-                </label>
-                <select
-                  id="category"
-                  value={categoryId}
-                  onChange={(event) => setCategoryId(event.target.value)}
-                  className="input"
-                >
-                  <option value="">{t('不选择分区')}</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="visibility">
-                  {t('可见性')}{' '}
-                </label>
-                <select
-                  id="visibility"
-                  value={visibility}
-                  onChange={(event) => setVisibility(event.target.value as typeof visibility)}
-                  className="input"
-                >
-                  <option value="public">{t('公开')}</option>
-                  <option value="unlisted">{t('不列出')}</option>
-                  <option value="private">{t('私密')}</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="label" htmlFor="tags">
-                {t('标签')}{' '}
-              </label>
-              <input
-                id="tags"
-                value={tags}
-                onChange={(event) => setTags(event.target.value)}
-                className="input"
-                placeholder={t('用逗号分隔，最多 12 个')}
-              />
-            </div>
-
-            {region?.canUploadRestricted && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-amber-800">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[#fb7299]"
-                    checked={restricted}
-                    onChange={(event) => setRestricted(event.target.checked)}
-                  />
-                  {t('限制级内容')}
-                </label>
-                {restricted && (
-                  <p className="mt-2 text-xs leading-5 text-amber-700">
-                    {t('限制级内容只会在无限制地区显示，并自动禁止在以下地区播放：{0}', {
-                      0: blockedLabels || t('暂无'),
-                    })}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="regionMode">
-                  {t('地区限制')}{' '}
-                </label>
-                <select
-                  id="regionMode"
-                  value={restricted ? 'inherit' : regionMode}
-                  disabled={restricted}
-                  onChange={(event) =>
-                    setRegionMode(event.target.value === 'block' ? 'block' : 'inherit')
-                  }
-                  className="input disabled:opacity-60"
-                >
-                  <option value="inherit">{t('不额外限制')}</option>
-                  <option value="block">{t('禁止在指定国家播放')}</option>
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="regionDenyBehavior">
-                  {t('拒绝方式')}{' '}
-                </label>
-                <select
-                  id="regionDenyBehavior"
-                  value={regionDenyBehavior}
-                  onChange={(event) =>
-                    setRegionDenyBehavior(event.target.value as 'default' | 'message' | 'not_found')
-                  }
-                  className="input"
-                >
-                  <option value="default">{t('跟随站点默认')}</option>
-                  <option value="message">{t('说明地区限制')}</option>
-                  <option value="not_found">{t('显示视频不存在')}</option>
-                </select>
-              </div>
-            </div>
-
-            {regionMode === 'block' && !restricted && (
-              <div>
-                <label className="label" htmlFor="regionCodes">
-                  {t('禁止播放的国家')}{' '}
-                </label>
-                <select
-                  id="regionCodes"
-                  multiple
-                  size={6}
-                  value={regionCodes}
-                  onChange={(event) =>
-                    setRegionCodes(
-                      Array.from(event.target.selectedOptions, (option) => option.value),
-                    )
-                  }
-                  className="input h-auto"
-                >
-                  {regionOptions.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {locale === 'en-US' ? option.nameEn : option.name} ({option.code})
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-muted">
-                  {t('按住 Ctrl 或 Command 可选择多个国家。')}
-                </p>
-              </div>
-            )}
-
-            <div>
-              <label className="label" htmlFor="regionDenyMessage">
-                {t('拒绝提示文案')}{' '}
-              </label>
-              <input
-                id="regionDenyMessage"
-                value={regionDenyMessage}
-                onChange={(event) => setRegionDenyMessage(event.target.value)}
-                maxLength={200}
-                className="input"
-                placeholder={t('留空则使用站点默认文案')}
-              />
-            </div>
-
-            {current ? (
-              <div className="rounded-xl border border-line bg-canvas p-4">
-                <div className="text-sm font-medium">{current.title}</div>
-                <div className="mt-1 text-xs text-muted">
-                  {t('状态：')}
-                  {t(statusLabels[current.status] ?? current.status)}
-                </div>
-              </div>
-            ) : (
-              <button type="submit" disabled={creating} className="btn-primary w-full">
-                {creating ? t('创建中…') : t('创建草稿')}
-              </button>
-            )}
-          </form>
-
-          {current && (
-            <div className="mt-5 border-t border-line pt-5">
-              <h3 className="mb-3 text-sm font-semibold">{t('上传视频')}</h3>
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-canvas px-4 py-8 text-center transition hover:border-brand">
-                <UploadCloud className="mb-2 h-7 w-7 text-brand" />
-                <span className="text-sm font-medium">
-                  {file ? file.name : t('点击选择视频文件')}
-                </span>
-                <span className="mt-1 text-xs text-muted">
-                  {file ? formatBytes(file.size) : t('支持 MP4、MOV、MKV、WebM 等')}
-                </span>
-                <input
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
-              </label>
-              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-muted">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => setCover(event.target.files?.[0] ?? null)}
-                />
-                {t('自定义封面（可选）')}{' '}
-              </label>
-              {uploading && (
-                <div className="mt-4">
-                  <div className="mb-1 flex justify-between text-xs text-muted">
-                    <span>{t('上传中…')}</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-line">
-                    <div
-                      className="h-full bg-brand transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveMetadata(current)}
-                  className="btn-ghost"
-                >
-                  {t('保存稿件信息')}{' '}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void uploadVideo()}
-                  disabled={!file || uploading}
-                  className="btn-primary"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t('上传中')}{' '}
-                    </>
-                  ) : (
-                    t('开始上传')
-                  )}
-                </button>
-                {['ready', 'pending_review'].includes(current.status) && (
-                  <button type="button" onClick={() => void publish(current)} className="btn-soft">
-                    {current.status === 'pending_review' ? t('查看审核状态') : t('发布视频')}
-                  </button>
-                )}
-                {current.status === 'published' && (
-                  <Link href={`/video/${current.id}`} className="btn-ghost">
-                    {t('查看视频')}{' '}
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrent(null);
-                    setTitle('');
-                    setDescription('');
-                    setTags('');
-                    setFile(null);
-                    setCover(null);
-                    setRestricted(false);
-                    setRegionMode('inherit');
-                    setRegionCodes([]);
-                    setRegionDenyBehavior('default');
-                    setRegionDenyMessage('');
-                  }}
-                  className="btn-ghost"
-                >
-                  {t('新建稿件')}{' '}
-                </button>
-              </div>
-              <StudioManage
-                video={current}
-                onRefresh={async () => {
-                  await loadVideos();
-                  const refreshed = await api
-                    .get<StudioVideo>(`/api/v1/studio/videos/${current.id}`)
-                    .catch(() => null);
-                  if (refreshed) setCurrent(refreshed);
-                }}
-              />
-            </div>
-          )}
-        </section>
-
-        <section className="card p-5">
-          <h2 className="mb-4 text-base font-semibold">{t('我的稿件')}</h2>
-          <div className="space-y-3">
-            {videos.map((video) => (
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <BarChart3 className="h-4 w-4 text-brand" />
+              {t('近 30 日播放趋势')}
+            </h2>
+            <Link href="/studio/analytics" className="text-sm text-brand">
+              {t('查看详细数据')}
+            </Link>
+          </div>
+          <div className="flex h-40 items-end gap-1">
+            {(analytics?.daily ?? []).map((item) => (
               <div
-                key={video.id}
-                className="flex gap-3 rounded-xl border border-line p-3 transition hover:border-brand"
-              >
-                <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-canvas">
-                  {video.coverUrl ? (
-                    <img src={video.coverUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-muted">
-                      {t('无封面')}{' '}
-                    </div>
-                  )}
-                  <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">
-                    {formatDuration(video.durationSeconds)}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 text-sm font-medium">{video.title}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
-                        video.status === 'published'
-                          ? 'bg-green-50 text-green-700'
-                          : video.status === 'failed'
-                            ? 'bg-red-50 text-red-600'
-                            : 'bg-canvas text-muted',
-                      )}
-                    >
-                      {video.status === 'published' ? (
-                        <CheckCircle2 className="h-3 w-3" />
-                      ) : (
-                        <Clock className="h-3 w-3" />
-                      )}
-                      {t(statusLabels[video.status] ?? video.status)}
-                    </span>
-                    {video.restricted && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
-                        <ShieldAlert className="h-3 w-3" />
-                        {t('限制级')}
-                      </span>
-                    )}
-                    <span>{formatDate(video.createdAt, locale)}</span>
-                  </div>
-                  <div className="mt-2 flex gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrent(video);
-                        setTitle(video.title);
-                        setDescription(video.description);
-                        setCategoryId(video.categoryId ?? '');
-                        setVisibility(video.visibility as typeof visibility);
-                        setRestricted(video.restricted);
-                        setRegionMode(video.regionMode === 'block' ? 'block' : 'inherit');
-                        setRegionCodes(video.regionCodes ?? []);
-                        setRegionDenyBehavior(
-                          video.regionDenyBehavior === 'message' ||
-                            video.regionDenyBehavior === 'not_found'
-                            ? video.regionDenyBehavior
-                            : 'default',
-                        );
-                        setRegionDenyMessage(video.regionDenyMessage ?? '');
-                      }}
-                      className="text-brand hover:underline"
-                    >
-                      {t('管理')}{' '}
-                    </button>
-                    {video.status === 'published' && (
-                      <Link href={`/video/${video.id}`} className="text-muted hover:text-brand">
-                        {t('查看')}{' '}
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void remove(video)}
-                      className="text-red-500 hover:underline"
-                    >
-                      {t('删除')}{' '}
-                    </button>
-                  </div>
-                </div>
-              </div>
+                key={item.day}
+                title={`${item.day}: ${item.views}`}
+                className="flex-1 rounded-t bg-brand/70 transition hover:bg-brand"
+                style={{ height: `${Math.max(2, (item.views / maxViews) * 100)}%` }}
+              />
             ))}
-            {videos.length === 0 && (
-              <p className="py-10 text-center text-sm text-muted">
-                {t('还没有稿件，先创建一个吧')}
-              </p>
-            )}
+          </div>
+          <div className="mt-2 flex justify-between text-xs text-muted">
+            <span>{analytics?.daily[0]?.day ?? ''}</span>
+            <span>{analytics?.daily.at(-1)?.day ?? ''}</span>
           </div>
         </section>
+
+        <section className="card p-5">
+          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+            <Sparkles className="h-4 w-4 text-brand" />
+            {t('成长进度')}
+          </h2>
+          <div className="text-sm text-muted">
+            {t('等级')} Lv.{growth?.level ?? 0} · {t('经验')} {growth?.experience ?? 0}
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${growth?.progress ?? 0}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-muted">
+            {growth?.nextLevelExperience
+              ? t('距离下一级还需 {0} 经验', {
+                  0: Math.max(0, growth.nextLevelExperience - growth.experience),
+                })
+              : t('已达到最高等级')}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(growth?.badges ?? []).slice(0, 6).map((badge) => (
+              <span key={badge.code} className="chip">
+                {badge.label}
+              </span>
+            ))}
+          </div>
+          <Link
+            href="/studio/growth"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-brand"
+          >
+            {t('查看成长任务')} <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </section>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <section className="card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">{t('最近稿件')}</h2>
+            <Link href="/studio/videos" className="text-sm text-brand">
+              {t('全部稿件')}
+            </Link>
+          </div>
+          {videos.length === 0 ? (
+            <p className="py-6 text-sm text-muted">
+              {t('还没有稿件，')}
+              <Link href="/studio/videos/new" className="text-brand">
+                {t('去投稿')}
+              </Link>
+            </p>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {videos.map((video) => (
+                <li key={video.id}>
+                  <Link
+                    href={`/studio/videos/${video.id}`}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{video.title}</div>
+                      <div className="mt-0.5 text-xs text-muted">
+                        {t('播放')} {formatCount(video.views)} · {relativeTime(video.updatedAt)}
+                      </div>
+                    </div>
+                    <span className="chip shrink-0">{t(video.status)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">{t('最新评论')}</h2>
+            <Link href="/studio/comments" className="text-sm text-brand">
+              {t('评论管理')}
+            </Link>
+          </div>
+          {comments.length === 0 ? (
+            <p className="py-6 text-sm text-muted">{t('暂时没有新评论')}</p>
+          ) : (
+            <ul className="space-y-3">
+              {comments.map((comment) => (
+                <li key={comment.id} className="rounded-lg bg-black/[0.03] p-3">
+                  <div className="text-xs text-muted">
+                    {comment.displayName} · {comment.videoTitle} · {relativeTime(comment.createdAt)}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm">{comment.content}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {pendingInvites > 0 && (
+        <Link
+          href="/studio/collaborations"
+          className="card flex items-center justify-between p-4 text-sm"
+        >
+          <span className="flex items-center gap-2">
+            <Film className="h-4 w-4 text-brand" />
+            {t('你有 {0} 个联合投稿邀请待处理', { 0: pendingInvites })}
+          </span>
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <QuickLink href="/studio/videos/new" icon={Film} label={t('投稿新视频')} />
+        <QuickLink href="/studio/columns/new" icon={BookOpen} label={t('写一篇专栏')} />
+        <QuickLink href="/studio/collections" icon={Users} label={t('整理合集')} />
       </div>
     </div>
+  );
+}
+
+function QuickLink({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: typeof Film;
+  label: string;
+}) {
+  return (
+    <Link href={href} className="card flex items-center gap-2 p-4 text-sm font-medium">
+      <Icon className="h-4 w-4 text-brand" />
+      {label}
+      <ArrowUpRight className="ml-auto h-4 w-4 text-muted" />
+    </Link>
   );
 }

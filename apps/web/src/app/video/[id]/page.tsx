@@ -8,7 +8,18 @@ import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
 import type { RegionContextInfo, SpaceProfile } from '@/lib/types';
 import type { AuthUser, VideoCard, VideoDetail } from '@uiliuili/shared';
-import { Calendar, Eye, Layers, MessageSquare, ShieldAlert } from 'lucide-react';
+import {
+  Calendar,
+  Eye,
+  Layers,
+  Link2,
+  MessageSquare,
+  MessageSquareOff,
+  Repeat2,
+  ShieldAlert,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -140,7 +151,70 @@ export default async function VideoPage({ params }: PageProps) {
                 {t('推荐')}
               </span>
             )}
+            {video.contentType === 'repost' && (
+              <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5">
+                <Repeat2 className="h-3.5 w-3.5" />
+                {t('转载')}
+              </span>
+            )}
+            {video.contentType === 'ai' && (
+              <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                {t('AI 生成')}
+              </span>
+            )}
+            {video.aiGenerated && video.contentType !== 'ai' && (
+              <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                {t('含 AI 生成内容')}
+              </span>
+            )}
+            {video.allowComments === false && (
+              <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5">
+                <MessageSquareOff className="h-3.5 w-3.5" />
+                {t('评论已关闭')}
+              </span>
+            )}
+            {video.allowDanmaku === false && (
+              <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5">
+                {t('弹幕已关闭')}
+              </span>
+            )}
           </div>
+
+          {(video.contentType === 'repost' && video.sourceUrl) || video.collaborators?.length ? (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl2 bg-canvas px-3 py-2 text-xs text-muted">
+              {video.contentType === 'repost' && video.sourceUrl && (
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <Link2 className="h-3.5 w-3.5 shrink-0" />
+                  {t('转载来源')}：
+                  <a
+                    href={video.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="truncate text-brand hover:underline"
+                  >
+                    {video.sourceUrl}
+                  </a>
+                </span>
+              )}
+              {video.collaborators?.length ? (
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  {t('联合投稿')}：
+                  {video.collaborators.map((member) => (
+                    <Link
+                      key={member.userId}
+                      href={`/space/${member.username}`}
+                      className="text-ink hover:text-brand"
+                    >
+                      {member.displayName}
+                    </Link>
+                  ))}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           <VideoActions video={video} />
           <div className="mt-3">
@@ -217,7 +291,13 @@ export default async function VideoPage({ params }: PageProps) {
             </div>
           )}
 
-          <CommentSection videoId={video.id} uploaderId={video.uploader.id} />
+          {video.allowComments === false ? (
+            <div className="mt-5 rounded-xl2 border border-line bg-white p-5 text-sm text-muted">
+              {t('作者已关闭这篇稿件的评论。')}
+            </div>
+          ) : (
+            <CommentSection videoId={video.id} uploaderId={video.uploader.id} />
+          )}
         </div>
 
         <aside className="min-w-0">
