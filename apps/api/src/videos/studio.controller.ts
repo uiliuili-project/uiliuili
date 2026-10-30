@@ -12,10 +12,15 @@ import {
   Req,
 } from '@nestjs/common';
 import {
+  collaboratorInviteSchema,
+  collectionCreateSchema,
+  collectionItemSchema,
+  collectionUpdateSchema,
   presignPartsSchema,
   publishVideoSchema,
   recordPartSchema,
   uploadInitSchema,
+  videoAppealCreateSchema,
   videoCreateSchema,
   videoPartCreateSchema,
   videoPartUpdateSchema,
@@ -49,6 +54,24 @@ const completeSchema = z.object({
     .optional(),
 });
 
+const analyticsSchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+
+const inboxSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  status: z.enum(['visible', 'hidden', 'pending', 'deleted']).optional(),
+});
+
+const moderateSchema = z.object({
+  action: z.enum(['hide', 'visible', 'delete']),
+});
+
+const respondSchema = z.object({
+  accept: z.boolean(),
+});
+
 @Controller('api/v1/studio')
 export class StudioController {
   constructor(private readonly studio: StudioService) {}
@@ -72,10 +95,214 @@ export class StudioController {
     return this.studio.create(user.id, body, request.ip);
   }
 
+  @Get('videos/trash')
+  @RequirePermissions('video:upload')
+  async trash(
+    @CurrentUser() user: AuthUser,
+    @Query(zodQuery(listSchema)) query: z.infer<typeof listSchema>,
+  ) {
+    return this.studio.listDeleted(user.id, query.page, query.limit);
+  }
+
   @Get('videos/:id')
   @RequirePermissions('video:upload')
   async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.studio.get(user.id, id);
+  }
+
+  @Post('videos/:id/restore')
+  @RequirePermissions('video:upload')
+  async restore(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.restore(user.id, id);
+  }
+
+  @Delete('videos/:id/purge')
+  @RequirePermissions('video:upload')
+  async purge(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.purge(user.id, id);
+  }
+
+  @Get('videos/:id/history')
+  @RequirePermissions('video:upload')
+  async history(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.history(user.id, id);
+  }
+
+  @Get('appeals')
+  @RequirePermissions('video:upload')
+  async appeals(
+    @CurrentUser() user: AuthUser,
+    @Query(zodQuery(listSchema)) query: z.infer<typeof listSchema>,
+  ) {
+    return this.studio.listAppeals(user.id, query.page, query.limit);
+  }
+
+  @Post('videos/:id/appeals')
+  @RequirePermissions('video:upload')
+  async createAppeal(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(videoAppealCreateSchema)) body: z.infer<typeof videoAppealCreateSchema>,
+  ) {
+    return this.studio.createAppeal(user.id, id, body);
+  }
+
+  @Get('analytics')
+  @RequirePermissions('video:upload')
+  async analytics(
+    @CurrentUser() user: AuthUser,
+    @Query(zodQuery(analyticsSchema)) query: z.infer<typeof analyticsSchema>,
+  ) {
+    return this.studio.analytics(user.id, query.days);
+  }
+
+  @Get('comments')
+  @RequirePermissions('video:upload')
+  async comments(
+    @CurrentUser() user: AuthUser,
+    @Query(zodQuery(inboxSchema)) query: z.infer<typeof inboxSchema>,
+  ) {
+    return this.studio.commentsInbox(user.id, query);
+  }
+
+  @Post('comments/:id/moderate')
+  @RequirePermissions('video:upload')
+  async moderateComment(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(moderateSchema)) body: z.infer<typeof moderateSchema>,
+  ) {
+    return this.studio.moderateComment(user.id, id, body.action);
+  }
+
+  @Get('danmaku')
+  @RequirePermissions('video:upload')
+  async danmaku(
+    @CurrentUser() user: AuthUser,
+    @Query(zodQuery(inboxSchema)) query: z.infer<typeof inboxSchema>,
+  ) {
+    return this.studio.danmakuInbox(user.id, query);
+  }
+
+  @Post('danmaku/:id/moderate')
+  @RequirePermissions('video:upload')
+  async moderateDanmaku(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(moderateSchema)) body: z.infer<typeof moderateSchema>,
+  ) {
+    return this.studio.moderateDanmaku(user.id, id, body.action);
+  }
+
+  @Get('collections')
+  @RequirePermissions('video:upload')
+  async collections(@CurrentUser() user: AuthUser) {
+    return this.studio.listCollections(user.id);
+  }
+
+  @Post('collections')
+  @RequirePermissions('video:upload')
+  async createCollection(
+    @CurrentUser() user: AuthUser,
+    @Body(zodBody(collectionCreateSchema)) body: z.infer<typeof collectionCreateSchema>,
+  ) {
+    return this.studio.createCollection(user.id, body);
+  }
+
+  @Patch('collections/:id')
+  @RequirePermissions('video:upload')
+  async updateCollection(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(collectionUpdateSchema)) body: z.infer<typeof collectionUpdateSchema>,
+  ) {
+    return this.studio.updateCollection(user.id, id, body);
+  }
+
+  @Delete('collections/:id')
+  @RequirePermissions('video:upload')
+  async deleteCollection(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.deleteCollection(user.id, id);
+  }
+
+  @Get('collections/:id/items')
+  @RequirePermissions('video:upload')
+  async collectionItems(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.collectionItems(user.id, id);
+  }
+
+  @Post('collections/:id/items')
+  @RequirePermissions('video:upload')
+  async addCollectionItem(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(collectionItemSchema)) body: z.infer<typeof collectionItemSchema>,
+  ) {
+    return this.studio.addCollectionItem(user.id, id, body.videoId);
+  }
+
+  @Delete('collections/:id/items/:videoId')
+  @RequirePermissions('video:upload')
+  async removeCollectionItem(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('videoId') videoId: string,
+  ) {
+    return this.studio.removeCollectionItem(user.id, id, videoId);
+  }
+
+  @Get('fans')
+  @RequirePermissions('video:upload')
+  async fans(@CurrentUser() user: AuthUser) {
+    return this.studio.fans(user.id);
+  }
+
+  @Get('growth')
+  @RequirePermissions('video:upload')
+  async growth(@CurrentUser() user: AuthUser) {
+    return this.studio.growth(user.id);
+  }
+
+  @Get('collaborations')
+  @RequirePermissions('video:upload')
+  async collaborations(@CurrentUser() user: AuthUser) {
+    return this.studio.myCollaborations(user.id);
+  }
+
+  @Get('videos/:id/collaborators')
+  @RequirePermissions('video:upload')
+  async collaborators(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studio.collaborators(user.id, id);
+  }
+
+  @Post('videos/:id/collaborators')
+  @RequirePermissions('video:upload')
+  async inviteCollaborator(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(collaboratorInviteSchema)) body: z.infer<typeof collaboratorInviteSchema>,
+  ) {
+    return this.studio.inviteCollaborator(user.id, id, body.username, body.role);
+  }
+
+  @Delete('videos/:id/collaborators/:userId')
+  @RequirePermissions('video:upload')
+  async removeCollaborator(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') collaboratorId: string,
+  ) {
+    return this.studio.removeCollaborator(user.id, id, collaboratorId);
+  }
+
+  @Post('collaborations/:videoId/respond')
+  @RequirePermissions('video:upload')
+  async respondCollaboration(
+    @CurrentUser() user: AuthUser,
+    @Param('videoId') videoId: string,
+    @Body(zodBody(respondSchema)) body: z.infer<typeof respondSchema>,
+  ) {
+    return this.studio.respondCollaboration(user.id, videoId, body.accept);
   }
 
   @Patch('videos/:id')

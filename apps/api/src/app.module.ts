@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module';
+import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
 import { CollectionsModule } from './collections/collections.module';
 import { CommentsModule } from './comments/comments.module';
@@ -23,6 +24,7 @@ import { VideosModule } from './videos/videos.module';
     CommonModule,
     AuthModule,
     AdminModule,
+    ArticlesModule,
     ReviewModule,
     UsersModule,
     VideosModule,

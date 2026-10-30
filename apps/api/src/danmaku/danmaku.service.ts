@@ -94,6 +94,9 @@ export class DanmakuService {
     if (row.video.status !== 'published') {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未发布', 400);
     }
+    if (!row.video.allowDanmaku) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, 'UP 主已关闭弹幕', 403);
+    }
     const settings = await this.settings.getDanmakuSettings();
     if (!settings.enabled) throw new AppError(ERROR_CODES.BAD_REQUEST, '弹幕功能已关闭', 400);
     if (user.level < Number(settings.levelGate ?? 0)) {

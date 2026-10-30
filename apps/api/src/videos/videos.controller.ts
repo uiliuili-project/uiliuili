@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res } from '@ne
 import {
   coinSchema,
   feedbackSchema,
+  playlistQuerySchema,
   progressSchema,
   reportSchema,
   videoListQuerySchema,
@@ -20,6 +21,17 @@ const userVideosQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   sort: z.enum(['new', 'hot']).default('new'),
 });
+
+/** Coarse device class used only for anonymous aggregate analytics. */
+function deviceFromUserAgent(userAgent?: string): string {
+  const ua = (userAgent ?? '').toLowerCase();
+  if (!ua) return 'unknown';
+  if (/bot|crawler|spider|preview/.test(ua)) return 'bot';
+  if (/\btv\b|smarttv|appletv|googletv/.test(ua)) return 'tv';
+  if (/ipad|tablet|playbook|silk/.test(ua)) return 'tablet';
+  if (/mobi|iphone|android.*mobile|windows phone/.test(ua)) return 'mobile';
+  return 'desktop';
+}
 
 @Controller('api/v1/videos')
 export class VideosController {
@@ -54,10 +66,14 @@ export class VideosController {
   @Get(':id/playlist')
   async playlist(
     @Param('id') id: string,
-    @Query('partId') partId?: string,
+    @Query(zodQuery(playlistQuerySchema)) query: z.infer<typeof playlistQuerySchema>,
+    @Req() request: FastifyRequest,
     @CurrentUser() viewer?: AuthUser,
   ) {
-    return this.videos.playlist(id, viewer, partId);
+    return this.videos.playlist(id, viewer, query.partId, {
+      source: query.source,
+      device: deviceFromUserAgent(request.headers['user-agent']),
+    });
   }
 
   @Public()
@@ -145,8 +161,11 @@ export class VideosController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
     @Body(zodBody(progressSchema)) body: z.infer<typeof progressSchema>,
+    @Req() request: FastifyRequest,
   ) {
-    return this.videos.saveProgress(id, user, body);
+    return this.videos.saveProgress(id, user, body, {
+      device: deviceFromUserAgent(request.headers['user-agent']),
+    });
   }
 
   @Post(':id/report')

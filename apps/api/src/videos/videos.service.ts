@@ -17,6 +17,7 @@ import {
   userTagInterests,
   users,
   videoCoins,
+  videoCollaborators,
   videoLikes,
   videoParts,
   videoRenditions,
@@ -54,6 +55,7 @@ import { DatabaseService } from '../common/database.service';
 import { grantExperience } from '../common/experience';
 import { QueueService } from '../common/queue.service';
 import {
+  currentRegionContext,
   regionDenialError,
   regionDenialReason,
   videoRegionCondition,
@@ -240,6 +242,7 @@ export class VideosService {
       partRows,
       collectionRows,
       laterRows,
+      collaboratorRows,
     ] = await Promise.all([
       viewer
         ? this.database.db
@@ -321,6 +324,17 @@ export class VideosService {
             .where(and(eq(watchLater.userId, viewer.id), eq(watchLater.videoId, id)))
             .limit(1)
         : Promise.resolve([]),
+      this.database.db
+        .select({
+          userId: videoCollaborators.userId,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          role: videoCollaborators.role,
+        })
+        .from(videoCollaborators)
+        .innerJoin(users, eq(users.id, videoCollaborators.userId))
+        .where(and(eq(videoCollaborators.videoId, id), eq(videoCollaborators.status, 'accepted'))),
     ]);
 
     const base = videoCard(row, tagNames);
@@ -368,6 +382,12 @@ export class VideosService {
       regionCodes: row.video.regionCodes,
       regionDenyBehavior: row.video.regionDenyBehavior,
       regionDenyMessage: row.video.regionDenyMessage,
+      contentType: row.video.contentType,
+      aiGenerated: row.video.aiGenerated,
+      sourceUrl: row.video.sourceUrl,
+      allowComments: row.video.allowComments,
+      allowDanmaku: row.video.allowDanmaku,
+      collaborators: collaboratorRows,
       playlistUrl:
         playablePart?.playlistUrl ??
         (row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null),
@@ -478,7 +498,12 @@ export class VideosService {
     };
   }
 
-  async playlist(id: string, viewer?: AuthUser, partId?: string) {
+  async playlist(
+    id: string,
+    viewer?: AuthUser,
+    partId?: string,
+    meta: { source?: string; device?: string } = {},
+  ) {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
     const part = partId ? await this.getPart(id, partId) : null;
@@ -493,7 +518,11 @@ export class VideosService {
     await this.database.db.insert(watchEvents).values({
       userId: viewer?.id ?? null,
       videoId: id,
+      partId: part?.id ?? null,
       eventType: 'view',
+      source: meta.source ?? 'direct',
+      device: meta.device ?? 'unknown',
+      country: currentRegionContext().code ?? '',
     });
     const [renditions, subtitles] = await Promise.all([
       this.database.db
@@ -724,7 +753,14 @@ export class VideosService {
   async saveProgress(
     id: string,
     viewer: AuthUser,
-    input: { positionMs: number; durationMs?: number; partId?: string; completed?: boolean },
+    input: {
+      positionMs: number;
+      durationMs?: number;
+      partId?: string;
+      completed?: boolean;
+      source?: string;
+    },
+    meta: { device?: string } = {},
   ) {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
@@ -761,9 +797,13 @@ export class VideosService {
     await this.database.db.insert(watchEvents).values({
       userId: viewer.id,
       videoId: id,
+      partId: input.partId ?? null,
       positionMs: input.positionMs,
       durationMs: input.durationMs ?? 0,
       eventType: input.completed ? 'complete' : 'progress',
+      source: input.source ?? 'direct',
+      device: meta.device ?? 'unknown',
+      country: currentRegionContext().code ?? '',
     });
     const completedNow = input.completed ?? false;
     const syncedAt = existing?.tagSyncedAt?.getTime() ?? 0;

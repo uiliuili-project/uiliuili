@@ -203,6 +203,9 @@ export class CommentsService {
     if (row.video.status !== 'published') {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未发布', 400);
     }
+    if (!row.video.allowComments) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, 'UP 主已关闭评论', 403);
+    }
     const content = input.content.split('\u0000').join('').trim();
     if (!content) throw new AppError(ERROR_CODES.BAD_REQUEST, '评论不能为空', 400);
     await this.rateLimit.check('comment', this.rateLimit.contextFrom(viewer, ip));

@@ -4,6 +4,7 @@ import {
   categories,
   favoriteFolders,
   favoriteItems,
+  followEvents,
   follows,
   notifications,
   tags,
@@ -176,10 +177,18 @@ export class UsersService {
     if (viewer.id === targetId) throw new Error('不能关注自己');
     const target = await this.byId(targetId);
     if (!target) throw new Error('用户不存在');
-    await this.database.db
+    const inserted = await this.database.db
       .insert(follows)
       .values({ followerId: viewer.id, followingId: targetId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ followerId: follows.followerId });
+    if (inserted.length > 0) {
+      await this.database.db.insert(followEvents).values({
+        followerId: viewer.id,
+        followingId: targetId,
+        eventType: 'follow',
+      });
+    }
     if (viewer.id !== targetId) {
       await this.database.db.insert(notifications).values({
         userId: targetId,
@@ -194,9 +203,17 @@ export class UsersService {
   }
 
   async unfollow(viewer: AuthUser, targetId: string) {
-    await this.database.db
+    const removed = await this.database.db
       .delete(follows)
-      .where(and(eq(follows.followerId, viewer.id), eq(follows.followingId, targetId)));
+      .where(and(eq(follows.followerId, viewer.id), eq(follows.followingId, targetId)))
+      .returning({ followerId: follows.followerId });
+    if (removed.length > 0) {
+      await this.database.db.insert(followEvents).values({
+        followerId: viewer.id,
+        followingId: targetId,
+        eventType: 'unfollow',
+      });
+    }
     return { following: false };
   }
 

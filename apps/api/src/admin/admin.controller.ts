@@ -49,6 +49,18 @@ const moderationTestSchema = z.object({
   content: z.string().min(1).max(10_000),
 });
 
+const appealQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['pending', 'accepted', 'rejected']).optional(),
+  q: z.string().max(100).optional(),
+});
+
+const appealHandleSchema = z.object({
+  status: z.enum(['accepted', 'rejected']),
+  note: z.string().max(500).optional(),
+});
+
 const oauthSchema = z.object({
   enabled: z.boolean().default(false),
   clientId: z.string().default(''),
@@ -114,6 +126,22 @@ export class AdminController {
     @Body(zodBody(adminVideoUpdateSchema)) body: z.infer<typeof adminVideoUpdateSchema>,
   ) {
     return this.admin.updateVideo(actor, id, body);
+  }
+
+  @Get('appeals')
+  @RequirePermissions('video:manage_any')
+  async appeals(@Query(zodQuery(appealQuerySchema)) query: z.infer<typeof appealQuerySchema>) {
+    return this.admin.listAppeals(query);
+  }
+
+  @Post('appeals/:id/handle')
+  @RequirePermissions('video:manage_any')
+  async handleAppeal(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body(zodBody(appealHandleSchema)) body: z.infer<typeof appealHandleSchema>,
+  ) {
+    return this.admin.handleAppeal(actor, id, body);
   }
 
   @Get('danmaku')

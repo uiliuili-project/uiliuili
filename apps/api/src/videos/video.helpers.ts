@@ -51,6 +51,8 @@ export function videoCard(row: VideoJoinRow, tags: string[]): VideoCard {
     uploader: publicUser(row.uploader),
     tags,
     restricted: row.video.restricted,
+    contentType: row.video.contentType,
+    aiGenerated: row.video.aiGenerated,
   };
 }
 

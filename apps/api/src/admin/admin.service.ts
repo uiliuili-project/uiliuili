@@ -21,6 +21,8 @@ import {
   siteSettings,
   tags,
   users,
+  videoAppeals,
+  videoStatusLogs,
   videoTags,
   videos,
 } from '@uiliuili/db';
@@ -521,6 +523,134 @@ export class AdminService {
       after: input,
     });
     return updated;
+  }
+
+  async listAppeals(query: {
+    page: number;
+    limit: number;
+    status?: string;
+    q?: string;
+  }) {
+    const offset = (query.page - 1) * query.limit;
+    const where = and(
+      query.status ? eq(videoAppeals.status, query.status) : undefined,
+      query.q ? ilike(videos.title, `%${query.q}%`) : undefined,
+    );
+    const [rows, total] = await Promise.all([
+      this.database.db
+        .select({
+          appeal: videoAppeals,
+          videoTitle: videos.title,
+          videoStatus: videos.status,
+          videoCover: videos.coverUrl,
+          blockReason: videos.blockReason,
+          username: users.username,
+          displayName: users.displayName,
+        })
+        .from(videoAppeals)
+        .innerJoin(videos, eq(videos.id, videoAppeals.videoId))
+        .innerJoin(users, eq(users.id, videoAppeals.userId))
+        .where(where)
+        .orderBy(desc(videoAppeals.createdAt))
+        .limit(query.limit)
+        .offset(offset),
+      this.database.db
+        .select({ value: count() })
+        .from(videoAppeals)
+        .innerJoin(videos, eq(videos.id, videoAppeals.videoId))
+        .where(where),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.appeal.id,
+        videoId: row.appeal.videoId,
+        videoTitle: row.videoTitle,
+        videoStatus: row.videoStatus,
+        videoCover: row.videoCover,
+        blockReason: row.blockReason,
+        reason: row.appeal.reason,
+        detail: row.appeal.detail,
+        status: row.appeal.status,
+        handleNote: row.appeal.handleNote,
+        handledAt: row.appeal.handledAt?.toISOString() ?? null,
+        createdAt: row.appeal.createdAt.toISOString(),
+        user: { username: row.username, displayName: row.displayName },
+      })),
+      total: Number(total[0]?.value ?? 0),
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  async handleAppeal(
+    actor: AuthUser,
+    id: string,
+    input: { status: 'accepted' | 'rejected'; note?: string },
+  ) {
+    this.assertPermission(actor, 'video:manage_any');
+    const rows = await this.database.db
+      .select({ appeal: videoAppeals, video: videos })
+      .from(videoAppeals)
+      .innerJoin(videos, eq(videos.id, videoAppeals.videoId))
+      .where(eq(videoAppeals.id, id))
+      .limit(1);
+    const row = rows[0];
+    if (!row) throw new AppError(ERROR_CODES.NOT_FOUND, '申诉不存在', 404);
+    if (row.appeal.status !== 'pending') {
+      throw new AppError(ERROR_CODES.BAD_REQUEST, '申诉已处理', 400);
+    }
+    const note = (input.note ?? '').slice(0, 500);
+    await this.database.db
+      .update(videoAppeals)
+      .set({
+        status: input.status,
+        handleNote: note,
+        handledBy: actor.id,
+        handledAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(videoAppeals.id, id));
+    if (input.status === 'accepted' && row.video.status === 'blocked') {
+      await this.database.db
+        .update(videos)
+        .set({
+          status: 'published',
+          blockReason: '',
+          deletedAt: null,
+          publishedAt: row.video.publishedAt ?? new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(videos.id, row.video.id));
+      await this.database.db.insert(videoStatusLogs).values({
+        videoId: row.video.id,
+        fromStatus: row.video.status,
+        toStatus: 'published',
+        actorId: actor.id,
+        reason: 'appeal',
+      });
+      await this.queue.enqueue(
+        'search-index',
+        { videoId: row.video.id },
+        { idempotencyKey: `search:${row.video.id}:${Date.now()}` },
+      );
+    }
+    await this.database.db.insert(notifications).values({
+      userId: row.appeal.userId,
+      actorId: actor.id,
+      type: 'appeal',
+      title: input.status === 'accepted' ? '申诉已通过' : '申诉未通过',
+      body: note || row.video.title,
+      link: `/video/${row.video.id}`,
+    });
+    await this.audit.record({
+      actorId: actor.id,
+      action: 'admin.appeal.handle',
+      targetType: 'video_appeal',
+      targetId: id,
+      before: { status: 'pending' },
+      after: { status: input.status, note },
+    });
+    return { ok: true };
   }
 
   async listDanmaku(query: {

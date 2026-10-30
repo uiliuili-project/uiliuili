@@ -11,6 +11,7 @@ import { runCleanup } from './cleanup';
 import { transcodeVideo } from './media';
 import { notifyFollowersOfNewVideo } from './notifications';
 import { decayTagInterests, rebuildSimilarities } from './recommend';
+import { rollupDailyStats } from './rollup';
 import { indexVideo, reindexAll } from './search';
 
 export type Job = typeof backgroundJobs.$inferSelect;
@@ -149,6 +150,9 @@ export async function processJob(db: Db, job: Job): Promise<unknown> {
         await runCleanup(db);
         return { ok: true };
       }
+      case 'daily-rollup': {
+        return rollupDailyStats(db, payload.day ? String(payload.day) : undefined);
+      }
       case 'daily-coins': {
         const rows = await db
           .select()
@@ -198,6 +202,15 @@ export async function scheduleRecurringJobs(db: Db): Promise<void> {
   const date = now.toISOString().slice(0, 10);
   const hour = now.toISOString().slice(0, 13);
   await enqueue(db, 'daily-coins', {}, { idempotencyKey: `daily-coins:${date}` });
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  for (const day of [yesterday, date]) {
+    await enqueue(
+      db,
+      'daily-rollup',
+      { day },
+      { idempotencyKey: `daily-rollup:${day}`, maxAttempts: 2 },
+    );
+  }
   await enqueue(db, 'cleanup', {}, { idempotencyKey: `cleanup:${hour}` });
   await enqueue(db, 'recommend', {}, { idempotencyKey: `recommend:${date}`, maxAttempts: 1 });
   await enqueue(db, 'tag-decay', {}, { idempotencyKey: `tag-decay:${date}` });
