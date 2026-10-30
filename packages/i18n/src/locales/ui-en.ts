@@ -624,7 +624,6 @@ export const uiEn: Record<string, string> = {
   页面不存在: 'Page not found',
   '你访问的内容可能已被删除或从未存在。': 'The content may have been deleted or never existed.',
   关于萌悠: 'About MoeYou',
-  安装向导: 'Installer',
   欢迎来到: 'Welcome to',
   '还没有已发布的视频。完成安装并上传第一支视频后，这里会自动出现推荐内容。':
     'No published videos yet. Finish setup and upload your first video to see recommendations here.',
@@ -1273,4 +1272,6 @@ export const uiEn: Record<string, string> = {
   '站点尚未正确配置人机验证，请联系管理员。':
     'Captcha is not configured correctly. Contact the site administrator.',
   '待审核，仅自己可见': 'Pending review — visible only to you',
+  '站点尚未安装，请先完成安装向导。':
+    'This site is not installed yet. Complete the installer first.',
 };

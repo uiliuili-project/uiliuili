@@ -10,9 +10,7 @@ export default async function AboutPage() {
         <p className="mt-4 text-sm leading-7 text-muted">{t('about.intro')}</p>
         <p className="mt-3 text-sm leading-7 text-muted">{t('about.runtime')}</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <a href="/admin/install" className="btn-ghost">
-            {t('about.installer')}
-          </a>
+          {/* Only staff see this; the console link checks the account itself. */}
           <AdminConsoleLink className="btn-ghost" />
         </div>
       </div>

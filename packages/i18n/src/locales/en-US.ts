@@ -258,7 +258,6 @@ export const enUS = {
       'MoeYou is an open-source, self-hosted danmaku video community with uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin console.',
     runtime:
       'The project is released under the MIT license. The runtime only needs Node.js, PostgreSQL, and FFmpeg; Redis, Meilisearch, S3, SMTP, and OAuth are optional enhancements.',
-    installer: 'Installer',
   },
   admin: {
     dashboard: 'Dashboard',

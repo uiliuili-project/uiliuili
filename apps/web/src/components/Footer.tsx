@@ -1,7 +1,7 @@
 'use client';
 
 import { api, getMe } from '@/lib/api';
-import { type AuthUser, type NavigationItem } from '@uiliuili/shared';
+import { type AuthUser, type NavigationItem, consoleAreaForGroup } from '@uiliuili/shared';
 import {
   BookOpen,
   Download,
@@ -57,7 +57,7 @@ export function Footer() {
       .catch(() => undefined);
   }, []);
 
-  const isStaff = Boolean(user?.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'));
+  const isStaff = consoleAreaForGroup(user?.group) !== null;
   const customLinks = (settings.navigation?.footer ?? [])
     .filter((item) => item.enabled)
     .filter((item) => {

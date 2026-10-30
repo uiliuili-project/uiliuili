@@ -29,12 +29,14 @@ export default async function HomePage({
 }) {
   const { mode } = await searchParams;
   const moments = mode === 'moments';
-  const [t, locale, feed, announcements, setup] = await Promise.all([
+  const [t, locale, feed, announcements, setup, install] = await Promise.all([
     getT(),
     getLocale(),
     serverFetchSafe<HomeFeed>('/api/v1/feed/home', emptyFeed),
     serverFetchSafe<{ items: Announcement[] }>('/api/v1/announcements', { items: [] }),
     serverFetchSafe<{ needsOwner: boolean }>('/api/v1/auth/setup-status', { needsOwner: false }),
+    // 404 once installed, so any failure means the site is already installed.
+    serverFetchSafe<{ installed: boolean }>('/api/install/status', { installed: true }),
   ]);
   const hero = feed.sections.recommended.items[0];
   const recommended = feed.sections.recommended.items.slice(hero ? 1 : 0, 8);
@@ -42,6 +44,14 @@ export default async function HomePage({
 
   return (
     <div className="container-page py-6">
+      {install.installed === false && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl2 border border-brand/20 bg-brand-light/50 px-4 py-3 text-sm text-brand-dark">
+          <span>{t('站点尚未安装，请先完成安装向导。')}</span>
+          <Link href="/admin/install" className="btn-primary">
+            {t('开始安装')}
+          </Link>
+        </div>
+      )}
       {setup.needsOwner && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           <span>{t('站点尚未设置站长，请注册第一个账号完成初始化。')}</span>

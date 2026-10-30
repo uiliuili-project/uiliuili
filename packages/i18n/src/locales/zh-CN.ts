@@ -253,7 +253,6 @@ export const zhCN = {
       '萌悠是一个开源、自托管的弹幕视频社区。它包含视频上传、FFmpeg HLS 转码、Canvas 弹幕播放器、评论、关注、收藏、投币、通知、搜索、推荐和可视化管理后台。',
     runtime:
       '项目以 MIT 许可证开源。运行时只需要 Node.js、PostgreSQL 和 FFmpeg；Redis、Meilisearch、S3、SMTP 与 OAuth 都是可选增强。',
-    installer: '安装向导',
   },
   admin: {
     dashboard: '仪表盘',
