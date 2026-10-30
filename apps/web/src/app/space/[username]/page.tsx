@@ -5,8 +5,9 @@ import { formatCount, formatDate, relativeTime } from '@/lib/format';
 import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetch, serverFetchSafe } from '@/lib/server-api';
 import type { FavoritesResponse, SpaceProfile } from '@/lib/types';
+import { regionLabel } from '@uiliuili/shared';
 import type { CollectionInfo, DynamicItem, VideoCard as VideoCardType } from '@uiliuili/shared';
-import { Award, CalendarDays, Heart, Layers, MessageSquare, Users } from 'lucide-react';
+import { Award, CalendarDays, Heart, Layers, MapPin, MessageSquare, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -73,9 +74,17 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
   return (
     <div className="container-page py-6">
       <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-        <div className="relative h-36 bg-gradient-to-r from-brand via-[#ff9db5] to-[#ffd9e4]">
+        <div className="relative h-44 bg-gradient-to-r from-brand via-[#ff9db5] to-[#ffd9e4] sm:h-56">
           {profile.user.coverUrl && (
             <img src={profile.user.coverUrl} alt="" className="h-full w-full object-cover" />
+          )}
+          {profile.isSelf && (
+            <Link
+              href="/settings"
+              className="absolute right-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-xs text-white backdrop-blur transition hover:bg-black/60"
+            >
+              {t('更换头图')}
+            </Link>
           )}
         </div>
         <div className="px-5 pb-6 sm:px-8">
@@ -134,6 +143,12 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
               <CalendarDays className="h-4 w-4" />
               {t('common.joinDate', { date: formatDate(profile.user.createdAt, locale) })}
             </span>
+            {profile.user.lastRegion && (
+              <span className="inline-flex items-center gap-1.5 text-muted">
+                <MapPin className="h-4 w-4" />
+                {t('IP 属地：{0}', { 0: regionLabel(profile.user.lastRegion, locale) })}
+              </span>
+            )}
           </div>
           {profile.user.bio && (
             <p className="mt-3 text-sm leading-6 text-muted">{profile.user.bio}</p>
@@ -282,6 +297,12 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
                           >
                             #{dynamic.topic.title}
                           </Link>
+                        </>
+                      )}
+                      {dynamic.ipRegion && (
+                        <>
+                          {' · '}
+                          {t('IP 属地：{0}', { 0: regionLabel(dynamic.ipRegion, locale) })}
                         </>
                       )}
                     </div>

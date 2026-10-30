@@ -4,6 +4,7 @@ import { useLocale, useT } from './I18nProvider';
 import { api, getMe } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatCount, relativeTime } from '@/lib/format';
+import { regionLabel } from '@uiliuili/shared';
 import type { CommentItem } from '@uiliuili/shared';
 import { Heart, MessageCircle, Pin, Send, Smile, ThumbsUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -377,6 +378,9 @@ function CommentRow({
             </span>
           )}
           <span>{relativeTime(comment.createdAt, locale)}</span>
+          {comment.ipRegion && (
+            <span>{t('IP 属地：{0}', { 0: regionLabel(comment.ipRegion, locale) })}</span>
+          )}
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.content}</p>
         {comment.upLiked && (

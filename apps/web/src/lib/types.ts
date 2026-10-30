@@ -31,6 +31,7 @@ export interface SpaceProfile {
     badges?: Array<{ code: string; label: string; description: string; awardedAt?: string }>;
     createdAt: string;
     roles: string[];
+    lastRegion?: string | null;
   };
   stats: { videos: number; followers: number; following: number };
   following: boolean;

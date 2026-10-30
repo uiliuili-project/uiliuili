@@ -1,14 +1,26 @@
 'use client';
 import { useLocale, useT } from '@/components/I18nProvider';
 
-import { api } from '@/lib/api';
+import { api, removeCover, uploadCover } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
+import { cropCover } from '@/lib/image';
 import type { FollowGroup, FollowGroupsResponse, RegionContextInfo } from '@/lib/types';
-import type { AuthUser, PublicUser } from '@uiliuili/shared';
-import { BellRing, Globe2, Monitor, Shield, ShieldOff, User, Users } from 'lucide-react';
+import type { AuthUser, PublicUser, TagInterest } from '@uiliuili/shared';
+import {
+  BellRing,
+  Globe2,
+  ImageIcon,
+  Monitor,
+  Shield,
+  ShieldOff,
+  Sparkles,
+  User,
+  Users,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface SessionItem {
   id: string;
@@ -24,7 +36,14 @@ export default function SettingsPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [tab, setTab] = useState<
-    'profile' | 'region' | 'security' | 'sessions' | 'groups' | 'blocked' | 'notifications'
+    | 'profile'
+    | 'region'
+    | 'recommend'
+    | 'security'
+    | 'sessions'
+    | 'groups'
+    | 'blocked'
+    | 'notifications'
   >('profile');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -38,6 +57,10 @@ export default function SettingsPage() {
   const [region, setRegion] = useState<RegionContextInfo | null>(null);
   const [showRestricted, setShowRestricted] = useState(false);
   const [savingPreference, setSavingPreference] = useState(false);
+  const [interests, setInterests] = useState<TagInterest[]>([]);
+  const [interestsLoading, setInterestsLoading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -76,6 +99,14 @@ export default function SettingsPage() {
         .get<{ items: PublicUser[] }>('/api/v1/me/blocked')
         .then((data) => setBlocked(data.items))
         .catch((error) => setError(error instanceof Error ? error.message : t('加载失败')));
+    }
+    if (tab === 'recommend') {
+      setInterestsLoading(true);
+      void api
+        .get<{ items: TagInterest[] }>('/api/v1/me/tag-interests')
+        .then((data) => setInterests(data.items))
+        .catch((error) => setError(error instanceof Error ? error.message : t('加载失败')))
+        .finally(() => setInterestsLoading(false));
     }
   }, [tab]);
 
@@ -170,6 +201,64 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCover = async (file: File | undefined) => {
+    if (!file) return;
+    setMessage('');
+    setError('');
+    setCoverUploading(true);
+    try {
+      const cropped = await cropCover(file);
+      const data = await uploadCover(cropped);
+      setUser(data.user);
+      setMessage(t('头图已更新'));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : t('上传失败'));
+    } finally {
+      setCoverUploading(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const clearCover = async () => {
+    setMessage('');
+    setError('');
+    setCoverUploading(true);
+    try {
+      const data = await removeCover();
+      setUser(data.user);
+      setMessage(t('头图已移除'));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : t('操作失败'));
+    } finally {
+      setCoverUploading(false);
+    }
+  };
+
+  const removeInterest = async (tagId: string) => {
+    setMessage('');
+    setError('');
+    try {
+      await api.delete(`/api/v1/me/tag-interests/${tagId}`);
+      setInterests((current) => current.filter((item) => item.tagId !== tagId));
+      setMessage(t('已移除该标签兴趣'));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('操作失败'));
+    }
+  };
+
+  const clearInterests = async () => {
+    if (!window.confirm(t('确定清空全部标签兴趣吗？推荐将重新从浏览记录学习。'))) return;
+    setMessage('');
+    setError('');
+    try {
+      await api.delete('/api/v1/me/tag-interests');
+      setInterests([]);
+      setMessage(t('标签兴趣已清空'));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('操作失败'));
+    }
+  };
+
   const saveProfile = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage('');
@@ -240,6 +329,7 @@ export default function SettingsPage() {
           {[
             { key: 'profile', label: t('个人资料'), icon: User },
             { key: 'region', label: t('地区与限制级内容'), icon: Globe2 },
+            { key: 'recommend', label: t('推荐偏好'), icon: Sparkles },
             { key: 'security', label: t('账号安全'), icon: Shield },
             { key: 'sessions', label: t('登录设备'), icon: Monitor },
             { key: 'groups', label: t('关注分组'), icon: Users },
@@ -274,6 +364,48 @@ export default function SettingsPage() {
           )}
           {tab === 'profile' && (
             <form onSubmit={saveProfile} className="max-w-xl space-y-4">
+              <div className="rounded-xl border border-line p-4">
+                <div className="text-sm font-medium">{t('空间头图')}</div>
+                <p className="mt-1 text-xs text-muted">
+                  {t('建议上传横向图片，会按 4:1 居中裁剪为 1920×480。')}
+                </p>
+                <div className="mt-3 aspect-[4/1] overflow-hidden rounded-lg bg-canvas">
+                  {user.coverUrl ? (
+                    <img src={user.coverUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-muted">
+                      <ImageIcon className="h-6 w-6" />
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => void handleCover(event.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={coverUploading}
+                    className="btn-ghost h-9"
+                  >
+                    {coverUploading ? t('处理中…') : t('上传头图')}
+                  </button>
+                  {user.coverUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void clearCover()}
+                      disabled={coverUploading}
+                      className="btn-ghost h-9 text-red-500 hover:border-red-200 hover:text-red-600"
+                    >
+                      {t('移除头图')}
+                    </button>
+                  )}
+                </div>
+              </div>
               <div>
                 <label className="label" htmlFor="displayName">
                   {t('昵称')}{' '}
@@ -350,6 +482,65 @@ export default function SettingsPage() {
                   <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                     {t('当前地区不支持显示限制级内容。')}
                   </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'recommend' && (
+            <div className="max-w-2xl space-y-5">
+              <div className="rounded-xl border border-line p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">{t('标签兴趣')}</div>
+                    <p className="mt-1 text-sm text-muted">
+                      {t(
+                        '系统会根据最近的观看记录学习你的标签偏好，并用于首页推荐。你可以随时移除或清空。',
+                      )}
+                    </p>
+                  </div>
+                  {interests.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void clearInterests()}
+                      className="btn-ghost h-9 shrink-0 text-red-500 hover:border-red-200 hover:text-red-600"
+                    >
+                      {t('全部清空')}
+                    </button>
+                  )}
+                </div>
+                {interestsLoading ? (
+                  <p className="mt-3 text-xs text-muted">{t('加载中…')}</p>
+                ) : interests.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {interests.map((interest) => (
+                      <span
+                        key={interest.tagId}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-3 py-1 text-xs"
+                        title={t('兴趣分值 {0}', { 0: interest.score.toFixed(2) })}
+                      >
+                        <span className="font-medium">#{interest.name}</span>
+                        <span className="text-muted">{interest.score.toFixed(1)}</span>
+                        <button
+                          type="button"
+                          onClick={() => void removeInterest(interest.tagId)}
+                          className="text-muted hover:text-red-500"
+                          aria-label={t('移除')}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+                    {t('还没有学习到标签兴趣，观看一些视频后再来看看。')}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-line p-4 text-xs text-muted">
+                {t(
+                  '标签兴趣只保存在服务端，不会显示在个人主页。清空后首页会暂时回到分区与热门推荐。',
                 )}
               </div>
             </div>

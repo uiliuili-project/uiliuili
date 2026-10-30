@@ -46,11 +46,12 @@ function readCookie(name: string): string | undefined {
 
 export async function clientFetch<T>(
   path: string,
-  options: RequestInit & { body?: unknown } = {},
+  options: RequestInit & { body?: unknown; raw?: boolean } = {},
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  const method = (options.method ?? 'GET').toUpperCase();
-  if (options.body !== undefined && !(options.body instanceof FormData)) {
+  const { raw, ...init } = options;
+  const headers = new Headers(init.headers);
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (init.body !== undefined && !raw && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
@@ -58,12 +59,12 @@ export async function clientFetch<T>(
     if (csrf) headers.set('x-csrf-token', csrf);
   }
   const body = (
-    options.body === undefined || options.body instanceof FormData
-      ? options.body
-      : JSON.stringify(options.body)
+    init.body === undefined || raw || init.body instanceof FormData
+      ? init.body
+      : JSON.stringify(init.body)
   ) as BodyInit | undefined;
   let response = await fetch(path, {
-    ...options,
+    ...init,
     method,
     headers,
     credentials: 'include',
@@ -77,7 +78,7 @@ export async function clientFetch<T>(
     });
     if (refreshed.ok) {
       response = await fetch(path, {
-        ...options,
+        ...init,
         method,
         headers,
         credentials: 'include',
@@ -114,4 +115,33 @@ export async function getMe() {
   } catch {
     return null;
   }
+}
+
+/** Uploads a cropped personal-space cover as raw image bytes. */
+export function uploadCover(image: Blob) {
+  return clientFetch<{ user: import('@uiliuili/shared').AuthUser }>('/api/v1/auth/cover', {
+    method: 'PUT',
+    body: image,
+    raw: true,
+    headers: { 'content-type': image.type || 'image/webp' },
+  });
+}
+
+export function removeCover() {
+  return clientFetch<{ user: import('@uiliuili/shared').AuthUser }>('/api/v1/auth/cover', {
+    method: 'DELETE',
+  });
+}
+
+/** Uploads a composer image and returns the stored public URL. */
+export function uploadImage(image: Blob) {
+  return clientFetch<{ url: string; contentType: string; bytes: number }>(
+    '/api/v1/uploads/images',
+    {
+      method: 'POST',
+      body: image,
+      raw: true,
+      headers: { 'content-type': image.type || 'application/octet-stream' },
+    },
+  );
 }

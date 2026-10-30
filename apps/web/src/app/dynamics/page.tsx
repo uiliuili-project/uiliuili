@@ -1,13 +1,15 @@
 'use client';
 import { useLocale, useT } from '@/components/I18nProvider';
 
-import { api, getMe } from '@/lib/api';
+import { api, getMe, uploadImage } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatCount, relativeTime } from '@/lib/format';
+import { assertImageFile } from '@/lib/image';
+import { regionLabel } from '@uiliuili/shared';
 import type { DynamicItem, TopicInfo } from '@uiliuili/shared';
-import { Heart, ImageIcon, Send, Sparkles, Trash2 } from 'lucide-react';
+import { Heart, ImagePlus, Loader2, Send, Sparkles, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface DynamicResponse {
   items: DynamicItem[];
@@ -23,7 +25,9 @@ export default function DynamicsPage() {
   const [topics, setTopics] = useState<TopicInfo[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [content, setContent] = useState('');
-  const [images, setImages] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [topicId, setTopicId] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
@@ -56,23 +60,37 @@ export default function DynamicsPage() {
       .catch(() => undefined);
   }, []);
 
+  const addImages = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setMessage('');
+    setUploading(true);
+    try {
+      const remaining = Math.max(0, 9 - images.length);
+      const chosen = Array.from(files).slice(0, remaining);
+      for (const file of chosen) assertImageFile(file, 10);
+      const uploaded = await Promise.all(chosen.map((file) => uploadImage(file)));
+      setImages((current) => [...current, ...uploaded.map((item) => item.url)].slice(0, 9));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('上传失败'));
+    } finally {
+      setUploading(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
   const publish = async () => {
-    if (!content.trim() && !images.trim()) return;
+    if (!content.trim() && images.length === 0) return;
     setPosting(true);
     setMessage('');
     try {
       await api.post('/api/v1/dynamics', {
         content: content.trim(),
-        images: images
-          .split(/[\n,，\s]+/)
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .slice(0, 9),
+        images,
         topicId: topicId || undefined,
         visibility: 'public',
       });
       setContent('');
-      setImages('');
+      setImages([]);
       setTopicId('');
       await load();
       setMessage(t('动态已发布'));
@@ -143,18 +161,55 @@ export default function DynamicsPage() {
               placeholder={t('分享此刻的想法…')}
               className="input resize-none"
             />
-            <div className="mt-2 flex items-center gap-3 text-xs text-muted">
-              <ImageIcon className="h-4 w-4" />
+            {images.length > 0 && (
+              <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                {images.map((image) => (
+                  <div
+                    key={image}
+                    className="group relative aspect-square overflow-hidden rounded-lg bg-canvas"
+                  >
+                    <img src={image} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImages((current) => current.filter((item) => item !== image))
+                      }
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"
+                      aria-label={t('移除图片')}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
               <input
-                value={images}
-                onChange={(event) => setImages(event.target.value)}
-                placeholder={t('图片链接（可选，逗号分隔）')}
-                className="min-w-0 flex-1 bg-transparent outline-none"
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={(event) => void addImages(event.target.files)}
               />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploading || images.length >= 9}
+                className="inline-flex items-center gap-1 hover:text-brand disabled:opacity-50"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
+                {uploading ? t('上传中…') : t('添加图片')}
+              </button>
+              <span>{images.length}/9</span>
               <select
                 value={topicId}
                 onChange={(event) => setTopicId(event.target.value)}
-                className="input h-8 w-36 text-xs"
+                className="input ml-auto h-8 w-36 text-xs"
               >
                 <option value="">{t('选择话题')}</option>
                 {topics.map((topic) => (
@@ -166,7 +221,7 @@ export default function DynamicsPage() {
               <button
                 type="button"
                 onClick={() => void publish()}
-                disabled={posting || (!content.trim() && !images.trim())}
+                disabled={posting || uploading || (!content.trim() && images.length === 0)}
                 className="btn-primary h-8 shrink-0 rounded-full px-3 text-xs"
               >
                 <Send className="h-3.5 w-3.5" />
@@ -208,6 +263,12 @@ export default function DynamicsPage() {
                             >
                               #{dynamic.topic.title}
                             </Link>
+                          </>
+                        )}
+                        {dynamic.ipRegion && (
+                          <>
+                            {' · '}
+                            {t('IP 属地：{0}', { 0: regionLabel(dynamic.ipRegion, locale) })}
                           </>
                         )}
                       </span>
