@@ -1278,7 +1278,7 @@ export class AdminService {
   }
 
   async checkUpdate() {
-    const repo = process.env.GITHUB_REPO ?? 'uiliuili/uiliuili';
+    const repo = process.env.GITHUB_REPO ?? 'uiliuili-project/uiliuili';
     try {
       const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
         headers: { 'User-Agent': 'uiliuili', Accept: 'application/vnd.github+json' },

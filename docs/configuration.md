@@ -30,7 +30,7 @@ Do not commit either file.
 | `INSTALL_ALLOW_LOCALHOST` | Allow loopback installer access without token |
 | `TRUST_PROXY` | Trust reverse-proxy headers |
 | `UPGRADE_RESTART_CMD` | Optional fixed command run after a successful admin upgrade (for example `systemctl restart uiliuili-api uiliuili-worker`); never supplied by the browser |
-| `GITHUB_REPO` | Repository used by the manual update check, default `uiliuili/uiliuili` |
+| `GITHUB_REPO` | Repository used by the manual update check, default `uiliuili-project/uiliuili` |
 
 Environment variables take precedence over database settings.
 

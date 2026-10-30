@@ -37,3 +37,13 @@ All notable changes to this project are documented here. The format follows
   when a MaxMind GeoLite2-City database or a `region.provinceHeader` is
   configured; other countries and unknown provinces keep showing the country.
   Provinces are display-only and never affect region policy.
+- Maintenance mode is rendered on the server, so visitors without JavaScript
+  and crawlers see the notice, while reviewers, administrators and the owner
+  keep full access to the site instead of being locked out.
+- Rate limit settings reject a hard threshold that is not above the soft
+  threshold, which would otherwise skip the captcha step entirely; the admin
+  form validates the same rule before saving.
+- The manual update check defaults to the project repository
+  (`uiliuili-project/uiliuili`) instead of a non-existent one.
+- Queue retry/cancel and search reindex controls are disabled for accounts
+  without `system:operate` instead of failing with a permission error.

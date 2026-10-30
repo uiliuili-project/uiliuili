@@ -42,6 +42,7 @@ export function SystemPage() {
   const t = useT();
   const actor = useAdminUser();
   const canUpdate = can(actor, 'system:update');
+  const canOperate = can(actor, 'system:operate');
   const queryClient = useQueryClient();
   const [jobPage, setJobPage] = useState(1);
   const [jobStatus, setJobStatus] = useState<string | undefined>();
@@ -204,7 +205,7 @@ export function SystemPage() {
               <Button icon={<CloudDownloadOutlined />} onClick={() => void checkUpdate()}>
                 {t('检查更新')}{' '}
               </Button>
-              <Button icon={<SyncOutlined />} onClick={() => void reindex()}>
+              <Button icon={<SyncOutlined />} disabled={!canOperate} onClick={() => void reindex()}>
                 {t('重建搜索索引')}{' '}
               </Button>
               {updateInfo && (
@@ -428,12 +429,21 @@ export function SystemPage() {
               render: (_value, record) => (
                 <Space>
                   {['failed', 'cancelled'].includes(record.status) && (
-                    <Button size="small" onClick={() => void retry(record.id)}>
+                    <Button
+                      size="small"
+                      disabled={!canOperate}
+                      onClick={() => void retry(record.id)}
+                    >
                       {t('重试')}{' '}
                     </Button>
                   )}
                   {['created', 'retry'].includes(record.status) && (
-                    <Button size="small" danger onClick={() => void cancel(record.id)}>
+                    <Button
+                      size="small"
+                      danger
+                      disabled={!canOperate}
+                      onClick={() => void cancel(record.id)}
+                    >
                       {t('取消')}{' '}
                     </Button>
                   )}
