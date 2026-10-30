@@ -31,7 +31,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useT } from './I18nProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -58,6 +59,9 @@ export function Header() {
   const [unread, setUnread] = useState(0);
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const [siteName, setSiteName] = useState('萌悠');
   const [siteLogo, setSiteLogo] = useState('');
   const [showSiteName, setShowSiteName] = useState(true);
@@ -132,6 +136,50 @@ export function Header() {
       }
     });
   }, [pathname]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (accountButtonRef.current?.contains(target) || accountMenuRef.current?.contains(target)) {
+        return;
+      }
+      setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    const closeOnViewportChange = () => setMenuOpen(false);
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('resize', closeOnViewportChange);
+    window.addEventListener('scroll', closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('resize', closeOnViewportChange);
+      window.removeEventListener('scroll', closeOnViewportChange, true);
+    };
+  }, [menuOpen]);
+
+  const toggleAccountMenu = () => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    const button = accountButtonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    setMenuPosition({
+      top: rect.bottom + 8,
+      right: Math.max(8, window.innerWidth - rect.right),
+    });
+    setMenuOpen(true);
+  };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -288,8 +336,11 @@ export function Header() {
               </Link>
               <div className="relative">
                 <button
+                  ref={accountButtonRef}
                   type="button"
-                  onClick={() => setMenuOpen((open) => !open)}
+                  onClick={toggleAccountMenu}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
                   className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-canvas ring-1 ring-line"
                 >
                   {user.avatarUrl ? (
@@ -300,72 +351,80 @@ export function Header() {
                     </span>
                   )}
                 </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-12 w-52 overflow-hidden rounded-xl border border-line bg-white p-1 shadow-float">
-                    <div className="px-3 py-2">
-                      <div className="truncate text-sm font-semibold">{user.displayName}</div>
-                      <div className="truncate text-xs text-muted">@{user.username}</div>
-                    </div>
-                    <Link
-                      href={`/space/${user.username}`}
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                {menuOpen &&
+                  menuPosition &&
+                  createPortal(
+                    <div
+                      ref={accountMenuRef}
+                      role="menu"
+                      style={{ top: menuPosition.top, right: menuPosition.right }}
+                      className="fixed z-[70] w-52 overflow-hidden rounded-xl border border-line bg-white p-1 shadow-float"
                     >
-                      <User className="h-4 w-4" />
-                      {t('nav.space')}
-                    </Link>
-                    <Link
-                      href="/studio"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                    >
-                      <Clapperboard className="h-4 w-4" />
-                      {t('nav.studio')}
-                    </Link>
-                    {isStaff && (
-                      <a
-                        href="/admin/"
+                      <div className="px-3 py-2">
+                        <div className="truncate text-sm font-semibold">{user.displayName}</div>
+                        <div className="truncate text-xs text-muted">@{user.username}</div>
+                      </div>
+                      <Link
+                        href={`/space/${user.username}`}
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
                       >
-                        <ShieldCheck className="h-4 w-4" />
-                        {consoleLabel}
-                      </a>
-                    )}
-                    <Link
-                      href="/watch-later"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                    >
-                      <Clock className="h-4 w-4" />
-                      {t('稍后再看')}
-                    </Link>
-                    <Link
-                      href="/favorites"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {t('我的收藏')}
-                    </Link>
-                    <Link
-                      href="/settings"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                    >
-                      <Settings className="h-4 w-4" />
-                      {t('settings.title')}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={logout}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      {t('common.logout')}
-                    </button>
-                  </div>
-                )}
+                        <User className="h-4 w-4" />
+                        {t('nav.space')}
+                      </Link>
+                      <Link
+                        href="/studio"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                      >
+                        <Clapperboard className="h-4 w-4" />
+                        {t('nav.studio')}
+                      </Link>
+                      {isStaff && (
+                        <a
+                          href="/admin/"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          {consoleLabel}
+                        </a>
+                      )}
+                      <Link
+                        href="/watch-later"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                      >
+                        <Clock className="h-4 w-4" />
+                        {t('稍后再看')}
+                      </Link>
+                      <Link
+                        href="/favorites"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {t('我的收藏')}
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+                      >
+                        <Settings className="h-4 w-4" />
+                        {t('settings.title')}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={logout}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        {t('common.logout')}
+                      </button>
+                    </div>,
+                    document.body,
+                  )}
               </div>
             </>
           ) : (
