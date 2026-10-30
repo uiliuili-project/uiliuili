@@ -13,6 +13,7 @@ import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { grantExperience } from '../common/experience';
+import { currentRegionContext } from '../common/region-context';
 import { decodeCursor, encodeCursor, publicUser } from '../videos/video.helpers';
 import { VideosService } from '../videos/videos.service';
 
@@ -185,6 +186,7 @@ export class CommentsService {
       }
       parentUserId = parent.userId;
     }
+    const region = currentRegionContext();
     const [created] = await this.database.db
       .insert(comments)
       .values({
@@ -192,6 +194,7 @@ export class CommentsService {
         userId: viewer.id,
         parentId: input.parentId ?? null,
         content: content.slice(0, 1000),
+        ipRegion: region.ipLocationEnabled ? region.networkCode || null : null,
       })
       .returning();
     if (!created) throw new AppError(ERROR_CODES.INTERNAL_ERROR, '发布评论失败', 500);
@@ -383,6 +386,7 @@ export class CommentsService {
       pinned: comment.pinned,
       upLiked: comment.upLiked,
       isUploader: comment.userId === uploaderId,
+      ipRegion: currentRegionContext().ipLocationEnabled ? comment.ipRegion : null,
       user: publicUser(user),
       replies,
       replyCount,

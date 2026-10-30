@@ -16,7 +16,7 @@ import { and, count, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
 import { badgesForUser } from '../common/experience';
-import { videoRegionCondition } from '../common/region-context';
+import { currentRegionContext, videoRegionCondition } from '../common/region-context';
 import { videoCard } from '../videos/video.helpers';
 
 export interface UserProfile {
@@ -31,6 +31,8 @@ export interface UserProfile {
   badges?: Awaited<ReturnType<typeof badgesForUser>>;
   createdAt: string;
   roles: string[];
+  /** Latest network country, shown as the profile IP location. */
+  lastRegion: string | null;
 }
 
 @Injectable()
@@ -211,6 +213,7 @@ export class UsersService {
       badges: await badgesForUser(this.database.db, user.id),
       createdAt: user.createdAt.toISOString(),
       roles: user.roles,
+      lastRegion: currentRegionContext().ipLocationEnabled ? user.lastRegion : null,
     };
   }
 

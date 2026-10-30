@@ -1,12 +1,15 @@
 import fs from 'node:fs/promises';
 import { Injectable, Logger } from '@nestjs/common';
+import { users } from '@uiliuili/db';
 import {
   REGION_OPTIONS,
   type RegionSource,
   normalizeRegionCode,
   normalizeRegionList,
 } from '@uiliuili/shared';
+import { eq } from 'drizzle-orm';
 import type { RequestWithUser } from './auth-user';
+import { DatabaseService } from './database.service';
 import type { RegionContextValue } from './region-context';
 import { SettingsService } from './settings.service';
 
@@ -33,27 +36,71 @@ interface ReaderEntry {
 export class RegionService {
   private readonly logger = new Logger(RegionService.name);
   private readonly readers = new Map<string, ReaderEntry>();
+  private readonly lastRegionWrites = new Map<string, number>();
   private geoipWarningLogged = false;
 
-  constructor(private readonly settings: SettingsService) {}
+  constructor(
+    private readonly settings: SettingsService,
+    private readonly database: DatabaseService,
+  ) {}
 
   async resolve(
     request: Pick<RequestWithUser, 'user' | 'headers' | 'ip'>,
   ): Promise<RegionContextValue> {
-    const [region, restricted] = await Promise.all([
+    const [region, restricted, privacy] = await Promise.all([
       this.settings.getRegionSettings(),
       this.settings.getRestrictedSettings(),
+      this.settings.getPrivacySettings(),
     ]);
     const blockedRegions = normalizeRegionList(restricted.blockedRegions);
     const accountRegion = normalizeRegionCode(request.user?.region);
     const resolved = accountRegion
       ? { code: accountRegion, source: 'registration' as const }
       : await this.resolveCode(request, region.header, region.geoipDatabase, region.fallback);
-    return this.buildContext(resolved.code, resolved.source, request.user, {
-      blockedRegions,
-      defaultBehavior: restricted.defaultBehavior === 'not_found' ? 'not_found' : 'message',
-      defaultMessage: restricted.defaultMessage || '该内容在您所在的地区不可用',
-    });
+    const ipLocationEnabled = (privacy as { ipLocation?: boolean }).ipLocation !== false;
+    // IP location reflects the current network, never the immutable account
+    // region, so it is resolved without the account precedence.
+    const network = ipLocationEnabled
+      ? await this.resolveCode(
+          request,
+          region.header,
+          region.geoipDatabase,
+          accountRegion || region.fallback,
+        )
+      : { code: '', source: 'disabled' as const };
+    if (ipLocationEnabled && request.user && network.code) {
+      this.touchLastRegion(request.user.id, network.code);
+    }
+    return this.buildContext(
+      resolved.code,
+      resolved.source,
+      request.user,
+      {
+        blockedRegions,
+        defaultBehavior: restricted.defaultBehavior === 'not_found' ? 'not_found' : 'message',
+        defaultMessage: restricted.defaultMessage || '该内容在您所在的地区不可用',
+      },
+      network.code,
+      network.source,
+      ipLocationEnabled,
+    );
+  }
+
+  /**
+   * Persists the account's latest network country at most once an hour per
+   * process. Failures never affect the request.
+   */
+  private touchLastRegion(userId: string, code: string): void {
+    const last = this.lastRegionWrites.get(userId);
+    const now = Date.now();
+    if (last && now - last < 60 * 60 * 1000) return;
+    if (this.lastRegionWrites.size > 50_000) this.lastRegionWrites.clear();
+    this.lastRegionWrites.set(userId, now);
+    void this.database.db
+      .update(users)
+      .set({ lastRegion: code, lastRegionAt: new Date() })
+      .where(eq(users.id, userId))
+      .catch((error) => this.logger.warn(`Unable to record last region: ${String(error)}`));
   }
 
   /** Resolves a region for a request without considering any account. */
@@ -92,6 +139,9 @@ export class RegionService {
       defaultBehavior: 'message' | 'not_found';
       defaultMessage: string;
     },
+    networkCode: string,
+    networkSource: string,
+    ipLocationEnabled: boolean,
   ): RegionContextValue {
     const privileged = Boolean(
       user &&
@@ -103,6 +153,9 @@ export class RegionService {
     return {
       code,
       source,
+      networkCode,
+      networkSource,
+      ipLocationEnabled,
       showRestricted,
       privileged,
       restrictedAllowed: unrestricted && (showRestricted || privileged),

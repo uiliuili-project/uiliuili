@@ -28,6 +28,7 @@ import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
 import { DatabaseService } from '../common/database.service';
+import { ImageUploadService } from '../common/image-upload.service';
 import { MailService } from '../common/mail.service';
 import { currentRegionContext } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
@@ -57,6 +58,7 @@ export class AuthService {
     private readonly settings: SettingsService,
     private readonly mail: MailService,
     private readonly audit: AuditService,
+    private readonly images: ImageUploadService,
   ) {}
 
   async register(
@@ -285,18 +287,52 @@ export class AuthService {
     userId: string,
     input: { displayName?: string; bio?: string; avatarUrl?: string },
   ): Promise<AuthUser> {
+    // Partial updates must not clear fields the caller did not send.
+    const values: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
+    if (input.displayName !== undefined) values.displayName = input.displayName;
+    if (input.bio !== undefined) values.bio = input.bio;
+    if (input.avatarUrl !== undefined) values.avatarUrl = input.avatarUrl || null;
     const [updated] = await this.database.db
       .update(users)
-      .set({
-        displayName: input.displayName,
-        bio: input.bio,
-        avatarUrl: input.avatarUrl || null,
-        updatedAt: new Date(),
-      })
+      .set(values)
       .where(eq(users.id, userId))
       .returning();
     if (!updated) throw new Error('用户不存在');
     return this.toAuthUser(updated);
+  }
+
+  async setCover(userId: string, buffer: Buffer, _contentType: string): Promise<AuthUser> {
+    const previous = await this.coverUrl(userId);
+    const saved = await this.images.save(`users/${userId}/cover`, buffer, 8 * 1024 * 1024);
+    const [updated] = await this.database.db
+      .update(users)
+      .set({ coverUrl: saved.url, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) throw new Error('用户不存在');
+    if (previous && previous !== saved.url) await this.images.removeByUrl(previous);
+    return this.toAuthUser(updated);
+  }
+
+  async clearCover(userId: string): Promise<AuthUser> {
+    const previous = await this.coverUrl(userId);
+    const [updated] = await this.database.db
+      .update(users)
+      .set({ coverUrl: null, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) throw new Error('用户不存在');
+    await this.images.removeByUrl(previous);
+    return this.toAuthUser(updated);
+  }
+
+  private async coverUrl(userId: string): Promise<string | null> {
+    const rows = await this.database.db
+      .select({ coverUrl: users.coverUrl })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return rows[0]?.coverUrl ?? null;
   }
 
   async changePassword(
@@ -600,6 +636,7 @@ export class AuthService {
       coinBalance: user.coinBalance,
       region: user.region,
       showRestricted: user.showRestricted,
+      coverUrl: user.coverUrl,
     };
   }
 

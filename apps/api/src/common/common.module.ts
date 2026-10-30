@@ -3,6 +3,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditService } from './audit.service';
 import { CacheService } from './cache.service';
 import { DatabaseService } from './database.service';
+import { ImageUploadService } from './image-upload.service';
 import { MailService } from './mail.service';
 import { QueueService } from './queue.service';
 import { RegionContextInterceptor } from './region-context.interceptor';
@@ -20,6 +21,7 @@ import { StorageService } from './storage.service';
     CacheService,
     SettingsService,
     StorageService,
+    ImageUploadService,
     MailService,
     AuditService,
     QueueService,
@@ -31,6 +33,7 @@ import { StorageService } from './storage.service';
     CacheService,
     SettingsService,
     StorageService,
+    ImageUploadService,
     MailService,
     AuditService,
     QueueService,

@@ -13,6 +13,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewModule } from './review/review.module';
 import { SearchModule } from './search/search.module';
 import { SocialModule } from './social/social.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
 
@@ -33,6 +34,7 @@ import { VideosModule } from './videos/videos.module';
     SearchModule,
     SocialModule,
     MediaModule,
+    UploadsModule,
   ],
   controllers: [HealthController],
 })

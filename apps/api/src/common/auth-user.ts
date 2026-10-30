@@ -18,6 +18,7 @@ export interface AuthUser {
   coinBalance: number;
   region: string;
   showRestricted: boolean;
+  coverUrl: string | null;
 }
 
 export interface RequestWithUser {

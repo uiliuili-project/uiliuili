@@ -145,6 +145,10 @@ export class SettingsService {
     return this.getGroup('restricted', DEFAULT_SETTINGS.restricted);
   }
 
+  async getPrivacySettings() {
+    return this.getGroup('privacy', DEFAULT_SETTINGS.privacy);
+  }
+
   async getPublicSettings() {
     const cached = await this.cacheService.get('settings:public');
     if (cached) return JSON.parse(cached) as Record<string, unknown>;

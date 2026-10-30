@@ -1,5 +1,18 @@
 import crypto from 'node:crypto';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -150,6 +163,31 @@ export class AuthController {
     @Body(zodBody(updateProfileSchema)) body: z.infer<typeof updateProfileSchema>,
   ) {
     return { user: await this.auth.updateProfile(user.id, body) };
+  }
+
+  @Put('cover')
+  async uploadCover(
+    @CurrentUser() user: AuthUser,
+    @Body() body: Buffer,
+    @Headers('content-type') contentType: string,
+  ) {
+    const attempts = await this.cache.increment(`cover:${user.id}`, 3600);
+    if (attempts > 20) {
+      throw new AppError(ERROR_CODES.RATE_LIMITED, '上传过于频繁，请稍后再试', 429);
+    }
+    const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body ?? []);
+    return {
+      user: await this.auth.setCover(
+        user.id,
+        buffer,
+        (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? '',
+      ),
+    };
+  }
+
+  @Delete('cover')
+  async removeCover(@CurrentUser() user: AuthUser) {
+    return { user: await this.auth.clearCover(user.id) };
   }
 
   @Patch('preferences')

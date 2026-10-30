@@ -9,6 +9,14 @@ export interface RegionContextValue {
   /** Resolved ISO 3166-1 alpha-2 country code, empty when unknown. */
   code: string;
   source: string;
+  /**
+   * Country resolved from the request network (proxy header or GeoIP) rather
+   * than the account. Used only for the IP-location label.
+   */
+  networkCode: string;
+  networkSource: string;
+  /** Whether IP location may be stored and displayed. */
+  ipLocationEnabled: boolean;
   /** True when the account opted in to restricted content. */
   showRestricted: boolean;
   /** Staff can preview content regardless of region policy. */
@@ -23,6 +31,9 @@ export interface RegionContextValue {
 export const FALLBACK_REGION_CONTEXT: RegionContextValue = {
   code: '',
   source: 'fallback',
+  networkCode: '',
+  networkSource: 'fallback',
+  ipLocationEnabled: false,
   showRestricted: false,
   privileged: false,
   restrictedAllowed: false,
