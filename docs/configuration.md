@@ -29,6 +29,8 @@ Do not commit either file.
 | `INSTALL_TOKEN` | Optional fixed installer token |
 | `INSTALL_ALLOW_LOCALHOST` | Allow loopback installer access without token |
 | `TRUST_PROXY` | Trust reverse-proxy headers |
+| `UPGRADE_RESTART_CMD` | Optional fixed command run after a successful admin upgrade (for example `systemctl restart uiliuili-api uiliuili-worker`); never supplied by the browser |
+| `GITHUB_REPO` | Repository used by the manual update check, default `uiliuili/uiliuili` |
 
 Environment variables take precedence over database settings.
 
@@ -67,6 +69,29 @@ Runtime settings are stored in PostgreSQL and can be edited in the admin panel:
 site information (including the site logo), registration, upload limits,
 playback defaults, danmaku rules, social limits, recommendation weights,
 storage, transcoding, mail, OAuth, search, security, and audit retention.
+
+The admin settings page is organized into site/brand, appearance/navigation,
+legal, content/playback, engagement/rate limits, captcha, AI moderation,
+region/privacy, integrations, and security. Categories and the system upgrade
+center remain separate pages.
+
+Additional groups:
+
+| Group | Purpose |
+| --- | --- |
+| `branding` | Country badge next to the logo, blocked countries, guest visibility |
+| `navigation` | Header and footer custom buttons (up to 12 each) |
+| `customCode` | Raw header/footer HTML; scripts run, so only `settings:site` may edit |
+| `analytics` | GA4 measurement ID, anonymized IP, Do Not Track |
+| `legal` | Terms and privacy HTML, version, registration consent |
+| `rateLimit` | Per-action window, soft threshold (captcha), hard threshold |
+| `captcha` | Turnstile/reCAPTCHA provider, site key, always-on actions |
+| `aiModeration` | Targets, action, failure mode, timeout, cache, prompt |
+| `review` | Site-wide comment/dynamic pre-moderation |
+
+The captcha secret and AI API key are stored encrypted and are never included
+in public settings. Public settings expose only the captcha site key and safe
+branding/analytics values.
 
 Secrets in the database are encrypted with `APP_KEY`. Back up `.env`; losing
 `APP_KEY` makes stored provider secrets unreadable.

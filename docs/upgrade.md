@@ -13,6 +13,33 @@
 If migrations are pending, run `pnpm cli migrate`. If you downgrade the code,
 restore a database backup taken before the upgrade.
 
+### Upgrade center
+
+**Admin → System** now includes an upgrade center that never replaces the
+application code. It reports the database version, the running program version,
+pending migrations, and the last five backups.
+
+- **Create backup** runs `pg_dump --format=custom` into `storage/backups` and
+  copies `.env` and `config/instance.json` next to it. The Docker image installs
+  `postgresql-client`; native installs need `pg_dump` on `PATH`.
+- **Run database upgrade** asks for the current program version as confirmation,
+  creates a backup, briefly enables maintenance mode, runs every pending
+  migration under the migration advisory lock, updates `app_instance.version`,
+  and writes an audit log entry.
+- The service restart is never arbitrary shell from the browser. Set
+  `UPGRADE_RESTART_CMD` in the API environment to a fixed command such as
+  `systemctl restart uiliuili-api uiliuili-worker`, and the upgrade center runs
+  that command after a successful migration. Without it, the page asks the
+  administrator to restart the API and worker manually.
+- **Maintenance mode** can be toggled independently, which is useful before a
+  manual code replacement. Visitors see the maintenance page while staff can
+  still sign in.
+
+Migration `0006` adds legal consent fields, AI moderation logs, comment/dynamic
+moderation metadata, category presentation fields, and renames the default site
+name from `uiliuili` to `萌悠` only when it is still the old default. Custom site
+names are never overwritten.
+
 ## Region and restricted-content migration
 
 Migration `0004` adds `users.region`, `users.region_source`,

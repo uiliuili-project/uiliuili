@@ -1,8 +1,8 @@
-# uiliuili
+# 萌悠 (uiliuili)
 
 > An open-source, self-hosted danmaku video platform.
 
-uiliuili is a complete video community: uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin panel.
+MoeYou (萌悠) is a complete video community: uploads, FFmpeg HLS transcoding, a Canvas danmaku player, comments, follows, favorites, coins, notifications, search, recommendations, and a visual admin panel. The repository, package scope, CLI command, environment prefixes, and database schema remain `uiliuili`; only the product display name is MoeYou.
 
 - **License:** MIT
 - **Stack:** NestJS · PostgreSQL · Drizzle · Next.js · React · Ant Design · FFmpeg
@@ -21,6 +21,9 @@ uiliuili is a complete video community: uploads, FFmpeg HLS transcoding, a Canva
 - Admin panel: users, videos, danmaku, comments, reports, categories, settings, jobs, audit.
 - Creator center at `/studio` and a permission-gated admin console at `/admin/`, with a persisted user-group marker and an editable site logo.
 - Local storage or S3-compatible object storage. Single-node mode without Redis.
+- Bot protection with Cloudflare Turnstile or reCAPTCHA v2/v3, per-action rate limits with soft/hard thresholds, and an optional OpenAI-compatible AI moderation pipeline with review logs and a pending queue.
+- Editable terms of service and privacy policy with registration consent tracking, custom header/footer navigation buttons, custom header/footer HTML, GA4, and a network-country badge next to the logo.
+- Upgrade center with version checks, database backups, advisory-locked migrations, maintenance mode, and an optional fixed restart command.
 - Complete Chinese and English UI with in-app language switching for both the site and admin console.
 
 ## Quick start (self-hosted)

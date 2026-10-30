@@ -12,6 +12,17 @@
 
 如果存在待执行的迁移，运行 `pnpm cli migrate`。如果要降级代码，请恢复升级前创建的数据库备份。
 
+### 升级中心
+
+**管理后台 → 系统状态**新增升级中心。它只处理数据库迁移与备份，不会自动替换程序代码，并显示数据库版本、当前程序版本、待执行迁移以及最近 5 份备份。
+
+- **创建备份**会执行 `pg_dump --format=custom`，把备份写入 `storage/backups`，同时复制 `.env` 和 `config/instance.json`。Docker 镜像已安装 `postgresql-client`；原生部署需要服务器 `PATH` 中存在 `pg_dump`。
+- **执行数据库升级**要求输入当前程序版本号二次确认；随后自动备份、短暂开启维护模式、在迁移 advisory lock 下执行全部待处理迁移、更新 `app_instance.version` 并写入审计日志。
+- 浏览器不能执行任意 shell。只有在 API 环境变量中设置固定的 `UPGRADE_RESTART_CMD`（例如 `systemctl restart uiliuili-api uiliuili-worker`）时，升级成功后才会执行该命令；未配置时页面会提示管理员手动重启 API 与 Worker。
+- **维护模式**可独立开关，便于在手动替换代码前阻止写入。维护期间访客看到维护页，员工仍可登录。
+
+迁移 `0006` 新增协议同意记录、AI 审核日志、评论/动态审核元数据、分区展示字段，并且只在站点名仍为旧默认值 `uiliuili` 时改为「萌悠」，不会覆盖管理员自定义的站点名。
+
 ## 地区与限制级内容迁移
 
 迁移 `0004` 新增 `users.region`、`users.region_source`、
