@@ -4,7 +4,18 @@ import { VIDEO_VISIBILITIES } from '../constants';
 export const dynamicCreateSchema = z
   .object({
     content: z.string().max(2000).default(''),
-    images: z.array(z.string().max(500)).max(9).default([]),
+    images: z
+      .array(
+        z
+          .string()
+          .max(500)
+          .refine(
+            (value) => value.startsWith('/media/') || /^https?:\/\//i.test(value),
+            '图片地址不合法',
+          ),
+      )
+      .max(9)
+      .default([]),
     videoId: z.string().uuid().optional(),
     topicId: z.string().uuid().optional(),
     visibility: z.enum(VIDEO_VISIBILITIES).default('public'),
@@ -19,6 +30,13 @@ export const dynamicListQuerySchema = z.object({
   feed: z.enum(['all', 'following', 'user', 'topic']).default('all'),
   username: z.string().max(40).optional(),
   topicId: z.string().uuid().optional(),
+});
+
+/** Image-only dynamic feed used by the home "moments" waterfall mode. */
+export const momentListQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  sort: z.enum(['latest', 'hot']).default('latest'),
 });
 
 export const topicCreateSchema = z.object({

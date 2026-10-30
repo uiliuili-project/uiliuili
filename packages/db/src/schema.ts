@@ -53,6 +53,9 @@ export const users = appSchema.table(
     regionSource: text('region_source').default('').notNull(),
     /** Personal preference for showing restricted content in unrestricted regions. */
     showRestricted: boolean('show_restricted').default(false).notNull(),
+    /** Most recent network country resolved for the account, shown as IP location. */
+    lastRegion: text('last_region'),
+    lastRegionAt: timestamp('last_region_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     ...timestamps,
   },
@@ -367,6 +370,8 @@ export const dynamics = appSchema.table(
     videoId: uuid('video_id').references(() => videos.id, { onDelete: 'set null' }),
     topicId: uuid('topic_id').references(() => topics.id, { onDelete: 'set null' }),
     visibility: text('visibility').default('public').notNull(),
+    /** Country code captured when the post was published. */
+    ipRegion: text('ip_region'),
     likeCount: integer('like_count').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -466,7 +471,10 @@ export const videoTags = appSchema.table(
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (table) => [primaryKey({ columns: [table.videoId, table.tagId] })],
+  (table) => [
+    primaryKey({ columns: [table.videoId, table.tagId] }),
+    index('video_tags_tag_idx').on(table.tagId),
+  ],
 );
 
 export const videoRenditions = appSchema.table(
@@ -587,6 +595,8 @@ export const comments = appSchema.table(
       .references(() => users.id, { onDelete: 'cascade' }),
     parentId: uuid('parent_id'),
     content: text('content').notNull(),
+    /** Country code captured when the comment was published. */
+    ipRegion: text('ip_region'),
     likeCount: integer('like_count').default(0).notNull(),
     pinned: boolean('pinned').default(false).notNull(),
     pinnedAt: timestamp('pinned_at', { withTimezone: true }),
@@ -702,11 +712,36 @@ export const watchHistories = appSchema.table(
     positionMs: integer('position_ms').default(0).notNull(),
     durationMs: integer('duration_ms').default(0).notNull(),
     completed: boolean('completed').default(false).notNull(),
+    /** Last time this watch updated the user's tag interests. */
+    tagSyncedAt: timestamp('tag_synced_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.videoId] }),
     index('watch_histories_user_idx').on(table.userId, table.updatedAt),
+  ],
+);
+
+/**
+ * Decayed tag affinity learned from recent watch history. Only stored for the
+ * owning user and never exposed on public profiles.
+ */
+export const userTagInterests = appSchema.table(
+  'user_tag_interests',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+    score: real('score').default(0).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.tagId] }),
+    index('user_tag_interests_score_idx').on(table.userId, table.score),
   ],
 );
 

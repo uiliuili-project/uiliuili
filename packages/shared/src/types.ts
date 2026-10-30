@@ -31,6 +31,8 @@ export interface AuthUser extends PublicUser {
   region: string;
   /** Whether the user opted in to restricted content in unrestricted regions. */
   showRestricted: boolean;
+  /** Personal space header image, uploaded by the user. */
+  coverUrl?: string | null;
 }
 
 export interface Category {
@@ -107,9 +109,20 @@ export interface DynamicItem {
   createdAt: string;
   likeCount: number;
   liked: boolean;
+  /** Network country captured when the post was published. */
+  ipRegion: string | null;
   user: PublicUser;
   video: VideoCard | null;
   topic: TopicInfo | null;
+}
+
+/** Tag affinity learned from the signed-in user's recent watch history. */
+export interface TagInterest {
+  tagId: string;
+  name: string;
+  slug: string;
+  score: number;
+  lastSeenAt: string;
 }
 
 export interface TopicInfo {
@@ -200,6 +213,8 @@ export interface CommentItem {
   pinned: boolean;
   upLiked: boolean;
   isUploader: boolean;
+  /** Network country captured when the comment was published. */
+  ipRegion: string | null;
   user: PublicUser;
   replies: CommentItem[];
   replyCount: number;

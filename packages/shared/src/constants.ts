@@ -237,6 +237,14 @@ export const DEFAULT_SETTINGS = {
     enabled: true,
     explorationRatio: 0.15,
     cacheSeconds: 180,
+    /** Personalised boost from tags of recently watched videos. */
+    tagAffinity: {
+      enabled: true,
+      weight: 0.6,
+      ratio: 0.35,
+      decayPerDay: 0.95,
+      maxTags: 8,
+    },
     weights: {
       views: 0.06,
       likes: 0.24,
@@ -271,6 +279,10 @@ export const DEFAULT_SETTINGS = {
     /** `message` explains the region limit, `not_found` hides the video. */
     defaultBehavior: 'message' as 'message' | 'not_found',
     defaultMessage: '该内容在您所在的地区不可用',
+  },
+  privacy: {
+    /** Show and store the network country (IP location) on user content. */
+    ipLocation: true,
   },
 } as const;
 
