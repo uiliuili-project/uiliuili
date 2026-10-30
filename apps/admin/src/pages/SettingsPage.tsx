@@ -182,7 +182,10 @@ export function SettingsPage() {
       };
     }
     oauthForms.setFieldsValue(oauthValues);
-    brandingForm.setFieldsValue(groups.branding?.countryBadge ?? {});
+    brandingForm.setFieldsValue({
+      ...(groups.branding?.countryBadge ?? {}),
+      showLogoName: groups.branding?.showName ?? true,
+    });
     navigationForm.setFieldsValue({
       header: groups.navigation?.header ?? [],
       footer: groups.navigation?.footer ?? [],
@@ -415,7 +418,8 @@ export function SettingsPage() {
   };
   const saveBranding = async () => {
     const values = await brandingForm.validateFields();
-    await save({ branding: { countryBadge: values } });
+    const { showLogoName, ...countryBadge } = values;
+    await save({ branding: { showName: showLogoName, countryBadge } });
   };
   const saveNavigation = async () => {
     const values = await navigationForm.validateFields();
@@ -599,6 +603,20 @@ export function SettingsPage() {
                   </Form>
                   <Divider />
                   <Form form={brandingForm} layout="vertical" style={{ maxWidth: 720 }}>
+                    <Title level={5}>{t('顶栏 Logo')}</Title>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('显示站点名称')}
+                          name="showLogoName"
+                          valuePropName="checked"
+                          extra={t('关闭后顶栏只显示图片 Logo；未上传 Logo 时仍显示默认图标。')}
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Divider />
                     <Title level={5}>{t('Logo 旁的国家角标')}</Title>
                     <Alert
                       type="info"

@@ -1124,6 +1124,10 @@ export const uiEn: Record<string, string> = {
   不允许: 'Not allowed',
   测试失败: 'Test failed',
   站点与品牌: 'Site and brand',
+  '顶栏 Logo': 'Header logo',
+  显示站点名称: 'Show site name',
+  '关闭后顶栏只显示图片 Logo；未上传 Logo 时仍显示默认图标。':
+    'When disabled, the header shows only the logo image. The default icon remains when no logo is uploaded.',
   'Logo 旁的国家角标': 'Country badge next to the logo',
   '角标使用请求头或 GeoIP 解析出的网络地区，不显示具体 IP；无法解析时自动隐藏。':
     'The badge uses the network country from request headers or GeoIP. No raw IP is shown, and the badge hides when the country cannot be resolved.',
