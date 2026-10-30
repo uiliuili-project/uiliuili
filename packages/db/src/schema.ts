@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -254,6 +255,13 @@ export const videos = appSchema.table(
     regionCodes: text('region_codes').array().default(sql`ARRAY[]::text[]`).notNull(),
     regionDenyBehavior: text('region_deny_behavior').default('default').notNull(),
     regionDenyMessage: text('region_deny_message').default('').notNull(),
+    /** Creation declaration: original, repost or ai. */
+    contentType: text('content_type').default('original').notNull(),
+    /** Original source when the declaration is a repost. */
+    sourceUrl: text('source_url').default('').notNull(),
+    aiGenerated: boolean('ai_generated').default(false).notNull(),
+    allowComments: boolean('allow_comments').default(true).notNull(),
+    allowDanmaku: boolean('allow_danmaku').default(true).notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps,
   },
@@ -767,12 +775,20 @@ export const watchEvents = appSchema.table(
     videoId: uuid('video_id')
       .notNull()
       .references(() => videos.id, { onDelete: 'cascade' }),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'set null' }),
     positionMs: integer('position_ms').default(0).notNull(),
     durationMs: integer('duration_ms').default(0).notNull(),
     eventType: text('event_type').default('progress').notNull(),
+    /** Anonymised acquisition channel, device class and country code. */
+    source: text('source').default('direct').notNull(),
+    device: text('device').default('unknown').notNull(),
+    country: text('country').default('').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('watch_events_video_idx').on(table.videoId, table.createdAt)],
+  (table) => [
+    index('watch_events_video_idx').on(table.videoId, table.createdAt),
+    index('watch_events_created_idx').on(table.createdAt),
+  ],
 );
 
 export const notifications = appSchema.table(
@@ -942,7 +958,232 @@ export const backgroundJobs = appSchema.table(
   ],
 );
 
+export const videoStatusLogs = appSchema.table(
+  'video_status_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    fromStatus: text('from_status').default('').notNull(),
+    toStatus: text('to_status').notNull(),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    reason: text('reason').default('').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('video_status_logs_video_created_idx').on(table.videoId, table.createdAt)],
+);
+
+export const videoAppeals = appSchema.table(
+  'video_appeals',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    detail: text('detail').default('').notNull(),
+    status: text('status').default('pending').notNull(),
+    handledBy: uuid('handled_by').references(() => users.id, { onDelete: 'set null' }),
+    handleNote: text('handle_note').default('').notNull(),
+    handledAt: timestamp('handled_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('video_appeals_video_idx').on(table.videoId, table.createdAt),
+    index('video_appeals_status_idx').on(table.status, table.createdAt),
+  ],
+);
+
+export const videoDailyStats = appSchema.table(
+  'video_daily_stats',
+  {
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    views: integer('views').default(0).notNull(),
+    uniqueViewers: integer('unique_viewers').default(0).notNull(),
+    completions: integer('completions').default(0).notNull(),
+    likes: integer('likes').default(0).notNull(),
+    coins: integer('coins').default(0).notNull(),
+    favorites: integer('favorites').default(0).notNull(),
+    comments: integer('comments').default(0).notNull(),
+    danmaku: integer('danmaku').default(0).notNull(),
+    sources: jsonb('sources').$type<Record<string, number>>().default(sql`'{}'::jsonb`).notNull(),
+    devices: jsonb('devices').$type<Record<string, number>>().default(sql`'{}'::jsonb`).notNull(),
+    countries: jsonb('countries')
+      .$type<Record<string, number>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.videoId, table.day] }),
+    index('video_daily_stats_day_idx').on(table.day),
+  ],
+);
+
+export const creatorDailyStats = appSchema.table(
+  'creator_daily_stats',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    views: integer('views').default(0).notNull(),
+    uniqueViewers: integer('unique_viewers').default(0).notNull(),
+    completions: integer('completions').default(0).notNull(),
+    likes: integer('likes').default(0).notNull(),
+    coins: integer('coins').default(0).notNull(),
+    favorites: integer('favorites').default(0).notNull(),
+    comments: integer('comments').default(0).notNull(),
+    danmaku: integer('danmaku').default(0).notNull(),
+    followersGained: integer('followers_gained').default(0).notNull(),
+    followersLost: integer('followers_lost').default(0).notNull(),
+    newVideos: integer('new_videos').default(0).notNull(),
+    sources: jsonb('sources').$type<Record<string, number>>().default(sql`'{}'::jsonb`).notNull(),
+    devices: jsonb('devices').$type<Record<string, number>>().default(sql`'{}'::jsonb`).notNull(),
+    countries: jsonb('countries')
+      .$type<Record<string, number>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.day] }),
+    index('creator_daily_stats_day_idx').on(table.day),
+  ],
+);
+
+export const followEvents = appSchema.table(
+  'follow_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followingId: uuid('following_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('follow_events_following_created_idx').on(table.followingId, table.createdAt),
+    index('follow_events_follower_created_idx').on(table.followerId, table.createdAt),
+  ],
+);
+
+export const articles = appSchema.table(
+  'articles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    summary: text('summary').default('').notNull(),
+    content: text('content').default('').notNull(),
+    coverUrl: text('cover_url'),
+    categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    status: text('status').default('draft').notNull(),
+    visibility: text('visibility').default('public').notNull(),
+    allowComments: boolean('allow_comments').default(true).notNull(),
+    viewCount: integer('view_count').default(0).notNull(),
+    likeCount: integer('like_count').default(0).notNull(),
+    favoriteCount: integer('favorite_count').default(0).notNull(),
+    commentCount: integer('comment_count').default(0).notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('articles_author_idx').on(table.authorId, table.createdAt),
+    index('articles_status_published_idx').on(table.status, table.publishedAt),
+    index('articles_category_idx').on(table.categoryId, table.status),
+  ],
+);
+
+export const articleLikes = appSchema.table(
+  'article_likes',
+  {
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.articleId, table.userId] })],
+);
+
+export const articleFavorites = appSchema.table(
+  'article_favorites',
+  {
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.articleId, table.userId] })],
+);
+
+export const articleComments = appSchema.table(
+  'article_comments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id'),
+    content: text('content').notNull(),
+    ipRegion: text('ip_region'),
+    status: text('status').default('visible').notNull(),
+    likeCount: integer('like_count').default(0).notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('article_comments_article_idx').on(table.articleId, table.status, table.createdAt),
+    index('article_comments_parent_idx').on(table.parentId),
+  ],
+);
+
+export const videoCollaborators = appSchema.table(
+  'video_collaborators',
+  {
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').default('collaborator').notNull(),
+    status: text('status').default('pending').notNull(),
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.videoId, table.userId] }),
+    index('video_collaborators_user_status_idx').on(table.userId, table.status),
+  ],
+);
+
 export type DbUser = typeof users.$inferSelect;
+export type DbArticle = typeof articles.$inferSelect;
+export type DbVideoCollaborator = typeof videoCollaborators.$inferSelect;
 export type DbCategory = typeof categories.$inferSelect;
 export type DbTag = typeof tags.$inferSelect;
 export type DbVideo = typeof videos.$inferSelect;
