@@ -61,6 +61,9 @@ export interface VideoCard {
   tags: string[];
   /** Restricted content is only shown to opted-in users in unrestricted regions. */
   restricted?: boolean;
+  /** Creation declaration: original, repost or ai. */
+  contentType?: string;
+  aiGenerated?: boolean;
 }
 
 export interface VideoDetail extends VideoCard {
@@ -69,6 +72,16 @@ export interface VideoDetail extends VideoCard {
   visibility: string;
   featured: boolean;
   restricted: boolean;
+  sourceUrl?: string;
+  allowComments?: boolean;
+  allowDanmaku?: boolean;
+  collaborators?: Array<{
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    role: string;
+  }>;
   regionMode: string;
   regionCodes: string[];
   regionDenyBehavior: string;

@@ -109,6 +109,51 @@ export type VideoStatus = (typeof VIDEO_STATUSES)[number];
 export const VIDEO_VISIBILITIES = ['public', 'unlisted', 'private'] as const;
 export type VideoVisibility = (typeof VIDEO_VISIBILITIES)[number];
 
+/** How the uploader declares the origin of a video. */
+export const VIDEO_CONTENT_TYPES = ['original', 'repost', 'ai'] as const;
+export type VideoContentType = (typeof VIDEO_CONTENT_TYPES)[number];
+
+export const VIDEO_APPEAL_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+export type VideoAppealStatus = (typeof VIDEO_APPEAL_STATUSES)[number];
+
+export const VIDEO_APPEAL_REASONS = ['mistake', 'copyright', 'context', 'other'] as const;
+export type VideoAppealReason = (typeof VIDEO_APPEAL_REASONS)[number];
+
+export const ARTICLE_STATUSES = [
+  'draft',
+  'pending_review',
+  'published',
+  'blocked',
+  'deleted',
+] as const;
+export type ArticleStatus = (typeof ARTICLE_STATUSES)[number];
+
+export const COLLABORATOR_ROLES = ['coauthor', 'assistant'] as const;
+export type CollaboratorRole = (typeof COLLABORATOR_ROLES)[number];
+
+export const COLLABORATOR_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+export type CollaboratorStatus = (typeof COLLABORATOR_STATUSES)[number];
+
+/** Acquisition channels captured for anonymous aggregate analytics. */
+export const WATCH_SOURCES = [
+  'direct',
+  'home',
+  'search',
+  'feed',
+  'related',
+  'space',
+  'collection',
+  'topic',
+  'ranking',
+  'notification',
+  'external',
+  'unknown',
+] as const;
+export type WatchSource = (typeof WATCH_SOURCES)[number];
+
+export const WATCH_DEVICES = ['desktop', 'mobile', 'tablet', 'tv', 'bot', 'unknown'] as const;
+export type WatchDevice = (typeof WATCH_DEVICES)[number];
+
 /**
  * Region policy for videos. `inherit` follows the site restricted-content
  * rules only; `block` additionally denies playback in the listed countries.
@@ -167,6 +212,9 @@ export const NOTIFICATION_TYPES = [
   'favorite',
   'system',
   'moderation',
+  'collaboration',
+  'appeal',
+  'article',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -466,6 +514,7 @@ export const DEFAULT_SETTINGS = {
     /** Site-wide manual review. `pending` content stays hidden until approved. */
     comments: false,
     dynamics: false,
+    articles: false,
   },
 } as const;
 

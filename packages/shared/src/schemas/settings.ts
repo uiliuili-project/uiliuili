@@ -145,6 +145,7 @@ export const aiConfigSchema = z.object({
 export const reviewSettingsSchema = z.object({
   comments: z.boolean().default(false),
   dynamics: z.boolean().default(false),
+  articles: z.boolean().default(false),
 });
 
 /** Group names accepted by the settings update endpoint. */

@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { DANMAKU_MODES, DANMAKU_POOLS, VIDEO_VISIBILITIES } from '../constants';
+import {
+  COLLABORATOR_ROLES,
+  DANMAKU_MODES,
+  DANMAKU_POOLS,
+  VIDEO_CONTENT_TYPES,
+  VIDEO_VISIBILITIES,
+  WATCH_SOURCES,
+} from '../constants';
 import { videoRegionFieldsSchema } from './region';
 
 export const paginationSchema = z.object({
@@ -7,18 +14,48 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const videoCreateSchema = z
+const videoBaseSchema = z
   .object({
     title: z.string().min(1, '请输入标题').max(120),
     description: z.string().max(5000).default(''),
     categoryId: z.string().uuid().optional(),
     tags: z.array(z.string().min(1).max(24)).max(12).default([]),
     visibility: z.enum(VIDEO_VISIBILITIES).default('public'),
+    contentType: z.enum(VIDEO_CONTENT_TYPES).default('original'),
+    sourceUrl: z.string().url().max(500).or(z.literal('')).default(''),
+    aiGenerated: z.boolean().default(false),
+    allowComments: z.boolean().default(true),
+    allowDanmaku: z.boolean().default(true),
   })
   .merge(videoRegionFieldsSchema);
 
-export const videoUpdateSchema = videoCreateSchema.partial().extend({
+export const videoCreateSchema = videoBaseSchema.superRefine((value, ctx) => {
+  if (value.contentType === 'repost' && value.sourceUrl.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: '转载稿件需要填写来源链接',
+      path: ['sourceUrl'],
+    });
+  }
+});
+
+export const videoUpdateSchema = videoBaseSchema.partial().extend({
   coverUrl: z.string().max(500).optional(),
+});
+
+export const videoAppealCreateSchema = z.object({
+  reason: z.enum(['mistake', 'copyright', 'context', 'other']),
+  detail: z.string().max(1000).default(''),
+});
+
+export const collaboratorInviteSchema = z.object({
+  username: z.string().min(1).max(40),
+  role: z.enum(COLLABORATOR_ROLES).default('coauthor'),
+});
+
+export const playlistQuerySchema = z.object({
+  partId: z.string().uuid().optional(),
+  source: z.enum(WATCH_SOURCES).default('direct'),
 });
 
 export const uploadInitSchema = z.object({
@@ -138,6 +175,7 @@ export const progressSchema = z.object({
   durationMs: z.number().int().min(0).optional(),
   partId: z.string().uuid().optional(),
   completed: z.boolean().optional().default(false),
+  source: z.enum(WATCH_SOURCES).default('direct'),
 });
 
 export const reportSchema = z.object({
