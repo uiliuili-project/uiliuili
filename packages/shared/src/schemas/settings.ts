@@ -25,6 +25,8 @@ export const countryBadgeSchema = z.object({
 });
 
 export const brandingSettingsSchema = z.object({
+  /** Show the site name next to the logo in the header. */
+  showName: z.boolean().default(true),
   countryBadge: countryBadgeSchema,
 });
 

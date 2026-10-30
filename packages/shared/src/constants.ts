@@ -430,6 +430,8 @@ export const DEFAULT_SETTINGS = {
     ipLocation: true,
   },
   branding: {
+    /** Show the site name next to the logo in the header. */
+    showName: true,
     countryBadge: {
       enabled: true,
       /** Show the country name next to the code in the tooltip. */

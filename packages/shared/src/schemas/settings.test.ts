@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RATE_LIMIT_ACTIONS } from '../constants';
-import { rateLimitSettingsSchema } from './settings';
+import { brandingSettingsSchema, rateLimitSettingsSchema } from './settings';
 
 function rateLimitConfig(overrides: Record<string, { soft?: number; hard?: number }> = {}) {
   return {
@@ -14,6 +14,18 @@ function rateLimitConfig(overrides: Record<string, { soft?: number; hard?: numbe
     ),
   };
 }
+
+describe('brandingSettingsSchema', () => {
+  it('shows the site name next to the logo by default', () => {
+    expect(brandingSettingsSchema.parse({ countryBadge: {} }).showName).toBe(true);
+  });
+
+  it('allows hiding the site name', () => {
+    expect(brandingSettingsSchema.parse({ showName: false, countryBadge: {} }).showName).toBe(
+      false,
+    );
+  });
+});
 
 describe('rateLimitSettingsSchema', () => {
   it('accepts a disabled soft threshold and a hard limit above it', () => {
