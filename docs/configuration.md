@@ -111,6 +111,80 @@ list. Denials use the site default or a per-video `regionDenyBehavior`
 SQL; detail and playback endpoints return HTTP 451 with error code
 `REGION_RESTRICTED`, or 404 when the video opts into `not_found`.
 
+## IP location display
+
+Comments and dynamics store a country-code snapshot (`ip_region`) taken when
+they are published. It is resolved from the request's network region, which is
+deliberately separate from the account-based region used for access control:
+
+1. the configured country header (`cf-ipcountry` by default);
+2. the optional MaxMind `.mmdb` database, when installed;
+3. the signed-in account's stored region;
+4. the configured fallback region.
+
+Only the ISO 3166-1 alpha-2 code is stored. Raw IP addresses and sub-country
+regions are never persisted, and existing rows are not backfilled, so content
+published before the feature was enabled shows no label.
+
+The `privacy.ipLocation` setting (default on, **Settings → Regions**) controls
+display. When it is off the API omits `ipRegion` from comments and dynamics and
+`lastRegion` from profiles without deleting the stored values; turning it back
+on restores the labels. Personal spaces show the account's most recently
+observed network region (`users.lastRegion`), refreshed on authenticated
+requests and only used for display.
+
+## Space covers and image uploads
+
+Members may upload a public-space cover in **Settings → Profile**. The browser
+centre-crops it to 1920×480 (4:1) and re-encodes it as WebP (JPEG fallback)
+before upload, so stored files stay small. Endpoints:
+
+- `PUT /api/v1/auth/cover` — raw JPEG, PNG, or WebP body, at most 10 MB;
+- `DELETE /api/v1/auth/cover` — removes the stored cover file.
+
+Image posts upload each image through `POST /api/v1/uploads/images` (raw body,
+at most 10 MB, up to nine per post, 60 uploads per user per hour). The shared
+uploader validates magic bytes instead of trusting the declared content type;
+SVG and other formats are rejected. The returned URL is what a dynamic stores.
+
+## Moments feed
+
+The home page carries a video/image-posts switch. `/?mode=moments` renders an
+image waterfall assembled from public dynamics that contain at least one image;
+banned authors and authors blocked by the viewer are excluded. It stays a query
+mode on the home route rather than a separate page, so existing links and
+sharing keep working. API: `GET /api/v1/feed/moments?limit=&cursor=` (public,
+cursor paginated).
+
+## Tag affinity recommendations
+
+When enabled, the platform learns tag interests from recent watch history:
+
+- Saving watch progress adds every tag of the watched video with a depth weight
+  (`0.2 + 0.8 × watched fraction`, plus `0.5` on completion, capped at 5).
+- Learning happens at most once every ten minutes per video, or immediately when
+  the video is completed; `watch_histories.tag_synced_at` records the last sync.
+- Every new hit decays the existing score by `× 0.9` before adding, so recent
+  interests dominate. A daily worker job (`tag-decay`) multiplies all scores by
+  `decayPerDay` and deletes anything below `0.05`.
+
+The `recommendation.tagAffinity` settings group controls the feature:
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `true` | Learn tag affinity and use it in recommendations |
+| `weight` | `0.6` | Ranking-SQL boost for videos matching interest tags |
+| `ratio` | `0.35` | Share of the 12-slot home feed filled from interest-tag pools (capped at 0.8) |
+| `decayPerDay` | `0.95` | Daily decay factor applied by the worker |
+| `maxTags` | `8` | Number of strongest tags kept and used |
+
+Users can review, remove, or clear learned tags in **Settings → Recommendation
+preferences** (`GET /api/v1/me/tag-interests`, `DELETE
+/api/v1/me/tag-interests`, `DELETE /api/v1/me/tag-interests/:tagId`). Interests
+are private and never shown on a profile. Without learned tags, or with the
+feature disabled, the home feed falls back to the existing category and
+exploration blend.
+
 ## User groups and interfaces
 
 Each user row stores a `user_group` marker. Roles remain the source of truth for

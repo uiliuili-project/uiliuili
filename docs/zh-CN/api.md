@@ -14,6 +14,8 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
 - `PATCH /api/v1/auth/profile`
+- `PUT /api/v1/auth/cover`（原始 JPEG/PNG/WebP 请求体，最大 10 MB）
+- `DELETE /api/v1/auth/cover`
 - `POST /api/v1/auth/password`
 - `POST /api/v1/auth/password/forgot`
 - `POST /api/v1/auth/password/reset`
@@ -70,14 +72,21 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 - `GET /api/v1/feed/home`
 - `GET /api/v1/feed/following`
 - `GET /api/v1/feed/continue`
+- `GET /api/v1/feed/moments`（公开图文瀑布流，游标分页）
 - `GET /api/v1/me/history`
 - `GET /api/v1/me/favorites`
+- `GET /api/v1/me/tag-interests`
+- `DELETE /api/v1/me/tag-interests`
+- `DELETE /api/v1/me/tag-interests/:tagId`
+- `POST /api/v1/uploads/images`（原始 JPEG/PNG/WebP 请求体，最大 10 MB）
 - `GET /api/v1/me/notifications`（另见 `/notifications`）
 - `POST|DELETE /api/v1/users/:id/follow`
 - `GET /api/v1/search`
 - `GET /api/v1/search/suggest`
 - `GET /api/v1/search/hot`
 - `GET|DELETE /api/v1/search/history`
+
+评论和动态会返回 `ipRegion`，它是发布时按网络地区解析出的国家代码快照；关闭 `privacy.ipLocation` 后不再返回。`GET /api/v1/me/tag-interests` 返回已学到的标签兴趣，两个删除接口分别移除单个标签和全部标签。
 
 ## 管理后台
 

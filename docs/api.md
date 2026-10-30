@@ -15,6 +15,8 @@ The API is served by NestJS under `/api/v1`. Installer endpoints live under
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
 - `PATCH /api/v1/auth/profile`
+- `PUT /api/v1/auth/cover` (raw JPEG/PNG/WebP body, max 10 MB)
+- `DELETE /api/v1/auth/cover`
 - `POST /api/v1/auth/password`
 - `POST /api/v1/auth/password/forgot`
 - `POST /api/v1/auth/password/reset`
@@ -83,14 +85,24 @@ denials on detail and playback return HTTP 451 with error code
 - `GET /api/v1/feed/home`
 - `GET /api/v1/feed/following`
 - `GET /api/v1/feed/continue`
+- `GET /api/v1/feed/moments` (public image waterfall, cursor paginated)
 - `GET /api/v1/me/history`
 - `GET /api/v1/me/favorites`
+- `GET /api/v1/me/tag-interests`
+- `DELETE /api/v1/me/tag-interests`
+- `DELETE /api/v1/me/tag-interests/:tagId`
+- `POST /api/v1/uploads/images` (raw JPEG/PNG/WebP body, max 10 MB)
 - `GET /api/v1/me/notifications` (see `/notifications`)
 - `POST|DELETE /api/v1/users/:id/follow`
 - `GET /api/v1/search`
 - `GET /api/v1/search/suggest`
 - `GET /api/v1/search/hot`
 - `GET|DELETE /api/v1/search/history`
+
+Comments and dynamics include `ipRegion`, a country-code snapshot resolved from
+the request's network region at publish time and hidden when
+`privacy.ipLocation` is off. `GET /api/v1/me/tag-interests` returns the learned
+tag affinity; the delete routes remove one tag or all of them.
 
 ## Admin
 
