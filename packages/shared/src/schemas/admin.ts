@@ -61,7 +61,7 @@ export const adminDanmakuQuerySchema = adminPaginationSchema.extend({
 });
 
 export const adminCommentQuerySchema = adminPaginationSchema.extend({
-  status: z.enum(['visible', 'hidden', 'deleted']).optional(),
+  status: z.enum(['visible', 'pending', 'hidden', 'deleted']).optional(),
   videoId: z.string().uuid().optional(),
 });
 
@@ -92,6 +92,9 @@ export const categoryCreateSchema = z.object({
     .max(32)
     .regex(/^[a-z0-9\-]+$/),
   name: z.string().min(1).max(40),
+  description: z.string().max(300).default(''),
+  icon: z.string().max(40).default(''),
+  visible: z.boolean().default(true),
   sort: z.number().int().default(0),
   parentId: z.string().uuid().nullable().optional(),
 });

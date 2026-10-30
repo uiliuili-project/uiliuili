@@ -57,6 +57,9 @@ export const users = appSchema.table(
     lastRegion: text('last_region'),
     lastRegionAt: timestamp('last_region_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    /** When the current user agreement version was accepted. */
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+    termsVersion: text('terms_version').default('').notNull(),
     ...timestamps,
   },
   (table) => [
@@ -194,6 +197,10 @@ export const categories = appSchema.table(
     id: uuid('id').defaultRandom().primaryKey(),
     slug: text('slug').notNull().unique(),
     name: text('name').notNull(),
+    description: text('description').default('').notNull(),
+    /** Icon key rendered by the public site; empty falls back to a letter tile. */
+    icon: text('icon').default('').notNull(),
+    visible: boolean('visible').default(true).notNull(),
     sort: integer('sort').default(0).notNull(),
     parentId: uuid('parent_id'),
     ...timestamps,
@@ -370,6 +377,10 @@ export const dynamics = appSchema.table(
     videoId: uuid('video_id').references(() => videos.id, { onDelete: 'set null' }),
     topicId: uuid('topic_id').references(() => topics.id, { onDelete: 'set null' }),
     visibility: text('visibility').default('public').notNull(),
+    /** Moderation state: visible, pending, hidden or deleted. */
+    status: text('status').default('visible').notNull(),
+    /** AI or manual moderation verdict details. */
+    moderation: jsonb('moderation').$type<Record<string, unknown> | null>(),
     /** Country code captured when the post was published. */
     ipRegion: text('ip_region'),
     likeCount: integer('like_count').default(0).notNull(),
@@ -380,6 +391,7 @@ export const dynamics = appSchema.table(
     index('dynamics_created_idx').on(table.createdAt),
     index('dynamics_user_idx').on(table.userId, table.createdAt),
     index('dynamics_topic_idx').on(table.topicId, table.createdAt),
+    index('dynamics_status_created_idx').on(table.status, table.createdAt),
   ],
 );
 
@@ -597,6 +609,8 @@ export const comments = appSchema.table(
     content: text('content').notNull(),
     /** Country code captured when the comment was published. */
     ipRegion: text('ip_region'),
+    /** AI or manual moderation verdict details. */
+    moderation: jsonb('moderation').$type<Record<string, unknown> | null>(),
     likeCount: integer('like_count').default(0).notNull(),
     pinned: boolean('pinned').default(false).notNull(),
     pinnedAt: timestamp('pinned_at', { withTimezone: true }),
@@ -856,6 +870,31 @@ export const announcements = appSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index('announcements_active_idx').on(table.active, table.createdAt)],
+);
+
+export const aiModerationLogs = appSchema.table(
+  'ai_moderation_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').default('').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    excerpt: text('excerpt').default('').notNull(),
+    allowed: boolean('allowed').notNull(),
+    /** reject, pending, flag, allow. */
+    decision: text('decision').notNull(),
+    reason: text('reason').default('').notNull(),
+    categories: jsonb('categories').$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    model: text('model').default('').notNull(),
+    latencyMs: integer('latency_ms').default(0).notNull(),
+    cached: boolean('cached').default(false).notNull(),
+    error: text('error').default('').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('ai_moderation_logs_created_idx').on(table.createdAt),
+    index('ai_moderation_logs_target_idx').on(table.targetType, table.decision),
+  ],
 );
 
 export const auditLogs = appSchema.table(

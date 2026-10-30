@@ -111,6 +111,9 @@ export interface DynamicItem {
   liked: boolean;
   /** Network country captured when the post was published. */
   ipRegion: string | null;
+  /** visible, pending, hidden or deleted. */
+  status?: string;
+  moderationReason?: string | null;
   user: PublicUser;
   video: VideoCard | null;
   topic: TopicInfo | null;
@@ -215,6 +218,9 @@ export interface CommentItem {
   isUploader: boolean;
   /** Network country captured when the comment was published. */
   ipRegion: string | null;
+  /** visible, pending, hidden or deleted. */
+  status?: string;
+  moderationReason?: string | null;
   user: PublicUser;
   replies: CommentItem[];
   replyCount: number;

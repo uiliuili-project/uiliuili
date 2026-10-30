@@ -24,6 +24,8 @@ export const registerSchema = z.object({
   email: z.string().email('邮箱格式不正确'),
   password: passwordSchema,
   claimToken: z.string().max(200).optional(),
+  /** Required when the site legal settings ask for explicit consent. */
+  termsAccepted: z.boolean().optional(),
 });
 
 export const updateProfileSchema = z.object({

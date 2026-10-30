@@ -1,4 +1,6 @@
-export const APP_NAME = 'uiliuili';
+/** Display name. Internal package, repository and CLI identifiers stay `uiliuili`. */
+export const APP_NAME = '萌悠';
+export const APP_NAME_EN = 'MoeYou';
 export const APP_VERSION = '0.1.0';
 export const CONFIG_DIR = 'config';
 export const INSTANCE_FILE = 'instance.json';
@@ -192,6 +194,96 @@ export const DEFAULT_CATEGORIES = [
   { slug: 'sports', name: '体育', sort: 80 },
 ] as const;
 
+export const CAPTCHA_PROVIDERS = ['turnstile', 'recaptcha_v2', 'recaptcha_v3'] as const;
+export type CaptchaProvider = (typeof CAPTCHA_PROVIDERS)[number];
+
+/** Actions that may require a human verification challenge. */
+export const CAPTCHA_ACTIONS = [
+  'register',
+  'login',
+  'comment',
+  'dynamic',
+  'upload',
+  'image',
+  'danmaku',
+  'forgotPassword',
+] as const;
+export type CaptchaAction = (typeof CAPTCHA_ACTIONS)[number];
+
+export const RATE_LIMIT_ACTIONS = [...CAPTCHA_ACTIONS, 'cover'] as const;
+export type RateLimitAction = (typeof RATE_LIMIT_ACTIONS)[number];
+
+export const MODERATION_TARGETS = ['comment', 'dynamic'] as const;
+export type ModerationTarget = (typeof MODERATION_TARGETS)[number];
+
+export const MODERATION_ACTIONS = ['reject', 'pending', 'flag'] as const;
+export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
+
+export const MODERATION_FAIL_MODES = ['open', 'closed'] as const;
+export type ModerationFailMode = (typeof MODERATION_FAIL_MODES)[number];
+
+export const NAV_VISIBILITIES = ['all', 'guest', 'user', 'staff'] as const;
+export type NavVisibility = (typeof NAV_VISIBILITIES)[number];
+
+/** Icon keys accepted by the navigation editor and rendered by the public site. */
+export const NAV_ICONS = [
+  'link',
+  'home',
+  'video',
+  'star',
+  'heart',
+  'book',
+  'users',
+  'info',
+  'music',
+  'game',
+  'download',
+  'external',
+] as const;
+export type NavIcon = (typeof NAV_ICONS)[number];
+
+export interface NavigationItem {
+  id: string;
+  label: string;
+  href: string;
+  icon: NavIcon;
+  newTab: boolean;
+  visibility: NavVisibility;
+  enabled: boolean;
+  highlight: boolean;
+  sort: number;
+}
+
+/**
+ * Built-in moderation prompt. Administrators can replace it, but the default
+ * references Chinese content law so a fresh installation is usable.
+ */
+export const DEFAULT_MODERATION_PROMPT = `你是「萌悠」的内容审核助手。请依据《中华人民共和国网络安全法》《网络信息内容生态治理规定》等法律法规，判断用户内容是否包含违法、色情、暴力、仇恨、诈骗、广告引流、侵犯隐私等内容。不要因观点不同判违规。只输出 JSON：{"allowed":true|false,"reason":"简短理由","categories":["..."]}`;
+
+export const DEFAULT_TERMS_HTML = `<h2>用户协议</h2>
+<p>欢迎使用萌悠。注册或继续使用本站，即表示你同意遵守本协议及适用法律法规。</p>
+<h3>一、账号</h3>
+<p>你应妥善保管账号与密码，对账号下的行为负责。不得冒用他人身份，不得批量注册或出租、出售账号。</p>
+<h3>二、内容规范</h3>
+<p>你不得发布违法、色情、暴力、仇恨、诈骗、侵权或广告引流内容。本站有权对违规内容进行隐藏、删除，并视情节限制或封禁账号。</p>
+<h3>三、知识产权</h3>
+<p>你应确保上传内容拥有合法权利。你授予本站展示、存储和分发该内容所必需的许可。</p>
+<h3>四、免责声明</h3>
+<p>本站按现状提供服务，不对服务中断或内容准确性作出保证。因不可抗力或第三方原因造成的损失，本站不承担责任。</p>
+<h3>五、协议变更</h3>
+<p>本站可能更新本协议，更新后在页面公布即生效。继续使用即视为接受更新后的协议。</p>`;
+
+export const DEFAULT_PRIVACY_HTML = `<h2>隐私政策</h2>
+<p>我们重视你的隐私。本政策说明萌悠收集哪些信息以及如何使用。</p>
+<h3>一、收集的信息</h3>
+<p>账号信息（用户名、邮箱、密码哈希）、你发布的内容、互动记录，以及为安全与地区合规所需的网络地区信息。</p>
+<h3>二、使用方式</h3>
+<p>用于提供登录、内容展示、互动、安全审核和服务改进。我们不会出售你的个人信息。</p>
+<h3>三、Cookie</h3>
+<p>我们使用必要的 Cookie 维持登录状态和 CSRF 防护。启用统计服务时可能使用分析 Cookie。</p>
+<h3>四、你的权利</h3>
+<p>你可以查看和修改个人资料，或联系站长申请删除账号及相关数据。</p>`;
+
 export const DEFAULT_SETTINGS = {
   site: {
     name: APP_NAME,
@@ -283,6 +375,92 @@ export const DEFAULT_SETTINGS = {
   privacy: {
     /** Show and store the network country (IP location) on user content. */
     ipLocation: true,
+  },
+  branding: {
+    countryBadge: {
+      enabled: true,
+      /** Show the country name next to the code in the tooltip. */
+      showName: true,
+      /** Hide the badge from signed-out visitors. */
+      hideForGuests: false,
+      /** Only render when the country came from a proxy header or GeoIP. */
+      trustedOnly: true,
+      /** Countries that must never show a badge. */
+      blockedCountries: [] as string[],
+    },
+  },
+  navigation: {
+    header: [] as NavigationItem[],
+    footer: [] as NavigationItem[],
+  },
+  customCode: {
+    headerEnabled: false,
+    headerHtml: '',
+    footerEnabled: false,
+    footerHtml: '',
+  },
+  analytics: {
+    enabled: false,
+    measurementId: '',
+    anonymizeIp: true,
+    trackAdmin: false,
+    respectDnt: true,
+  },
+  legal: {
+    termsHtml: DEFAULT_TERMS_HTML,
+    privacyHtml: DEFAULT_PRIVACY_HTML,
+    termsVersion: '1',
+    requireConsent: true,
+  },
+  captcha: {
+    enabled: false,
+    provider: 'turnstile' as CaptchaProvider,
+    siteKey: '',
+    minScore: 0.5,
+    /** Require verification on every request, regardless of rate limits. */
+    always: {
+      register: true,
+      login: false,
+      comment: false,
+      dynamic: false,
+      upload: false,
+      image: false,
+      danmaku: false,
+      forgotPassword: true,
+    } as Record<CaptchaAction, boolean>,
+    /** Staff accounts bypass human verification. */
+    skipStaff: true,
+  },
+  rateLimit: {
+    enabled: true,
+    /** Minutes a successful captcha grants a pass for this user or IP. */
+    passMinutes: 15,
+    actions: {
+      register: { windowSeconds: 300, soft: 0, hard: 5 },
+      login: { windowSeconds: 60, soft: 4, hard: 10 },
+      comment: { windowSeconds: 60, soft: 3, hard: 8 },
+      dynamic: { windowSeconds: 300, soft: 3, hard: 10 },
+      upload: { windowSeconds: 3600, soft: 2, hard: 5 },
+      image: { windowSeconds: 3600, soft: 20, hard: 60 },
+      danmaku: { windowSeconds: 10, soft: 3, hard: 10 },
+      forgotPassword: { windowSeconds: 3600, soft: 0, hard: 5 },
+      cover: { windowSeconds: 3600, soft: 10, hard: 20 },
+    } as Record<RateLimitAction, { windowSeconds: number; soft: number; hard: number }>,
+  },
+  aiModeration: {
+    enabled: false,
+    targets: { comment: true, dynamic: true } as Record<ModerationTarget, boolean>,
+    action: 'pending' as ModerationAction,
+    failMode: 'open' as ModerationFailMode,
+    timeoutMs: 6000,
+    maxChars: 4000,
+    cacheMinutes: 10,
+    prompt: DEFAULT_MODERATION_PROMPT,
+  },
+  review: {
+    /** Site-wide manual review. `pending` content stays hidden until approved. */
+    comments: false,
+    dynamics: false,
   },
 } as const;
 

@@ -85,7 +85,7 @@ export const mailConfigSchema = z.object({
   secure: z.boolean().default(false),
   user: z.string().default(''),
   password: z.string().default(''),
-  fromName: z.string().default('uiliuili'),
+  fromName: z.string().default('萌悠'),
   fromAddress: z.string().default(''),
   verificationRequired: z.boolean().default(false),
 });
