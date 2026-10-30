@@ -23,6 +23,7 @@ import { api } from '../api';
 import { useT } from '../i18n';
 import { can } from '../permissions';
 import { useAdminUser } from '../user-context';
+import { NavigationEditor } from './NavigationEditor';
 
 const { Title, Text } = Typography;
 
@@ -33,6 +34,8 @@ interface SettingsData {
   search: Record<string, any> | null;
   redis: { url: string } | null;
   oauth: Array<{ provider: string; enabled: boolean; config: Record<string, any> }>;
+  aiConfig: { baseUrl: string; model: string; apiKey: string } | null;
+  captchaConfig: { secretKey: string } | null;
 }
 
 export function SettingsPage() {
@@ -40,6 +43,8 @@ export function SettingsPage() {
   const actor = useAdminUser();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [aiTestContent, setAiTestContent] = useState('');
+  const [aiTestResult, setAiTestResult] = useState('');
   const [siteForm] = Form.useForm();
   const [uploadForm] = Form.useForm();
   const [playbackForm] = Form.useForm();
@@ -52,6 +57,15 @@ export function SettingsPage() {
   const [searchForm] = Form.useForm();
   const [securityForm] = Form.useForm();
   const [oauthForms] = Form.useForm();
+  const [brandingForm] = Form.useForm();
+  const [navigationForm] = Form.useForm();
+  const [customCodeForm] = Form.useForm();
+  const [analyticsForm] = Form.useForm();
+  const [legalForm] = Form.useForm();
+  const [captchaForm] = Form.useForm();
+  const [aiForm] = Form.useForm();
+  const [rateLimitForm] = Form.useForm();
+  const [reviewForm] = Form.useForm();
   const logoUrl = Form.useWatch('logoUrl', siteForm) as string | undefined;
   const canSite = can(actor, 'settings:site');
   const canContent = can(actor, 'settings:content');
@@ -59,12 +73,11 @@ export function SettingsPage() {
   const canSecurity = can(actor, 'settings:security');
 
   const canSeeTab = (key: string) => {
-    if (key === 'site') return canSite;
-    if (key === 'content' || key === 'social' || key === 'region') return canContent;
-    if (key === 'storage' || key === 'mail' || key === 'search' || key === 'oauth') {
-      return canIntegration;
-    }
-    if (key === 'security') return canSecurity;
+    if (key === 'site' || key === 'appearance' || key === 'legal') return canSite;
+    if (key === 'content' || key === 'engagement' || key === 'region') return canContent;
+    if (key === 'integrations') return canIntegration;
+    if (key === 'ai') return canIntegration;
+    if (key === 'captcha' || key === 'security') return canSecurity;
     return false;
   };
 
@@ -168,6 +181,26 @@ export function SettingsPage() {
       };
     }
     oauthForms.setFieldsValue(oauthValues);
+    brandingForm.setFieldsValue(groups.branding?.countryBadge ?? {});
+    navigationForm.setFieldsValue({
+      header: groups.navigation?.header ?? [],
+      footer: groups.navigation?.footer ?? [],
+    });
+    customCodeForm.setFieldsValue(groups.customCode ?? {});
+    analyticsForm.setFieldsValue(groups.analytics ?? {});
+    legalForm.setFieldsValue(groups.legal ?? {});
+    captchaForm.setFieldsValue({
+      ...(groups.captcha ?? {}),
+      secretKey: query.data.captchaConfig?.secretKey ?? '',
+    });
+    aiForm.setFieldsValue({
+      ...(groups.aiModeration ?? {}),
+      baseUrl: query.data.aiConfig?.baseUrl ?? 'https://api.openai.com/v1',
+      model: query.data.aiConfig?.model ?? 'gpt-4o-mini',
+      apiKey: query.data.aiConfig?.apiKey ?? '',
+    });
+    rateLimitForm.setFieldsValue(groups.rateLimit ?? {});
+    reviewForm.setFieldsValue(groups.review ?? {});
   }, [query.data]);
 
   const save = async (patches: Record<string, unknown>, forms?: Array<() => Promise<unknown>>) => {
@@ -328,7 +361,7 @@ export function SettingsPage() {
         secure: values.secure ?? false,
         user: values.user ?? '',
         password: values.password ?? '',
-        fromName: values.fromName ?? 'uiliuili',
+        fromName: values.fromName ?? '萌悠',
         fromAddress: values.fromAddress ?? '',
         verificationRequired: values.verificationRequired,
       },
@@ -378,6 +411,75 @@ export function SettingsPage() {
       setSaving(false);
     }
   };
+  const saveBranding = async () => {
+    const values = await brandingForm.validateFields();
+    await save({ branding: { countryBadge: values } });
+  };
+  const saveNavigation = async () => {
+    const values = await navigationForm.validateFields();
+    await save({ navigation: values });
+  };
+  const saveCustomCode = async () => {
+    const values = await customCodeForm.validateFields();
+    await save({ customCode: values });
+  };
+  const saveAnalytics = async () => {
+    const values = await analyticsForm.validateFields();
+    await save({ analytics: values });
+  };
+  const saveLegal = async () => {
+    const values = await legalForm.validateFields();
+    await save({ legal: values });
+  };
+  const saveCaptcha = async () => {
+    const values = await captchaForm.validateFields();
+    const { secretKey, ...captcha } = values;
+    await save({
+      captcha,
+      captcha_config: { secretKey: secretKey ?? '' },
+    });
+  };
+  const saveAi = async () => {
+    const values = await aiForm.validateFields();
+    const { baseUrl, model, apiKey, ...moderation } = values;
+    await save({
+      aiModeration: moderation,
+      ai_config: { baseUrl, model, apiKey: apiKey ?? '' },
+    });
+  };
+  const saveRateLimit = async () => {
+    const values = await rateLimitForm.validateFields();
+    const review = await reviewForm.validateFields();
+    await save({ rateLimit: values, review });
+  };
+  const testAi = async () => {
+    if (!aiTestContent.trim()) {
+      notification.error({ message: t('请输入用于测试的内容') });
+      return;
+    }
+    try {
+      setSaving(true);
+      const result = await api.post<{
+        decision: string;
+        allowed: boolean;
+        reason: string;
+        categories: string[];
+        latencyMs: number;
+        error?: string;
+      }>('/api/v1/admin/moderation/test', { content: aiTestContent });
+      setAiTestResult(
+        `${result.decision} · ${result.allowed ? t('允许') : t('不允许')} · ${Math.round(
+          result.latencyMs,
+        )}ms${result.reason ? ` · ${result.reason}` : ''}${
+          result.error ? ` · ${result.error}` : ''
+        }`,
+      );
+    } catch (error) {
+      notification.error({ message: error instanceof Error ? error.message : t('测试失败') });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -392,104 +494,319 @@ export function SettingsPage() {
           items={[
             {
               key: 'site',
-              label: t('站点'),
+              label: t('站点与品牌'),
               children: (
-                <Form form={siteForm} layout="vertical" style={{ maxWidth: 720 }}>
+                <>
+                  <Form form={siteForm} layout="vertical" style={{ maxWidth: 720 }}>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item label={t('站点名称')} name="name">
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item label={t('站点 URL')} name="url">
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24}>
+                        <Form.Item
+                          label={t('站点 Logo')}
+                          extra={t('上传后立即生效，建议使用正方形 JPG、PNG 或 WebP 图片。')}
+                        >
+                          <Space align="center" wrap>
+                            {logoUrl ? (
+                              <img
+                                src={logoUrl}
+                                alt=""
+                                style={{
+                                  width: 56,
+                                  height: 56,
+                                  borderRadius: 12,
+                                  objectFit: 'cover',
+                                  border: '1px solid #f0f0f0',
+                                }}
+                              />
+                            ) : (
+                              <span className="install-brand-mark">u</span>
+                            )}
+                            <Upload
+                              accept="image/jpeg,image/png,image/webp"
+                              showUploadList={false}
+                              beforeUpload={(file) => {
+                                void uploadLogo(file);
+                                return false;
+                              }}
+                            >
+                              <Button icon={<UploadOutlined />} loading={saving}>
+                                {t('上传 Logo')}
+                              </Button>
+                            </Upload>
+                            {logoUrl && (
+                              <Button onClick={() => siteForm.setFieldValue('logoUrl', '')}>
+                                {t('移除 Logo')}
+                              </Button>
+                            )}
+                          </Space>
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24}>
+                        <Form.Item label={t('Logo 地址')} name="logoUrl">
+                          <Input placeholder="/media/branding/logo.png" allowClear />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24}>
+                        <Form.Item label={t('描述')} name="description">
+                          <Input.TextArea rows={2} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.Item label={t('默认语言')} name="locale">
+                          <Select
+                            options={[
+                              { value: 'zh-CN', label: t('简体中文') },
+                              { value: 'en-US', label: 'English' },
+                            ]}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.Item label={t('时区')} name="timezone">
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item label={t('ICP 备案号')} name="icp">
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24}>
+                        <Form.Item label={t('页脚')} name="footer">
+                          <Input.TextArea rows={2} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      loading={saving}
+                      onClick={() => void saveSite()}
+                    >
+                      {t('保存站点设置')}{' '}
+                    </Button>
+                  </Form>
+                  <Divider />
+                  <Form form={brandingForm} layout="vertical" style={{ maxWidth: 720 }}>
+                    <Title level={5}>{t('Logo 旁的国家角标')}</Title>
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      message={t(
+                        '角标使用请求头或 GeoIP 解析出的网络地区，不显示具体 IP；无法解析时自动隐藏。',
+                      )}
+                    />
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item label={t('启用国家角标')} name="enabled" valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('悬停显示国家全名')}
+                          name="showName"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('对游客隐藏')}
+                          name="hideForGuests"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('仅使用可信网络来源')}
+                          name="trustedOnly"
+                          valuePropName="checked"
+                          extra={t('关闭后会回退到账号地区，可能误导访客。')}
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24}>
+                        <Form.Item
+                          label={t('隐藏角标的国家')}
+                          name="blockedCountries"
+                          extra={t('被选中的国家不显示角标。')}
+                        >
+                          <Select
+                            mode="multiple"
+                            allowClear
+                            showSearch
+                            optionFilterProp="label"
+                            options={regionSelectOptions}
+                            placeholder={t('搜索国家或地区代码')}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Button type="primary" loading={saving} onClick={() => void saveBranding()}>
+                      {t('保存品牌设置')}
+                    </Button>
+                  </Form>
+                </>
+              ),
+            },
+            {
+              key: 'appearance',
+              label: t('外观与导航'),
+              children: (
+                <>
+                  <Form form={navigationForm} layout="vertical">
+                    <Title level={5}>{t('自定义导航与页脚按钮')}</Title>
+                    <NavigationEditor />
+                    <Button type="primary" loading={saving} onClick={() => void saveNavigation()}>
+                      {t('保存导航设置')}
+                    </Button>
+                  </Form>
+                  <Divider />
+                  <Form form={customCodeForm} layout="vertical">
+                    <Title level={5}>{t('自定义 HTML')}</Title>
+                    <Alert
+                      type="warning"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      message={t(
+                        '这里的 HTML 会原样插入页面并执行其中的脚本，仅站长可编辑。请只粘贴可信代码。',
+                      )}
+                    />
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('启用顶部 HTML')}
+                          name="headerEnabled"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          label={t('启用页脚 HTML')}
+                          name="footerEnabled"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item label={t('顶部 HTML（导航下方）')} name="headerHtml">
+                      <Input.TextArea rows={5} style={{ fontFamily: 'monospace' }} />
+                    </Form.Item>
+                    <Form.Item label={t('页脚 HTML（默认页脚上方）')} name="footerHtml">
+                      <Input.TextArea rows={5} style={{ fontFamily: 'monospace' }} />
+                    </Form.Item>
+                    <Button type="primary" loading={saving} onClick={() => void saveCustomCode()}>
+                      {t('保存自定义 HTML')}
+                    </Button>
+                  </Form>
+                  <Divider />
+                  <Form form={analyticsForm} layout="vertical" style={{ maxWidth: 620 }}>
+                    <Title level={5}>Google Analytics</Title>
+                    <Form.Item
+                      label={t('启用 Google Analytics')}
+                      name="enabled"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item
+                      label={t('GA4 衡量 ID')}
+                      name="measurementId"
+                      extra={t('格式为 G-XXXXXXXXXX。中国大陆访问可能无法加载。')}
+                    >
+                      <Input placeholder="G-XXXXXXXXXX" />
+                    </Form.Item>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={8}>
+                        <Form.Item
+                          label={t('匿名化 IP')}
+                          name="anonymizeIp"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.Item
+                          label={t('尊重 Do Not Track')}
+                          name="respectDnt"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.Item
+                          label={t('统计后台页面')}
+                          name="trackAdmin"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Button type="primary" loading={saving} onClick={() => void saveAnalytics()}>
+                      {t('保存统计设置')}
+                    </Button>
+                  </Form>
+                </>
+              ),
+            },
+            {
+              key: 'legal',
+              label: t('协议与条款'),
+              children: (
+                <Form form={legalForm} layout="vertical" style={{ maxWidth: 900 }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message={t(
+                      '协议保存时会移除脚本、事件属性和内嵌样式，只保留排版标签；修改内容后版本号自动递增。',
+                    )}
+                  />
                   <Row gutter={16}>
                     <Col xs={24} sm={12}>
-                      <Form.Item label={t('站点名称')} name="name">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('站点 URL')} name="url">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24}>
                       <Form.Item
-                        label={t('站点 Logo')}
-                        extra={t('上传后立即生效，建议使用正方形 JPG、PNG 或 WebP 图片。')}
+                        label={t('注册时必须同意协议')}
+                        name="requireConsent"
+                        valuePropName="checked"
                       >
-                        <Space align="center" wrap>
-                          {logoUrl ? (
-                            <img
-                              src={logoUrl}
-                              alt=""
-                              style={{
-                                width: 56,
-                                height: 56,
-                                borderRadius: 12,
-                                objectFit: 'cover',
-                                border: '1px solid #f0f0f0',
-                              }}
-                            />
-                          ) : (
-                            <span className="install-brand-mark">u</span>
-                          )}
-                          <Upload
-                            accept="image/jpeg,image/png,image/webp"
-                            showUploadList={false}
-                            beforeUpload={(file) => {
-                              void uploadLogo(file);
-                              return false;
-                            }}
-                          >
-                            <Button icon={<UploadOutlined />} loading={saving}>
-                              {t('上传 Logo')}
-                            </Button>
-                          </Upload>
-                          {logoUrl && (
-                            <Button onClick={() => siteForm.setFieldValue('logoUrl', '')}>
-                              {t('移除 Logo')}
-                            </Button>
-                          )}
-                        </Space>
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24}>
-                      <Form.Item label={t('Logo 地址')} name="logoUrl">
-                        <Input placeholder="/media/branding/logo.png" allowClear />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24}>
-                      <Form.Item label={t('描述')} name="description">
-                        <Input.TextArea rows={2} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={8}>
-                      <Form.Item label={t('默认语言')} name="locale">
-                        <Select
-                          options={[
-                            { value: 'zh-CN', label: t('简体中文') },
-                            { value: 'en-US', label: 'English' },
-                          ]}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={8}>
-                      <Form.Item label={t('时区')} name="timezone">
-                        <Input />
+                        <Switch />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label={t('ICP 备案号')} name="icp">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24}>
-                      <Form.Item label={t('页脚')} name="footer">
-                        <Input.TextArea rows={2} />
+                      <Form.Item label={t('协议版本')} name="termsVersion">
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                   </Row>
-                  <Button
-                    type="primary"
-                    icon={<SaveOutlined />}
-                    loading={saving}
-                    onClick={() => void saveSite()}
-                  >
-                    {t('保存站点设置')}{' '}
+                  <Form.Item label={t('用户协议 HTML')} name="termsHtml">
+                    <Input.TextArea rows={10} style={{ fontFamily: 'monospace' }} />
+                  </Form.Item>
+                  <Form.Item label={t('隐私政策 HTML')} name="privacyHtml">
+                    <Input.TextArea rows={10} style={{ fontFamily: 'monospace' }} />
+                  </Form.Item>
+                  <Button type="primary" loading={saving} onClick={() => void saveLegal()}>
+                    {t('保存协议')}
                   </Button>
                 </Form>
               ),
@@ -615,8 +932,8 @@ export function SettingsPage() {
               ),
             },
             {
-              key: 'social',
-              label: t('社交与推荐'),
+              key: 'engagement',
+              label: t('互动与频率'),
               children: (
                 <Row gutter={[24, 24]}>
                   <Col xs={24} lg={12}>
@@ -718,223 +1035,575 @@ export function SettingsPage() {
                       {t('保存社交与推荐设置')}{' '}
                     </Button>
                   </Col>
+                  <Col span={24}>
+                    <Divider />
+                    <Card
+                      size="small"
+                      title={t('频率限制与人机验证触发')}
+                      style={{ marginBottom: 16 }}
+                    >
+                      <Alert
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: 16 }}
+                        message={t(
+                          '超过软阈值时要求人机验证，验证通过后可继续；超过硬阈值直接拒绝并返回等待时间。0 表示不启用软阈值。',
+                        )}
+                      />
+                      <Form form={rateLimitForm} layout="vertical">
+                        <Row gutter={16}>
+                          <Col xs={24} sm={8}>
+                            <Form.Item
+                              label={t('启用频率限制')}
+                              name="enabled"
+                              valuePropName="checked"
+                            >
+                              <Switch />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} sm={8}>
+                            <Form.Item label={t('验证通过后放行分钟数')} name="passMinutes">
+                              <InputNumber min={1} max={1440} style={{ width: '100%' }} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Row gutter={8} style={{ fontWeight: 600, marginBottom: 6 }}>
+                          <Col span={8}>{t('动作')}</Col>
+                          <Col span={5}>{t('窗口（秒）')}</Col>
+                          <Col span={5}>{t('软阈值')}</Col>
+                          <Col span={6}>{t('硬阈值')}</Col>
+                        </Row>
+                        {[
+                          ['comment', t('评论')],
+                          ['dynamic', t('动态')],
+                          ['upload', t('投稿')],
+                          ['image', t('图片上传')],
+                          ['danmaku', t('弹幕')],
+                          ['cover', t('封面上传')],
+                          ['register', t('注册')],
+                          ['login', t('登录')],
+                          ['forgotPassword', t('找回密码')],
+                        ].map(([action, label]) => (
+                          <Row gutter={8} key={action} align="middle" style={{ marginBottom: 6 }}>
+                            <Col span={8}>{label}</Col>
+                            <Col span={5}>
+                              <Form.Item
+                                name={['actions', action, 'windowSeconds']}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <InputNumber min={5} max={86400} style={{ width: '100%' }} />
+                              </Form.Item>
+                            </Col>
+                            <Col span={5}>
+                              <Form.Item
+                                name={['actions', action, 'soft']}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                              </Form.Item>
+                            </Col>
+                            <Col span={6}>
+                              <Form.Item
+                                name={['actions', action, 'hard']}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <InputNumber min={1} style={{ width: '100%' }} />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        ))}
+                        <Divider orientation="left" plain>
+                          {t('全站人工审核')}
+                        </Divider>
+                        <Button
+                          type="primary"
+                          loading={saving}
+                          onClick={() => void saveRateLimit()}
+                        >
+                          {t('保存频率与审核设置')}
+                        </Button>
+                      </Form>
+                      <Divider />
+                      <Form form={reviewForm} layout="inline">
+                        <Form.Item
+                          label={t('评论先审后发')}
+                          name="comments"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                        <Form.Item
+                          label={t('动态先审后发')}
+                          name="dynamics"
+                          valuePropName="checked"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Form>
+                    </Card>
+                  </Col>
                 </Row>
               ),
             },
             {
-              key: 'storage',
-              label: t('存储'),
+              key: 'integrations',
+              label: t('集成服务'),
               children: (
-                <Form form={storageForm} layout="vertical" style={{ maxWidth: 760 }}>
+                <Tabs
+                  items={[
+                    {
+                      key: 'storage',
+                      label: t('存储'),
+                      children: (
+                        <Form form={storageForm} layout="vertical" style={{ maxWidth: 760 }}>
+                          <Alert
+                            type="info"
+                            showIcon
+                            message={t('切换存储驱动不会自动迁移已有文件')}
+                            style={{ marginBottom: 16 }}
+                          />
+                          <Form.Item label={t('驱动')} name="driver">
+                            <Select
+                              options={[
+                                { value: 'local', label: t('本地磁盘') },
+                                { value: 's3', label: t('S3 兼容对象存储') },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Form.Item label={t('本地路径')} name="localPath">
+                            <Input />
+                          </Form.Item>
+                          <Row gutter={16}>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label="S3 Endpoint" name="endpoint">
+                                <Input placeholder={t('AWS 留空')} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label="Region" name="region">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label="Bucket" name="bucket">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('路径前缀')} name="prefix">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label="Access Key ID" name="accessKeyId">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label="Secret Access Key" name="secretAccessKey">
+                                <Input.Password />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('公开访问域名 / CDN')} name="publicBaseUrl">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item
+                                label="Path Style"
+                                name="forcePathStyle"
+                                valuePropName="checked"
+                              >
+                                <Switch />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Button
+                            type="primary"
+                            loading={saving}
+                            onClick={() => void saveStorage()}
+                          >
+                            {t('保存存储设置')}{' '}
+                          </Button>
+                        </Form>
+                      ),
+                    },
+                    {
+                      key: 'mail',
+                      label: t('邮件'),
+                      children: (
+                        <Form form={mailForm} layout="vertical" style={{ maxWidth: 760 }}>
+                          <Row gutter={16}>
+                            <Col xs={24} sm={8}>
+                              <Form.Item
+                                label={t('启用邮件')}
+                                name="enabled"
+                                valuePropName="checked"
+                              >
+                                <Switch />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={16}>
+                              <Form.Item
+                                label={t('新用户必须验证邮箱')}
+                                name="verificationRequired"
+                                valuePropName="checked"
+                              >
+                                <Switch />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={16}>
+                              <Form.Item label={t('SMTP 主机')} name="host">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                              <Form.Item label={t('端口')} name="port">
+                                <InputNumber style={{ width: '100%' }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('用户名')} name="user">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('密码')} name="password">
+                                <Input.Password />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('发件人名称')} name="fromName">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item label={t('发件人地址')} name="fromAddress">
+                                <Input />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} sm={12}>
+                              <Form.Item
+                                label={t('直接 TLS')}
+                                name="secure"
+                                valuePropName="checked"
+                              >
+                                <Switch />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Button type="primary" loading={saving} onClick={() => void saveMail()}>
+                            {t('保存邮件设置')}{' '}
+                          </Button>
+                        </Form>
+                      ),
+                    },
+                    {
+                      key: 'search',
+                      label: t('搜索'),
+                      children: (
+                        <Form form={searchForm} layout="vertical" style={{ maxWidth: 640 }}>
+                          <Form.Item label={t('搜索引擎')} name="driver">
+                            <Select
+                              options={[
+                                { value: 'postgres', label: t('PostgreSQL 兜底') },
+                                { value: 'meilisearch', label: 'Meilisearch' },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Form.Item label="Meilisearch URL" name="url">
+                            <Input />
+                          </Form.Item>
+                          <Form.Item label="Master Key" name="key">
+                            <Input.Password />
+                          </Form.Item>
+                          <Form.Item label={t('索引前缀')} name="indexPrefix">
+                            <Input />
+                          </Form.Item>
+                          <Button type="primary" loading={saving} onClick={() => void saveSearch()}>
+                            {t('保存搜索设置')}{' '}
+                          </Button>
+                        </Form>
+                      ),
+                    },
+                    {
+                      key: 'oauth',
+                      label: t('第三方登录'),
+                      children: (
+                        <Form form={oauthForms} layout="vertical">
+                          {['github', 'google', 'oidc'].map((provider) => (
+                            <Card
+                              key={provider}
+                              size="small"
+                              title={provider.toUpperCase()}
+                              style={{ marginBottom: 16 }}
+                            >
+                              <Row gutter={16}>
+                                <Col xs={24} sm={4}>
+                                  <Form.Item
+                                    label={t('启用')}
+                                    name={[provider, 'enabled']}
+                                    valuePropName="checked"
+                                  >
+                                    <Switch />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={24} sm={10}>
+                                  <Form.Item label="Client ID" name={[provider, 'clientId']}>
+                                    <Input />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={24} sm={10}>
+                                  <Form.Item
+                                    label="Client Secret"
+                                    name={[provider, 'clientSecret']}
+                                  >
+                                    <Input.Password />
+                                  </Form.Item>
+                                </Col>
+                                {provider === 'oidc' && (
+                                  <Col xs={24}>
+                                    <Form.Item label="Issuer" name={[provider, 'issuer']}>
+                                      <Input />
+                                    </Form.Item>
+                                  </Col>
+                                )}
+                                <Col xs={24}>
+                                  <Form.Item
+                                    label={t('Scopes（空格分隔）')}
+                                    name={[provider, 'scopes']}
+                                  >
+                                    <Input placeholder="openid email profile" />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                              <Button
+                                type="primary"
+                                loading={saving}
+                                onClick={() => void saveOAuth(provider)}
+                              >
+                                {t('保存')} {provider}
+                              </Button>
+                            </Card>
+                          ))}
+                        </Form>
+                      ),
+                    },
+                  ]}
+                />
+              ),
+            },
+            {
+              key: 'captcha',
+              label: t('人机验证'),
+              children: (
+                <Form form={captchaForm} layout="vertical" style={{ maxWidth: 820 }}>
                   <Alert
                     type="info"
                     showIcon
-                    message={t('切换存储驱动不会自动迁移已有文件')}
                     style={{ marginBottom: 16 }}
+                    message={t(
+                      '服务端密钥会加密保存，公开设置只暴露 Site Key。启用后按频率阈值触发，也可对指定动作始终验证。',
+                    )}
                   />
-                  <Form.Item label={t('驱动')} name="driver">
-                    <Select
-                      options={[
-                        { value: 'local', label: t('本地磁盘') },
-                        { value: 's3', label: t('S3 兼容对象存储') },
-                      ]}
-                    />
-                  </Form.Item>
-                  <Form.Item label={t('本地路径')} name="localPath">
-                    <Input />
-                  </Form.Item>
                   <Row gutter={16}>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="S3 Endpoint" name="endpoint">
-                        <Input placeholder={t('AWS 留空')} />
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('启用人机验证')} name="enabled" valuePropName="checked">
+                        <Switch />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="Region" name="region">
-                        <Input />
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('服务商')} name="provider">
+                        <Select
+                          options={[
+                            { value: 'turnstile', label: 'Cloudflare Turnstile' },
+                            { value: 'recaptcha_v2', label: 'reCAPTCHA v2' },
+                            { value: 'recaptcha_v3', label: 'reCAPTCHA v3' },
+                          ]}
+                        />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="Bucket" name="bucket">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('路径前缀')} name="prefix">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="Access Key ID" name="accessKeyId">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="Secret Access Key" name="secretAccessKey">
-                        <Input.Password />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('公开访问域名 / CDN')} name="publicBaseUrl">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label="Path Style" name="forcePathStyle" valuePropName="checked">
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('员工跳过验证')} name="skipStaff" valuePropName="checked">
                         <Switch />
                       </Form.Item>
                     </Col>
                   </Row>
-                  <Button type="primary" loading={saving} onClick={() => void saveStorage()}>
-                    {t('保存存储设置')}{' '}
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item label={t('站点密钥（Site Key）')} name="siteKey">
+                        <Input placeholder="0x4AAAAAAA..." />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={t('服务端密钥（Secret Key）')}
+                        name="secretKey"
+                        extra={t('已保存时显示掩码，留空掩码表示不修改。')}
+                      >
+                        <Input.Password placeholder="********" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={t('reCAPTCHA v3 最低分数')}
+                        name="minScore"
+                        extra={t('仅 reCAPTCHA v3 生效，0 到 1。')}
+                      >
+                        <InputNumber min={0} max={1} step={0.1} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Divider orientation="left" plain>
+                    {t('始终要求验证的动作')}
+                  </Divider>
+                  <Row gutter={[12, 0]}>
+                    {[
+                      ['register', t('注册')],
+                      ['login', t('登录')],
+                      ['comment', t('评论')],
+                      ['dynamic', t('动态')],
+                      ['upload', t('投稿')],
+                      ['image', t('图片上传')],
+                      ['danmaku', t('弹幕')],
+                      ['forgotPassword', t('找回密码')],
+                    ].map(([action, label]) => (
+                      <Col xs={12} sm={6} key={action}>
+                        <Form.Item label={label} name={['always', action]} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    ))}
+                  </Row>
+                  <Button type="primary" loading={saving} onClick={() => void saveCaptcha()}>
+                    {t('保存人机验证设置')}
                   </Button>
                 </Form>
               ),
             },
             {
-              key: 'mail',
-              label: t('邮件'),
+              key: 'ai',
+              label: t('AI 审核'),
               children: (
-                <Form form={mailForm} layout="vertical" style={{ maxWidth: 760 }}>
+                <Form form={aiForm} layout="vertical" style={{ maxWidth: 900 }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message={t(
+                      '兼容 OpenAI Chat Completions 的服务均可使用。接口失败时默认放行，可改为拦截。',
+                    )}
+                  />
                   <Row gutter={16}>
                     <Col xs={24} sm={8}>
-                      <Form.Item label={t('启用邮件')} name="enabled" valuePropName="checked">
+                      <Form.Item label={t('启用 AI 审核')} name="enabled" valuePropName="checked">
                         <Switch />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={16}>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('违规处理')} name="action">
+                        <Select
+                          options={[
+                            { value: 'pending', label: t('转待审核隐藏') },
+                            { value: 'reject', label: t('直接拒绝') },
+                            { value: 'flag', label: t('仅标记放行') },
+                          ]}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('接口失败时')} name="failMode">
+                        <Select
+                          options={[
+                            { value: 'open', label: t('放行（推荐）') },
+                            { value: 'closed', label: t('拦截') },
+                          ]}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12}>
                       <Form.Item
-                        label={t('新用户必须验证邮箱')}
-                        name="verificationRequired"
+                        label={t('审核评论')}
+                        name={['targets', 'comment']}
                         valuePropName="checked"
                       >
                         <Switch />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={16}>
-                      <Form.Item label={t('SMTP 主机')} name="host">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={8}>
-                      <Form.Item label={t('端口')} name="port">
-                        <InputNumber style={{ width: '100%' }} />
-                      </Form.Item>
-                    </Col>
                     <Col xs={24} sm={12}>
-                      <Form.Item label={t('用户名')} name="user">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('密码')} name="password">
-                        <Input.Password />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('发件人名称')} name="fromName">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('发件人地址')} name="fromAddress">
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={t('直接 TLS')} name="secure" valuePropName="checked">
+                      <Form.Item
+                        label={t('审核动态')}
+                        name={['targets', 'dynamic']}
+                        valuePropName="checked"
+                      >
                         <Switch />
                       </Form.Item>
                     </Col>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('超时（毫秒）')} name="timeoutMs">
+                        <InputNumber min={500} max={60000} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('最大字符数')} name="maxChars">
+                        <InputNumber min={100} max={20000} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label={t('结果缓存分钟数')} name="cacheMinutes">
+                        <InputNumber min={0} max={1440} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
                   </Row>
-                  <Button type="primary" loading={saving} onClick={() => void saveMail()}>
-                    {t('保存邮件设置')}{' '}
-                  </Button>
-                </Form>
-              ),
-            },
-            {
-              key: 'search',
-              label: t('搜索'),
-              children: (
-                <Form form={searchForm} layout="vertical" style={{ maxWidth: 640 }}>
-                  <Form.Item label={t('搜索引擎')} name="driver">
-                    <Select
-                      options={[
-                        { value: 'postgres', label: t('PostgreSQL 兜底') },
-                        { value: 'meilisearch', label: 'Meilisearch' },
-                      ]}
-                    />
+                  <Divider orientation="left" plain>
+                    OpenAI 兼容接口
+                  </Divider>
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item label={t('接口地址')} name="baseUrl">
+                        <Input placeholder="https://api.openai.com/v1" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={6}>
+                      <Form.Item label={t('模型')} name="model">
+                        <Input placeholder="gpt-4o-mini" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={6}>
+                      <Form.Item label="API Key" name="apiKey" extra={t('已保存时显示掩码。')}>
+                        <Input.Password placeholder="sk-..." />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Form.Item label={t('审核提示词')} name="prompt">
+                    <Input.TextArea rows={6} style={{ fontFamily: 'monospace' }} />
                   </Form.Item>
-                  <Form.Item label="Meilisearch URL" name="url">
-                    <Input />
-                  </Form.Item>
-                  <Form.Item label="Master Key" name="key">
-                    <Input.Password />
-                  </Form.Item>
-                  <Form.Item label={t('索引前缀')} name="indexPrefix">
-                    <Input />
-                  </Form.Item>
-                  <Button type="primary" loading={saving} onClick={() => void saveSearch()}>
-                    {t('保存搜索设置')}{' '}
-                  </Button>
-                </Form>
-              ),
-            },
-            {
-              key: 'oauth',
-              label: t('第三方登录'),
-              children: (
-                <Form form={oauthForms} layout="vertical">
-                  {['github', 'google', 'oidc'].map((provider) => (
-                    <Card
-                      key={provider}
-                      size="small"
-                      title={provider.toUpperCase()}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <Row gutter={16}>
-                        <Col xs={24} sm={4}>
-                          <Form.Item
-                            label={t('启用')}
-                            name={[provider, 'enabled']}
-                            valuePropName="checked"
-                          >
-                            <Switch />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={10}>
-                          <Form.Item label="Client ID" name={[provider, 'clientId']}>
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={10}>
-                          <Form.Item label="Client Secret" name={[provider, 'clientSecret']}>
-                            <Input.Password />
-                          </Form.Item>
-                        </Col>
-                        {provider === 'oidc' && (
-                          <Col xs={24}>
-                            <Form.Item label="Issuer" name={[provider, 'issuer']}>
-                              <Input />
-                            </Form.Item>
-                          </Col>
-                        )}
-                        <Col xs={24}>
-                          <Form.Item label={t('Scopes（空格分隔）')} name={[provider, 'scopes']}>
-                            <Input placeholder="openid email profile" />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                      <Button
-                        type="primary"
-                        loading={saving}
-                        onClick={() => void saveOAuth(provider)}
-                      >
-                        {t('保存')} {provider}
-                      </Button>
-                    </Card>
-                  ))}
+                  <Space wrap>
+                    <Button type="primary" loading={saving} onClick={() => void saveAi()}>
+                      {t('保存 AI 审核设置')}
+                    </Button>
+                    <Button href="/admin/comments" target="_blank">
+                      {t('查看审核日志与待审内容')}
+                    </Button>
+                  </Space>
+                  <Divider orientation="left" plain>
+                    {t('提示词试跑')}
+                  </Divider>
+                  <Input.TextArea
+                    rows={3}
+                    value={aiTestContent}
+                    onChange={(event) => setAiTestContent(event.target.value)}
+                    placeholder={t('输入一段内容，使用当前配置调用审核接口。')}
+                  />
+                  <Space wrap style={{ marginTop: 8 }}>
+                    <Button loading={saving} onClick={() => void testAi()}>
+                      {t('测试审核')}
+                    </Button>
+                    {aiTestResult && <Text type="secondary">{aiTestResult}</Text>}
+                  </Space>
                 </Form>
               ),
             },

@@ -87,6 +87,9 @@ export interface AdminCategory {
   id: string;
   slug: string;
   name: string;
+  description: string;
+  icon: string;
+  visible: boolean;
   sort: number;
   parentId: string | null;
 }
@@ -148,6 +151,23 @@ export interface AdminComment {
   username?: string;
   status: string;
   likeCount: number;
+  createdAt: string;
+}
+
+export interface AdminModerationLog {
+  id: string;
+  targetType: string;
+  targetId: string;
+  excerpt: string;
+  allowed: boolean;
+  decision: string;
+  reason: string;
+  categories: string[];
+  model: string;
+  latencyMs: number;
+  cached: boolean;
+  error: string;
+  username: string | null;
   createdAt: string;
 }
 

@@ -6,7 +6,7 @@ export interface SiteBrand {
   logoUrl: string;
 }
 
-const defaultBrand: SiteBrand = { name: 'uiliuili', logoUrl: '' };
+const defaultBrand: SiteBrand = { name: '萌悠', logoUrl: '' };
 
 export function useSiteBrand(): SiteBrand {
   const [brand, setBrand] = useState<SiteBrand>(defaultBrand);
