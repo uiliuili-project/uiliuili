@@ -23,6 +23,29 @@ All notable changes to this project are documented here. The format follows
 - Admin upgrade center with database backups, advisory-locked migrations,
   maintenance mode, and an optional fixed restart command.
 - Site rebrand to 萌悠 (MoeYou); internal `uiliuili` identifiers are unchanged.
+- Creator studio rebuilt as a multi-page workspace: overview, video management,
+  video editing, analytics, comments, danmaku, collections, columns, fans,
+  growth, messages, collaborations, appeals, and a recycle bin.
+- Recycle bin with restore and permanent deletion. Deletion remains a soft
+  delete; restore returns published videos to `published`, unpublished ones to
+  `ready`, and drafts to `draft`.
+- Review appeals: one pending appeal per video, reviewer queue in the admin
+  console, automatic restoration when accepted, status logs, notifications, and
+  audit entries.
+- Creation declarations (`original`, `repost`, `ai`), required repost source
+  links, an AI-generated badge, and per-video comment/danmaku switches enforced
+  by the API and reflected on the public page.
+- Anonymous playback aggregation: `watch_events` now records part, source,
+  device, and country; a worker rollup writes idempotent UTC daily rows to
+  `video_daily_stats` and `creator_daily_stats` for the studio analytics page.
+- Long-form columns stored in `articles`, rendered from a safe Markdown subset,
+  with public listing/detail pages, likes, favorites, comments, studio CRUD,
+  and an admin review queue.
+- Collaborations: invite by username or email, accept/reject, shared studio
+  access for accepted members, and public credit, while destructive actions stay
+  with the video owner.
+- Collections and series management, follower/growth dashboards, studio
+  message center, and an admin appeals/columns console.
 
 ### Fixed
 

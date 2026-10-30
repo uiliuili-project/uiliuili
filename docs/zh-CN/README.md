@@ -13,6 +13,7 @@ uiliuili 是一个开源、自托管的弹幕视频平台。本目录是中文�
 ## 功能与集成
 
 - [架构](architecture.md) — 进程模型、应用与包的职责、请求链路
+- [创作中心](creator-studio.md) — 多页面工作台、回收站、申诉、声明、数据与联合投稿
 - [API 概览](api.md) — REST 路由、鉴权与 WebSocket 协议
 - [弹幕](danmaku.md) — 数据模型、实时协议与渲染引擎
 - [邮件与 OAuth](oauth.md) — SMTP、GitHub/Google/OIDC 登录

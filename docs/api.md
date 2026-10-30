@@ -73,12 +73,43 @@ denials on detail and playback return HTTP 451 with error code
 
 - `GET|POST /api/v1/studio/videos`
 - `GET|PATCH|DELETE /api/v1/studio/videos/:id`
+- `GET /api/v1/studio/videos/trash`
+- `POST /api/v1/studio/videos/:id/restore`
+- `DELETE /api/v1/studio/videos/:id/purge`
+- `GET /api/v1/studio/videos/:id/history`
+- `POST /api/v1/studio/videos/:id/appeals`
+- `GET /api/v1/studio/appeals`
+- `GET /api/v1/studio/analytics?days=7|30|90`
+- `GET /api/v1/studio/comments` and `POST /api/v1/studio/comments/:id/moderate`
+- `GET /api/v1/studio/danmaku` and `POST /api/v1/studio/danmaku/:id/moderate`
+- `GET|POST /api/v1/studio/collections`
+- `PATCH|DELETE /api/v1/studio/collections/:id`
+- `GET|POST /api/v1/studio/collections/:id/items` and `DELETE .../items/:videoId`
+- `GET|POST /api/v1/studio/articles`
+- `GET|PATCH|DELETE /api/v1/studio/articles/:id`
+- `POST /api/v1/studio/articles/:id/publish|unpublish`
+- `GET /api/v1/studio/fans`, `GET /api/v1/studio/growth`
+- `GET /api/v1/studio/collaborations` and `POST /api/v1/studio/collaborations/:videoId/respond`
+- `POST|DELETE /api/v1/studio/videos/:id/collaborators[/:userId]`
 - `POST /api/v1/studio/videos/:id/upload`
 - `PUT /api/v1/studio/uploads/:uploadId/parts/:partNumber`
 - `POST /api/v1/studio/uploads/:uploadId/parts/presign`
 - `POST /api/v1/studio/uploads/:uploadId/complete`
 - `POST /api/v1/studio/videos/:id/publish`
 - `PUT /api/v1/studio/videos/:id/cover`
+
+Studio data is isolated by uploader: collaborators get read/edit access only after
+accepting an invitation, while destructuring actions such as delete, purge, and
+collaborator management stay with the owner. Analytics are anonymous daily
+aggregates; individual viewers are never returned, and geography stops at
+country level.
+
+## Columns
+
+- `GET /api/v1/articles` and `GET /api/v1/articles/:id` (sanitized HTML body)
+- `POST|DELETE /api/v1/articles/:id/like|favorite`
+- `GET|POST /api/v1/articles/:id/comments` and `DELETE .../comments/:commentId`
+
 
 ## Social
 
@@ -112,6 +143,8 @@ All admin routes require the corresponding permission and are listed in
 - `GET /api/v1/admin/dashboard`
 - `GET|PATCH|DELETE /api/v1/admin/users`
 - `GET|PATCH /api/v1/admin/videos`
+- `GET /api/v1/admin/appeals` and `POST /api/v1/admin/appeals/:id/handle`
+- `GET /api/v1/admin/articles` and `POST /api/v1/admin/articles/:id/moderate`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
 - `POST /api/v1/admin/owner/transfer` (owner only; demotes the caller)

@@ -60,12 +60,39 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 
 - `GET|POST /api/v1/studio/videos`
 - `GET|PATCH|DELETE /api/v1/studio/videos/:id`
+- `GET /api/v1/studio/videos/trash`
+- `POST /api/v1/studio/videos/:id/restore`
+- `DELETE /api/v1/studio/videos/:id/purge`
+- `GET /api/v1/studio/videos/:id/history`
+- `POST /api/v1/studio/videos/:id/appeals`
+- `GET /api/v1/studio/appeals`
+- `GET /api/v1/studio/analytics?days=7|30|90`
+- `GET /api/v1/studio/comments` 与 `POST /api/v1/studio/comments/:id/moderate`
+- `GET /api/v1/studio/danmaku` 与 `POST /api/v1/studio/danmaku/:id/moderate`
+- `GET|POST /api/v1/studio/collections`
+- `PATCH|DELETE /api/v1/studio/collections/:id`
+- `GET|POST /api/v1/studio/collections/:id/items` 与 `DELETE .../items/:videoId`
+- `GET|POST /api/v1/studio/articles`
+- `GET|PATCH|DELETE /api/v1/studio/articles/:id`
+- `POST /api/v1/studio/articles/:id/publish|unpublish`
+- `GET /api/v1/studio/fans`、`GET /api/v1/studio/growth`
+- `GET /api/v1/studio/collaborations` 与 `POST /api/v1/studio/collaborations/:videoId/respond`
+- `POST|DELETE /api/v1/studio/videos/:id/collaborators[/:userId]`
 - `POST /api/v1/studio/videos/:id/upload`
 - `PUT /api/v1/studio/uploads/:uploadId/parts/:partNumber`
 - `POST /api/v1/studio/uploads/:uploadId/parts/presign`
 - `POST /api/v1/studio/uploads/:uploadId/complete`
 - `POST /api/v1/studio/videos/:id/publish`
 - `PUT /api/v1/studio/videos/:id/cover`
+
+创作数据按投稿人隔离：联合投稿成员接受邀请后才能读写，删除、彻底删除、成员管理等破坏性操作仍仅限投稿人。数据面板只返回匿名每日聚合，不包含单个观众信息，地区只到国家。
+
+## 专栏
+
+- `GET /api/v1/articles` 与 `GET /api/v1/articles/:id`（正文为已过滤的 HTML）
+- `POST|DELETE /api/v1/articles/:id/like|favorite`
+- `GET|POST /api/v1/articles/:id/comments` 与 `DELETE .../comments/:commentId`
+
 
 ## 社交
 
@@ -95,6 +122,8 @@ API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`�
 - `GET /api/v1/admin/dashboard`
 - `GET|PATCH|DELETE /api/v1/admin/users`
 - `GET|PATCH /api/v1/admin/videos`
+- `GET /api/v1/admin/appeals` 与 `POST /api/v1/admin/appeals/:id/handle`
+- `GET /api/v1/admin/articles` 与 `POST /api/v1/admin/articles/:id/moderate`
 - `GET|POST /api/v1/admin/danmaku|comments|reports`
 - `GET|POST|PATCH|DELETE /api/v1/admin/categories|announcements`
 - `POST /api/v1/admin/owner/transfer`（仅站长；调用者会降为管理员）

@@ -91,6 +91,7 @@ Simplified Chinese: [docs/zh-CN](docs/zh-CN/README.md)
 English:
 
 - [Architecture](docs/architecture.md)
+- [Creator studio](docs/creator-studio.md)
 - [Installation](docs/installation.md)
 - [Docker deployment](docs/docker.md)
 - [Configuration](docs/configuration.md)
