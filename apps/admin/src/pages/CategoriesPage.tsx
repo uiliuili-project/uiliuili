@@ -1,4 +1,10 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -8,6 +14,7 @@ import {
   InputNumber,
   Modal,
   Space,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -76,8 +83,34 @@ export function CategoriesPage() {
 
   const remove = async (category: AdminCategory) => {
     if (!window.confirm(t('确定删除分区「{0}」吗？', { 0: category.name }))) return;
-    await api.delete(`/api/v1/admin/categories/${category.id}`);
-    await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+    try {
+      await api.delete(`/api/v1/admin/categories/${category.id}`);
+      await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+    } catch (error) {
+      notification.error({
+        message: error instanceof Error ? error.message : t('删除失败'),
+      });
+    }
+  };
+
+  const move = async (category: AdminCategory, direction: -1 | 1) => {
+    const ordered = [...(categories.data?.items ?? [])].sort(
+      (left, right) => left.sort - right.sort,
+    );
+    const index = ordered.findIndex((item) => item.id === category.id);
+    const neighbour = ordered[index + direction];
+    if (!neighbour) return;
+    try {
+      await Promise.all([
+        api.patch(`/api/v1/admin/categories/${category.id}`, { sort: neighbour.sort }),
+        api.patch(`/api/v1/admin/categories/${neighbour.id}`, { sort: category.sort }),
+      ]);
+      await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+    } catch (error) {
+      notification.error({
+        message: error instanceof Error ? error.message : t('排序失败'),
+      });
+    }
   };
 
   return (
@@ -105,12 +138,44 @@ export function CategoriesPage() {
           columns={[
             { title: t('名称'), dataIndex: 'name' },
             { title: 'Slug', dataIndex: 'slug' },
+            {
+              title: t('图标'),
+              dataIndex: 'icon',
+              width: 100,
+              render: (value: string) => value || '—',
+            },
+            {
+              title: t('描述'),
+              dataIndex: 'description',
+              ellipsis: true,
+              render: (value: string) => value || '—',
+            },
+            {
+              title: t('可见'),
+              dataIndex: 'visible',
+              width: 90,
+              render: (value: boolean) => (
+                <Tag color={value ? 'green' : 'default'}>{value ? t('显示') : t('隐藏')}</Tag>
+              ),
+            },
             { title: t('排序'), dataIndex: 'sort', width: 100 },
             {
               title: t('操作'),
-              width: 180,
+              width: 260,
               render: (_value, record) => (
                 <Space>
+                  <Button
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    aria-label={t('上移')}
+                    onClick={() => void move(record, -1)}
+                  />
+                  <Button
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    aria-label={t('下移')}
+                    onClick={() => void move(record, 1)}
+                  />
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
                     {t('编辑')}{' '}
                   </Button>
@@ -176,6 +241,24 @@ export function CategoriesPage() {
           </Form.Item>
           <Form.Item label={t('排序')} name="sort">
             <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            label={t('图标')}
+            name="icon"
+            extra={t('可选，填写图标名称，例如 video、music、game。')}
+          >
+            <Input placeholder="video" allowClear />
+          </Form.Item>
+          <Form.Item label={t('描述')} name="description">
+            <Input.TextArea rows={2} maxLength={300} showCount />
+          </Form.Item>
+          <Form.Item
+            label={t('在分区与投稿页显示')}
+            name="visible"
+            valuePropName="checked"
+            extra={t('隐藏后不影响已有视频，只是不再出现在公开分区列表。')}
+          >
+            <Switch defaultChecked />
           </Form.Item>
         </Form>
       </Modal>

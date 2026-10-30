@@ -4,9 +4,16 @@ import { Button, Card, Input, Select, Space, Table, Tag, Typography, notificatio
 import { useState } from 'react';
 import { api } from '../api';
 import { useT } from '../i18n';
-import type { AdminComment } from '../types';
+import type { AdminComment, AdminModerationLog } from '../types';
 
 const { Title, Text } = Typography;
+
+const DECISION_COLORS: Record<string, string> = {
+  allow: 'green',
+  pending: 'orange',
+  reject: 'red',
+  flag: 'blue',
+};
 
 export function CommentsPage() {
   const t = useT();
@@ -15,6 +22,9 @@ export function CommentsPage() {
   const [limit, setLimit] = useState(20);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string | undefined>();
+  const [logPage, setLogPage] = useState(1);
+  const [logDecision, setLogDecision] = useState<string | undefined>();
+  const [logTarget, setLogTarget] = useState<string | undefined>();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-comments', page, limit, q, status],
@@ -23,6 +33,17 @@ export function CommentsPage() {
       if (q) params.set('q', q);
       if (status) params.set('status', status);
       return api.get<{ items: AdminComment[]; total: number }>(`/api/v1/admin/comments?${params}`);
+    },
+  });
+  const logs = useQuery({
+    queryKey: ['admin-moderation-logs', logPage, logDecision, logTarget],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(logPage), limit: '20' });
+      if (logDecision) params.set('decision', logDecision);
+      if (logTarget) params.set('targetType', logTarget);
+      return api.get<{ items: AdminModerationLog[]; total: number }>(
+        `/api/v1/admin/moderation/logs?${params}`,
+      );
     },
   });
 
@@ -61,6 +82,7 @@ export function CommentsPage() {
             style={{ width: 150 }}
             options={[
               { value: 'visible', label: t('正常') },
+              { value: 'pending', label: t('待审核') },
               { value: 'hidden', label: t('已隐藏') },
               { value: 'deleted', label: t('已删除') },
             ]}
@@ -108,7 +130,17 @@ export function CommentsPage() {
               dataIndex: 'status',
               width: 100,
               render: (value: string) => (
-                <Tag color={value === 'visible' ? 'green' : value === 'hidden' ? 'orange' : 'red'}>
+                <Tag
+                  color={
+                    value === 'visible'
+                      ? 'green'
+                      : value === 'pending'
+                        ? 'orange'
+                        : value === 'hidden'
+                          ? 'gold'
+                          : 'red'
+                  }
+                >
                   {value}
                 </Tag>
               ),
@@ -146,6 +178,88 @@ export function CommentsPage() {
                   />
                 </Space>
               ),
+            },
+          ]}
+        />
+      </Card>
+      <Card
+        title={t('AI 审核日志')}
+        style={{ marginTop: 16 }}
+        extra={
+          <Space wrap>
+            <Select
+              placeholder={t('结论')}
+              allowClear
+              style={{ width: 130 }}
+              value={logDecision}
+              options={[
+                { value: 'allow', label: t('放行') },
+                { value: 'pending', label: t('待审核') },
+                { value: 'reject', label: t('拒绝') },
+                { value: 'flag', label: t('标记') },
+              ]}
+              onChange={(value) => {
+                setLogDecision(value);
+                setLogPage(1);
+              }}
+            />
+            <Select
+              placeholder={t('目标')}
+              allowClear
+              style={{ width: 120 }}
+              value={logTarget}
+              options={[
+                { value: 'comment', label: t('评论') },
+                { value: 'dynamic', label: t('动态') },
+              ]}
+              onChange={(value) => {
+                setLogTarget(value);
+                setLogPage(1);
+              }}
+            />
+          </Space>
+        }
+      >
+        <Table
+          rowKey="id"
+          loading={logs.isLoading}
+          dataSource={logs.data?.items ?? []}
+          scroll={{ x: 1100 }}
+          pagination={{
+            current: logPage,
+            pageSize: 20,
+            total: logs.data?.total ?? 0,
+            onChange: setLogPage,
+          }}
+          columns={[
+            {
+              title: t('时间'),
+              dataIndex: 'createdAt',
+              width: 170,
+              render: (value: string) => new Date(value).toLocaleString(),
+            },
+            { title: t('目标'), dataIndex: 'targetType', width: 90 },
+            { title: t('用户'), dataIndex: 'username', width: 120 },
+            {
+              title: t('结论'),
+              dataIndex: 'decision',
+              width: 100,
+              render: (value: string) => (
+                <Tag color={DECISION_COLORS[value] ?? 'default'}>{value}</Tag>
+              ),
+            },
+            {
+              title: t('内容摘要'),
+              dataIndex: 'excerpt',
+              ellipsis: true,
+            },
+            { title: t('理由'), dataIndex: 'reason', ellipsis: true },
+            { title: 'Model', dataIndex: 'model', width: 130, ellipsis: true },
+            {
+              title: t('耗时'),
+              dataIndex: 'latencyMs',
+              width: 90,
+              render: (value: number) => `${value} ms`,
             },
           ]}
         />

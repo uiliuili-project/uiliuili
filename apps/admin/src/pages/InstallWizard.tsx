@@ -341,7 +341,7 @@ export function InstallWizard() {
         secure: optional.mailSecure || false,
         user: optional.mailUser || '',
         password: optional.mailPassword || '',
-        fromName: optional.mailFromName || 'uiliuili',
+        fromName: optional.mailFromName || '萌悠',
         fromAddress: optional.mailFromAddress || '',
         verificationRequired: optional.verificationRequired || false,
       },
@@ -414,7 +414,7 @@ export function InstallWizard() {
           </div>
           <Result
             status="success"
-            title={t('uiliuili 已经安装')}
+            title={t('萌悠已经安装')}
             subTitle={status.siteUrl ? t('站点地址：{0}', { 0: status.siteUrl }) : t('安装已完成')}
             extra={[
               <Button type="primary" key="login" href={`${base}/login`}>
@@ -443,8 +443,8 @@ export function InstallWizard() {
             }}
           >
             <div className="install-brand">
-              <span className="install-brand-mark">u</span>
-              uiliuili
+              <span className="install-brand-mark">萌</span>
+              萌悠
             </div>
             <AdminLanguageSwitcher />
           </div>
@@ -462,7 +462,7 @@ export function InstallWizard() {
           {step === 0 && (
             <Space direction="vertical" size="large" className="w-full">
               <div>
-                <Title level={2}>{t('欢迎使用 uiliuili')}</Title>
+                <Title level={2}>{t('欢迎使用萌悠')}</Title>
                 <Paragraph className="muted">
                   {t(
                     '这是首次安装向导。请准备一个 PostgreSQL 数据库，并确保服务器已安装 FFmpeg。 Redis、Meilisearch、S3、SMTP 和 OAuth 都可以稍后配置。',
@@ -513,7 +513,7 @@ export function InstallWizard() {
                 <Title level={3}>{t('环境检查')}</Title>
                 <Paragraph className="muted">
                   {t(
-                    'uiliuili 需要 Node.js 22+、可写的配置目录和 FFmpeg。数据库连接将在下一步检查。',
+                    '萌悠需要 Node.js 22+、可写的配置目录和 FFmpeg。数据库连接将在下一步检查。',
                   )}{' '}
                 </Paragraph>
               </div>
@@ -649,7 +649,7 @@ export function InstallWizard() {
                 form={siteForm}
                 layout="vertical"
                 initialValues={{
-                  name: 'uiliuili',
+                  name: '萌悠',
                   description: t('一个自托管的弹幕视频站'),
                   url: window.location.origin,
                   timezone: 'Asia/Shanghai',
@@ -1247,7 +1247,7 @@ export function InstallWizard() {
           >
             {t('上一步')}{' '}
           </Button>
-          <Text className="muted">uiliuili {status.version} · MIT License</Text>
+          <Text className="muted">萌悠 {status.version} · MIT License</Text>
           <Space>
             {step === 0 && (
               <Button type="primary" loading={unlocking} onClick={unlock}>
