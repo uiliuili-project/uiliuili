@@ -37,7 +37,12 @@
   },
   "overrides": [
     {
-      "include": ["apps/web/src/app/terms/page.tsx", "apps/web/src/app/privacy/page.tsx"],
+      "include": [
+        "apps/web/src/app/terms/page.tsx",
+        "apps/web/src/app/privacy/page.tsx",
+        "apps/web/src/app/columns/[id]/page.tsx",
+        "apps/web/src/app/studio/columns/[id]/page.tsx"
+      ],
       "linter": {
         "rules": {
           "security": {
