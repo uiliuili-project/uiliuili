@@ -10,7 +10,7 @@ import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { runCleanup } from './cleanup';
 import { transcodeVideo } from './media';
 import { notifyFollowersOfNewVideo } from './notifications';
-import { rebuildSimilarities } from './recommend';
+import { decayTagInterests, rebuildSimilarities } from './recommend';
 import { indexVideo, reindexAll } from './search';
 
 export type Job = typeof backgroundJobs.$inferSelect;
@@ -142,6 +142,9 @@ export async function processJob(db: Db, job: Job): Promise<unknown> {
         await rebuildSimilarities(db);
         return { ok: true };
       }
+      case 'tag-decay': {
+        return decayTagInterests(db);
+      }
       case 'cleanup': {
         await runCleanup(db);
         return { ok: true };
@@ -197,4 +200,5 @@ export async function scheduleRecurringJobs(db: Db): Promise<void> {
   await enqueue(db, 'daily-coins', {}, { idempotencyKey: `daily-coins:${date}` });
   await enqueue(db, 'cleanup', {}, { idempotencyKey: `cleanup:${hour}` });
   await enqueue(db, 'recommend', {}, { idempotencyKey: `recommend:${date}`, maxAttempts: 1 });
+  await enqueue(db, 'tag-decay', {}, { idempotencyKey: `tag-decay:${date}` });
 }
