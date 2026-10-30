@@ -7,7 +7,7 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { CommentsPage } from './pages/CommentsPage';
 import { DanmakuPage } from './pages/DanmakuPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { InstallWizard } from './pages/InstallWizard';
+import { InstallGate } from './pages/InstallGate';
 import { LoginPage } from './pages/LoginPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReviewCommentsPage } from './pages/ReviewCommentsPage';
@@ -24,7 +24,7 @@ export function App() {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route path="/install" element={<InstallWizard />} />
+        <Route path="/install" element={<InstallGate />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<AdminLayout />}>
           <Route

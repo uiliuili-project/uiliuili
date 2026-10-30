@@ -56,6 +56,12 @@ export function AdminLayout() {
 
   useEffect(() => {
     if (!user) return;
+    // Ordinary accounts have no console at all; send them to the studio rather
+    // than rendering an administrator shell they cannot use.
+    if (!canAccessAdmin(user)) {
+      window.location.replace('/studio');
+      return;
+    }
     if (location.pathname === '/' && !can(user, 'audit:read')) {
       navigate(consoleHome(user), { replace: true });
     }
@@ -225,7 +231,7 @@ export function AdminLayout() {
             {brand.logoUrl ? (
               <img src={brand.logoUrl} alt={brand.name} className="admin-logo-image" />
             ) : (
-              <span className="install-brand-mark">u</span>
+              <span className="install-brand-mark">萌</span>
             )}
             {!collapsed && <span>{brand.name}</span>}
           </div>

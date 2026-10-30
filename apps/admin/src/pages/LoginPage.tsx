@@ -77,7 +77,7 @@ export function LoginPage() {
             {brand.logoUrl ? (
               <img src={brand.logoUrl} alt={brand.name} className="admin-logo-image" />
             ) : (
-              <span className="install-brand-mark">u</span>
+              <span className="install-brand-mark">萌</span>
             )}
             {brand.name}
           </div>
