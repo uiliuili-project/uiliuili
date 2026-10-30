@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { CaptchaChallenge } from './CaptchaChallenge';
 import { PermissionGate } from './PermissionGate';
 import { AdminLayout } from './pages/AdminLayout';
 import { AnnouncementsPage } from './pages/AnnouncementsPage';
@@ -149,6 +150,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      <CaptchaChallenge />
     </BrowserRouter>
   );
 }

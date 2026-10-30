@@ -31,6 +31,13 @@ export class ApiError extends Error {
   }
 }
 
+let captchaSolver: ((action: string) => Promise<void>) | null = null;
+
+/** Registered by the admin captcha gate so challenged requests can retry. */
+export function setCaptchaSolver(solver: ((action: string) => Promise<void>) | null) {
+  captchaSolver = solver;
+}
+
 function readCookie(name: string): string | undefined {
   return document.cookie
     .split('; ')
@@ -72,6 +79,25 @@ export async function request<T>(
       headers: { 'x-csrf-token': readCookie('ul_csrf') ?? '' },
     });
     if (refreshed.ok) {
+      response = await fetch(path, {
+        ...init,
+        method,
+        headers,
+        credentials: 'include',
+        body,
+      });
+    }
+  }
+  if (response.status === 429 && captchaSolver) {
+    const snapshot = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (snapshot?.error?.code === 'CAPTCHA_REQUIRED') {
+      const action = String(snapshot.error?.details?.action ?? 'login');
+      await captchaSolver(action);
+      // The verifier grants a short server-side pass, so replaying the same
+      // request succeeds without rebuilding its payload.
       response = await fetch(path, {
         ...init,
         method,

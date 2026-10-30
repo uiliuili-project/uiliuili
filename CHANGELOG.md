@@ -47,3 +47,6 @@ All notable changes to this project are documented here. The format follows
   (`uiliuili-project/uiliuili`) instead of a non-existent one.
 - Queue retry/cancel and search reindex controls are disabled for accounts
   without `system:operate` instead of failing with a permission error.
+- The management console shows the captcha challenge and retries a challenged
+  request, so enabling captcha for login no longer locks staff out of
+  `/admin/`.
