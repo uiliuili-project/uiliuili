@@ -1348,6 +1348,9 @@ export const uiEn: Record<string, string> = {
   成长中心: 'Growth center',
   成长任务: 'Growth tasks',
   成长进度: 'Growth progress',
+  成长: 'Growth',
+  概览: 'Overview',
+  消息: 'Messages',
   '把相关稿件整理成合集，观众可以按顺序连续观看。':
     'Group related videos into a collection so viewers can watch them in order.',
   投稿新视频: 'Upload a video',
@@ -1445,4 +1448,45 @@ export const uiEn: Record<string, string> = {
   邀请失败: 'Invitation failed',
   邀请已发送: 'Invitation sent',
   阅读: 'views',
+  // Studio upload flow
+  新建投稿: 'New upload',
+  上传已取消: 'Upload cancelled',
+  '上传失败，请重试': 'Upload failed. Please try again.',
+  '当前已有正在处理的稿件，请先完成或放弃后再上传新视频':
+    'A video is already being processed. Finish or discard it before uploading another.',
+  仅支持视频文件: 'Only video files are supported',
+  '已提交审核，请等待审核': 'Submitted for review. Please wait.',
+  稿件已发布: 'Video published',
+  '确定放弃本次投稿吗？稿件会移入回收站。':
+    'Discard this upload? The video will be moved to the recycle bin.',
+  拖拽视频文件到窗口任意位置即可开始上传:
+    'Drag a video file anywhere on the window to start uploading',
+  '正在创建稿件…': 'Creating video…',
+  拖拽视频文件到此处: 'Drag a video file here',
+  '松开鼠标即可开始上传，也可以点击下面的按钮选择文件。上传开始后仍可继续填写稿件信息。':
+    'Release the mouse to start uploading, or pick a file below. You can keep editing the details while it uploads.',
+  '支持 MP4、MOV、MKV、WebM 等视频格式': 'Supports MP4, MOV, MKV, WebM, and more',
+  选择视频文件: 'Choose a video file',
+  '上传过程中请不要关闭页面。': 'Please keep this page open while uploading.',
+  更多设置: 'More settings',
+  '保存中…': 'Saving…',
+  '发布中…': 'Publishing…',
+  重新提交审核: 'Submit for review again',
+  发布稿件: 'Publish video',
+  去稿件编辑: 'Edit video details',
+  重试上传: 'Retry upload',
+  放弃投稿: 'Discard upload',
+  再投一个: 'Upload another',
+  上传进度: 'Upload progress',
+  '已上传 {0} / {1}': 'Uploaded {0} of {1}',
+  '准备中…': 'Preparing…',
+  '剩余 {0}': '{0} left',
+  '正在转码，完成后即可发布…': 'Transcoding. You can publish when it finishes…',
+  '上传或转码失败，请重试或联系管理员。':
+    'The upload or transcode failed. Try again or contact the administrator.',
+  视频转码: 'Transcoding',
+  '上传过程中请不要关闭页面；转码在服务器后台进行，可以稍后回到稿件编辑页查看。':
+    'Keep this page open while uploading. Transcoding runs on the server; come back to the video editor later to check it.',
+  '转码完成，填写信息后即可发布。': 'Transcoding is done. Fill in the details and publish.',
+  松开鼠标即可开始上传: 'Release to start uploading',
 };
