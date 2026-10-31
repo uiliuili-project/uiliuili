@@ -4,6 +4,17 @@
 
 API 由 NestJS 提供，前缀为 `/api/v1`。安装接口位于 `/api/install`，安装完成后会被禁用。
 
+## 服务端点
+
+| 端点 | 用途 |
+| --- | --- |
+| `GET /health` | 就绪检查，返回 `{ ok, version, time }` |
+| `GET /health/live` | 轻量存活检查，返回 `{ ok: true }` |
+| `GET /api/docs` | Swagger UI，安装完成后启用 |
+
+这些端点位于 API 根路径，不在 `/api/v1` 下。Docker 网关和仓库提供的 Nginx 配置
+都会把 `/health` 精确反代到 API，因此探针可以直接使用公开地址。
+
 ## 鉴权
 
 - `GET /api/v1/auth/csrf`

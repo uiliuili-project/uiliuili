@@ -18,7 +18,7 @@ Nginx ── Next.js 公开站
 Worker ── FFmpeg ── HLS ── 存储
 ```
 
-硬性依赖为 Node.js 22+、PostgreSQL 16+ 和 FFmpeg 7+。Redis 与 Meilisearch
+硬性依赖为 Node.js 22+、PostgreSQL 16+ 和 FFmpeg 6+（推荐 7）。Redis 与 Meilisearch
 为可选项。未启用 Redis 时，API 以单机模式运行，缓存、限流与 WebSocket
 广播都在进程内存中完成。任务保存在 PostgreSQL 中，通过
 `FOR UPDATE SKIP LOCKED` 领取，因此 worker 可以独立横向扩容。
@@ -32,6 +32,7 @@ Worker ── FFmpeg ── HLS ── 存储
 | `apps/web` | Next.js 公开站 |
 | `apps/admin` | React 管理后台与安装向导 |
 | `apps/cli` | 无界面安装与运维命令 |
+| `apps/video-node` | 可选的外部视频节点：独立主机上的上传、转码与播放服务 |
 
 ## 包
 
@@ -43,6 +44,21 @@ Worker ── FFmpeg ── HLS ── 存储
 | `@uiliuili/shared` | Zod 契约、权限、错误码 |
 | `@uiliuili/danmaku` | Canvas 渲染引擎与 Bilibili XML 转换 |
 | `@uiliuili/i18n` | 中文/英文语言包 |
+| `@uiliuili/video-node-contract` | 主站与视频节点之间的 HMAC 签名与请求/响应 schema |
+
+## 外部视频节点
+
+视频节点是可选的横向扩展方式：把上传接收和 FFmpeg 转码放到离用户更近或
+CPU 更充足的机器上，主站只负责鉴权、路由和元数据。
+
+- 节点通过 `VIDEO_NODE_*` 环境变量配置：监听端口、公开地址、区域、数据库、
+  共享密钥、存储目录、转码并发、最大分辨率与上传大小。
+- 主站与节点之间使用 `@uiliuili/video-node-contract` 的 HMAC 签名请求，
+  带时间戳与 nonce，防止重放。
+- 管理后台的**视频节点**页面负责添加节点、测试连通性、设置上传路由策略
+  （`load`、`fixed`、`region`）以及管理资产复制任务。
+- 默认关闭（`videoNodes.enabled=false`）。单机部署不需要它；启用前请确认
+  节点与主站之间的网络、时钟和密钥一致。
 
 ## 身份与权限
 

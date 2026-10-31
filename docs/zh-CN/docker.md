@@ -2,52 +2,84 @@
 
 > [English](../docker.md)
 
-Docker 是**额外的部署方式**。原生 Node.js + systemd 部署继续完整支持；如果你希望应用直接运行在宿主机上，仍然优先选择原生方式。
+Docker 是推荐的快速安装方式，也是生产部署的完整方案之一。原生 Node.js + systemd 部署同样受支持；需要直接运行在宿主机时见[原生部署](deployment.md)。
 
 Compose 会启动一套完整环境：
 
 | 服务 | 作用 |
 | --- | --- |
-| `gateway` | Nginx，监听 8080：提供 `/admin/`，反代 `/api`、`/media`、`/socket.io` 与公开站 |
+| `gateway` | Nginx，对外端口 8080：提供 `/admin/`，反代 `/api`、`/media`、`/socket.io` 与公开站 |
 | `web` | Next.js standalone 服务 |
 | `api` | NestJS API 与安装接口 |
 | `worker` | FFmpeg 转码、搜索索引、推荐、清理 |
 | `bootstrap` | 一次性安装/迁移容器，先于 API 启动 |
 | `postgres` | PostgreSQL 16（业务 schema `uiliuili`） |
-| `redis` | 代码中为可选，这里默认启用，用于缓存与 Socket.IO 广播 |
+| `redis` | 代码中可选，Compose 默认启用，用于缓存与 Socket.IO 广播 |
 
-上传源文件、HLS、封面、`.env` 与 `config/instance.json` 都保存在
-`app-data` 卷的 `/data` 目录；PostgreSQL 和 Redis 各自使用独立卷。
+上传源文件、HLS、封面、`.env` 与 `config/instance.json` 都存在
+`app-data` 卷的 `/data`；PostgreSQL 与 Redis 各自使用独立卷。
 
 ## 环境要求
 
 - Docker Engine + Compose v2
-- 试用建议 2 vCPU / 4 GB 内存；转码容量参考[原生部署](deployment.md#服务器推荐配置)
+- 试用建议 2 vCPU / 4 GB 内存；转码容量参考[服务器推荐配置](deployment.md#服务器推荐配置)
 - 20 GB 以上可用磁盘（镜像与首批上传）
 - 应用镜像已内置 FFmpeg 7
 
-## 快速开始
+## 一键安装（推荐）
+
+```bash
+git clone https://github.com/uiliuili-project/uiliuili.git
+cd uiliuili
+./scripts/quickstart.sh
+```
+
+脚本会：
+
+1. 若 `.env` 不存在，从 `docker/.env.example` 创建；
+2. 自动生成 `APP_KEY`（64 位十六进制）与 `DB_PASSWORD`（URL 安全）；
+3. 执行 `docker compose up -d --build`；
+4. 轮询 `http://127.0.0.1:8080/health` 直到健康检查通过；
+5. 打印站点、管理后台、健康检查地址和**站长认领码**。
+
+打开站点注册第一个账号并填写认领码，然后在 `/admin/` 登录。
+
+常用参数：
+
+```bash
+./scripts/quickstart.sh --port 9090   # 修改对外端口并同步 APP_URL
+./scripts/quickstart.sh --no-build    # 使用现有镜像启动
+ENV_FILE=/path/to/.env ./scripts/quickstart.sh
+```
+
+脚本可重复执行：已生成的密钥不会被覆盖，已安装的实例会自动走迁移流程。
+
+## 手动安装
+
+想自己控制每一步时：
 
 ```bash
 cp docker/.env.example .env
 ```
 
-至少修改以下变量：
+至少修改：
 
-- `APP_URL`：对外访问地址，例如 `http://server.example.com:8080`
+- `APP_URL`：对外访问地址，例如 `https://video.example.com` 或 `http://server.example.com:8080`
 - `APP_KEY`：`openssl rand -hex 32`
 - `DB_PASSWORD`：URL 安全密码，例如
   `openssl rand -base64 24 | tr '+/' '-_' | tr -d '='`
 
-然后启动：
+然后：
 
 ```bash
 docker compose up -d --build
 docker compose logs -f bootstrap
 ```
 
-首次运行会创建表结构，并写入 `/data/.env` 与
-`/data/config/instance.json`，不会创建账号。`bootstrap` 日志会打印一次性的站长认领码；请保存它，然后在站点注册第一个账号成为站长。通过 gateway 访问不属于回环地址，因此需要填写认领码。之后再次执行同一条命令只会应用待执行的迁移，因此它也是升级入口。
+首次运行会创建表结构，写入 `/data/.env` 与 `/data/config/instance.json`，
+不会创建账号。`bootstrap` 日志会打印一次性的**站长认领码**。通过 gateway
+访问不属于回环地址，因此注册时必须填写它。之后再次执行同一条命令只会应用
+待执行迁移，所以它也是升级入口。
 
 访问：
 
@@ -66,7 +98,8 @@ GATEWAY_PORT=9090
 APP_URL=http://server.example.com:9090
 ```
 
-只有 gateway 会映射宿主机端口；PostgreSQL、Redis、API、worker 与 web 都只在 Compose 内部网络中通信。
+只有 gateway 映射宿主机端口；PostgreSQL、Redis、API、worker 与 web 只通过
+Compose 内部网络通信。
 
 ## 配置
 
@@ -81,18 +114,35 @@ Compose 在创建容器时读取 `.env`。常用变量：
 | `DB_USER` / `DB_NAME` | 否 | `uiliuili` | PostgreSQL 账号与库名 |
 | `DB_PASSWORD` | 是 | — | 必须 URL 安全，因为会拼进 `DATABASE_URL` |
 | `DB_SCHEMA` | 否 | `uiliuili` | 业务 schema |
-| `REDIS_URL` | 否 | `redis://redis:6379` | 留空则使用单机内存模式 |
-| `SITE_NAME` / `SITE_DESCRIPTION` | 否 | `uiliuili` | 站点信息 |
+| `REDIS_URL` | 否 | `redis://redis:6379` | Compose 默认启用内置 Redis；单机内存模式需移除 redis 服务并覆盖 compose 中的默认值 |
+| `SITE_NAME` / `SITE_DESCRIPTION` | 否 | `萌悠` / 自托管弹幕视频站 | 首次安装的站点信息 |
 | `SITE_LOCALE` / `SITE_TIMEZONE` / `SITE_REGISTRATION` | 否 | `zh-CN` / `Asia/Shanghai` / `open` | 初始站点设置 |
 | `STORAGE_DRIVER` | 否 | `local` | 首次安装可选 `local` 或 `s3` |
 | `TRANSCODE_CONCURRENCY` | 否 | `2` | 每个 worker 的并发转码数 |
 | `MEILISEARCH_URL` / `MEILISEARCH_KEY` | 否 | — | 启用 Meilisearch，否则使用 PostgreSQL 搜索 |
 
-`docker/.env.example` 还列出了无人值守安装支持的 `S3_*` 与 `MAIL_*` 变量。这些值只在创建新实例时读取；安装完成后请在管理后台修改。**安装后不要更换 `APP_KEY`**，否则已加密的设置将无法解密，请一并备份。
+`docker/.env.example` 还列出了无人值守安装支持的 `S3_*` 与 `MAIL_*` 变量。
+这些值只在创建新实例时读取；安装完成后请在管理后台修改。**安装后不要更换
+`APP_KEY`**，否则已加密的设置将无法解密，请与数据库一并备份。
 
 ### 使用外部数据库或 Redis
 
-删除或覆盖 `postgres`、`redis` 服务，把 `DATABASE_URL` / `REDIS_URL` 指向外部实例即可。多节点部署时，把 `api` 与 `worker` 分到不同主机、启用 Redis，并把媒体迁移到 S3；也可以用现有反向代理替代 gateway。
+删除或覆盖 `postgres`、`redis` 服务，把 `DATABASE_URL` / `REDIS_URL` 指向
+外部实例即可。多节点部署时，把 `api` 与 `worker` 分到不同主机、启用 Redis，
+并把媒体迁移到 S3；也可以用现有反向代理替代 gateway。
+
+## 首次上线检查清单
+
+安装完成后花十分钟确认：
+
+- [ ] `/health` 返回 `200`
+- [ ] 第一个账号已成为站长，`/admin/` 可以登录
+- [ ] **设置**中站点名称、URL、时区、注册策略正确
+- [ ] 上传一个短视频，状态从转码变为可发布/已发布
+- [ ] 视频可以播放，弹幕与评论可以发送
+- [ ] `docker compose ps` 中 api、worker、web、gateway、postgres 均健康
+- [ ] 已配置 HTTPS（生产环境）
+- [ ] 已设置数据库与 `app-data` 卷的定期备份
 
 ## 日常运维
 
@@ -109,22 +159,35 @@ docker compose exec postgres psql -U uiliuili -d uiliuili
 docker compose run --rm bootstrap node dist/index.js status
 docker compose run --rm bootstrap node dist/index.js doctor
 docker compose logs bootstrap   # 首次安装：查看站长认领码
-docker compose run --rm bootstrap node dist/index.js owner:promote --username owner --email owner@example.com
+docker compose run --rm bootstrap node dist/index.js owner:promote \
+  --username owner --email owner@example.com
 ```
 
-`bootstrap` 是容器入口：`/data/config/instance.json` 不存在时执行安装，存在时执行迁移。它失败时 API 与 worker 不会启动，避免半安装实例对外服务。
+`bootstrap` 是容器入口：`/data/config/instance.json` 不存在时执行安装，存在时
+执行迁移。它失败时 API 与 worker 不会启动，避免半安装实例对外服务；查看日志：
+
+```bash
+docker compose logs --tail=200 bootstrap
+```
+
+### 认领码丢失
+
+认领码只在首次安装时打印，数据库只保存哈希。若还没有站长，用上面的
+`owner:promote` 创建或提升账号；命令会把当前站长降为管理员。
 
 ### 升级
 
-先备份，再重建并重启：
+先备份，再拉取新代码并重建：
 
 ```bash
+git pull
 docker compose build
 docker compose up -d
 docker compose logs -f bootstrap
 ```
 
-代码和依赖都在镜像里，持久数据只在 `/data` 与数据库中，因此重建镜像不会影响用户数据。
+代码和依赖都在镜像里，持久数据只在 `/data` 与数据库中，因此重建镜像不会
+影响用户数据。管理后台是镜像内构建的静态文件，重建后自动更新。
 
 ### 备份与恢复
 
@@ -144,7 +207,18 @@ docker run --rm -v uiliuili_app-data:/data -v "$PWD":/backup alpine \
   tar xzf /backup/app-data.tar.gz -C /data
 ```
 
-如果修改过 `COMPOSE_PROJECT_NAME`，请用 `docker volume ls` 确认实际卷名。数据库与 `app-data` 必须一起备份：数据库中的媒体 key 指向该卷里的文件。
+如果修改过 `COMPOSE_PROJECT_NAME`，用 `docker volume ls` 确认实际卷名。数据库与
+`app-data` 必须一起备份：数据库中的媒体 key 指向该卷里的文件。
+
+恢复时先停止 api 与 worker，恢复数据库和卷，再启动：
+
+```bash
+docker compose stop api worker
+docker compose exec -T postgres pg_restore -U uiliuili -d uiliuili --clean --if-exists < uiliuili.dump
+docker run --rm -v uiliuili_app-data:/data -v "$PWD":/backup alpine \
+  tar xzf /backup/app-data.tar.gz -C /data
+docker compose up -d
+```
 
 ### 重置
 
@@ -156,16 +230,18 @@ docker compose run --rm bootstrap node dist/index.js reset --force
 docker compose down -v
 ```
 
-`down -v` 不可恢复，也没有二次确认。
+`down -v` 不可恢复，也没有二次确认。生产环境执行前务必确认卷名。
 
 ## TLS 与反向代理
 
-gateway 只监听 HTTP，请在前置 Caddy、Traefik 或另一层 Nginx 上终止 TLS：
+gateway 只监听 HTTP。请在前置 Caddy、Traefik 或另一层 Nginx 上终止 TLS：
 
 ```nginx
 server {
   listen 443 ssl;
   server_name video.example.com;
+
+  client_max_body_size 2g;
 
   location / {
     proxy_pass http://127.0.0.1:8080;
@@ -179,12 +255,19 @@ server {
 }
 ```
 
-把 `APP_URL` 设为 `https://video.example.com`，生成的链接与 CORS 才会使用 HTTPS 地址。Compose 中 `TRUST_PROXY` 已启用。
+把 `APP_URL` 设为 `https://video.example.com`，生成的链接与 CORS 才会使用
+HTTPS 地址。Compose 中 `TRUST_PROXY` 已启用。
 
 ## 注意事项
 
-- **FFmpeg 许可证**：运行镜像安装的是 Debian 的 FFmpeg 包，采用 GPL 许可证。FFmpeg 是系统依赖，不会链接进 MIT 应用代码；但分发镜像仍等于分发 FFmpeg。如有要求，请自行构建 LGPL 版运行镜像。
-- **默认单机**：PostgreSQL 与 Redis 和应用同机运行。需要横向扩容时把它们外置，并使用 S3 存储。
-- **上传大小**：gateway 允许最大 2 GB 请求体。如果调高站点上传上限，也要同步修改 `docker/nginx.conf` 中的 `client_max_body_size`。
-- **备份不会自动执行**：请为上述命令配置定时任务，或使用自己的 PostgreSQL 与卷备份方案。
-- **本地测试目录**：`docker-test/` 已加入 `.gitignore`，本地生成的密钥与数据不会被误提交。
+- **FFmpeg 许可证**：运行镜像安装的是 Debian 的 FFmpeg 包，采用 GPL 许可证。
+  FFmpeg 是系统依赖，不会链接进 MIT 应用代码；但分发镜像仍等于分发 FFmpeg。
+  如有要求，请自行构建 LGPL 版运行镜像。
+- **默认单机**：PostgreSQL 与 Redis 和应用同机运行。需要横向扩容时把它们外置，
+  并使用 S3 存储。
+- **上传大小**：gateway 允许最大 2 GB 请求体。调高站点上传上限时，同步修改
+  `docker/nginx.conf` 与前置代理的 `client_max_body_size`。
+- **备份不会自动执行**：请为上述命令配置定时任务，或使用自己的 PostgreSQL 与
+  卷备份方案。
+- **本地测试目录**：`docker-test/` 已加入 `.gitignore`，本地生成的密钥与数据不会
+  被误提交。

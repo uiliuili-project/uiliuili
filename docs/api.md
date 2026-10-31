@@ -5,6 +5,18 @@
 The API is served by NestJS under `/api/v1`. Installer endpoints live under
 `/api/install` and are disabled after installation.
 
+## Service endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Readiness check with `{ ok, version, time }` |
+| `GET /health/live` | Lightweight liveness check with `{ ok: true }` |
+| `GET /api/docs` | Swagger UI, enabled after installation |
+
+These live at the API root, not under `/api/v1`. The Docker gateway and the
+provided Nginx config proxy `/health` directly, so a probe can use the public
+origin.
+
 ## Authentication
 
 - `GET /api/v1/auth/csrf`

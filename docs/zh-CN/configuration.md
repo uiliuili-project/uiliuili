@@ -7,30 +7,78 @@
 - `.env` — 基础设施与密钥，权限 `0600`
 - `config/instance.json` — 安装标记、实例 ID、版本信息
 
-两个文件都不要提交到版本库。
+两个文件都不要提交到版本库。环境变量优先于数据库中的站点设置，因此适合容器、
+托管平台和临时覆盖。模板文件：
+
+- 原生安装：[`.env.example`](../../.env.example)
+- Docker 部署：[`docker/.env.example`](../../docker/.env.example)
 
 ## 环境变量
 
+### 基础
+
+| 变量 | 必填 | 说明 |
+| --- | --- | --- |
+| `NODE_ENV` | 否 | 生产环境设为 `production` |
+| `APP_URL` | 是 | 公开站点 URL，必须与浏览器地址完全一致 |
+| `APP_KEY` | 是 | 64 位十六进制（32 字节），用于加密数据库中的第三方密钥；安装后不可更改 |
+| `DATABASE_URL` | 是 | PostgreSQL 连接串；密码中的特殊字符需 URL 编码 |
+| `DB_SCHEMA` | 否 | 应用 schema，本版本固定为 `uiliuili` |
+| `UILIUILI_ROOT` | 否 | 保存 `.env`、`config/` 与 `storage/` 的目录，默认为工作目录（容器使用 `/data`） |
+| `DOTENV_CONFIG_PATH` | 否 | 指定 `.env` 路径，例如 `/opt/uiliuili/.env`；默认读取工作目录下的 `.env` |
+| `API_PORT` | 否 | API 监听端口，默认 `3001` |
+| `API_INTERNAL_URL` | 否 | Next.js 服务端访问 API 的地址，默认 `http://127.0.0.1:3001` |
+| `NEXT_PUBLIC_API_URL` | 否 | 浏览器访问 API 的前缀；同源部署留空，本地开发连接 WebSocket 时设为 `http://127.0.0.1:3001` |
+| `TRUST_PROXY` | 否 | 位于反向代理之后时设为 `true`，用于解析真实客户端 IP |
+| `LOG_LEVEL` | 否 | 日志级别，默认 `info` |
+
+### 存储与媒体
+
+| 变量 | 必填 | 说明 |
+| --- | --- | --- |
+| `STORAGE_ROOT` | 否 | 本地上传目录，默认 `./storage/uploads` |
+| `WORKER_TEMP_ROOT` | 否 | 转码临时目录，默认 `STORAGE_ROOT/tmp`；建议放在容量充足的磁盘 |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | 否 | 可执行文件路径，默认直接调用 `ffmpeg` / `ffprobe` |
+| `TRANSCODE_CONCURRENCY` | 否 | 每个 worker 的并发转码数，默认 `2` |
+
+存储驱动、S3 凭据、上传大小与转码清晰度属于数据库中的站点设置，安装后可在管理后台修改。
+
+### 可选集成
+
 | 变量 | 说明 |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL 连接串 |
-| `DB_SCHEMA` | 应用 schema（本版本固定为 `uiliuili`） |
-| `APP_KEY` | 32 字节十六进制密钥，用于加密第三方密钥 |
-| `UILIUILI_ROOT` | 保存 `.env`、`config/` 与 `storage/` 的目录，默认为工作目录（容器使用 `/data`） |
-| `APP_URL` | 公开站点 URL |
-| `API_INTERNAL_URL` | Next.js SSR 使用的内部 API 地址 |
-| `NEXT_PUBLIC_API_URL` | 公开 API 前缀，同源部署时通常留空 |
-| `REDIS_URL` | 可选的 Redis 连接串 |
-| `MEILISEARCH_URL`、`MEILISEARCH_KEY` | 可选的搜索引擎 |
-| `API_PORT` | API 端口，默认 3001 |
-| `STORAGE_ROOT` | 本地上传目录 |
-| `FFMPEG_PATH`、`FFPROBE_PATH` | 可执行文件路径 |
-| `TRANSCODE_CONCURRENCY` | 转码并发数 |
-| `INSTALL_TOKEN` | 可选的固定安装令牌 |
-| `INSTALL_ALLOW_LOCALHOST` | 允许本机回环请求免令牌安装 |
-| `TRUST_PROXY` | 信任反向代理请求头 |
+| `REDIS_URL` | Redis 连接串；留空则使用单机内存缓存与广播，多 API 实例必须配置 |
+| `MEILISEARCH_URL` / `MEILISEARCH_KEY` | 搜索引擎；留空则使用 PostgreSQL 搜索 |
+| `MEILISEARCH_INDEX_PREFIX` | 索引前缀，默认 `uiliuili` |
 
-环境变量的优先级高于数据库中的站点设置。
+`S3_*` 与 `MAIL_*` 变量只在首次安装（`pnpm cli install --from-env`、Docker
+`bootstrap` 或网页安装器）时读取；安装完成后请在管理后台修改。
+
+### 安装与运维
+
+| 变量 | 说明 |
+| --- | --- |
+| `INSTALL_TOKEN` | 可选的固定安装令牌；留空则启动时生成并写入 `storage/install-token` |
+| `INSTALL_ALLOW_LOCALHOST` | 允许本机回环请求免令牌安装；仅用于开发，生产保持 `false` |
+| `UPGRADE_RESTART_CMD` | 管理后台升级成功后执行的固定命令，例如 `systemctl restart uiliuili-api uiliuili-worker`；浏览器不能传入任意命令 |
+| `GITHUB_REPO` | 手动检查更新使用的仓库，默认 `uiliuili-project/uiliuili` |
+
+### 首次安装默认值
+
+以下变量只在创建新实例时使用，之后以管理后台设置为准：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `SITE_NAME` | `萌悠` | 站点名称 |
+| `SITE_DESCRIPTION` | 一个自托管的弹幕视频站 | 站点简介 |
+| `SITE_TIMEZONE` | `Asia/Shanghai` | 时区 |
+| `SITE_LOCALE` | `zh-CN` | 默认语言 |
+| `SITE_REGISTRATION` | `open` | 注册策略：`open`、`invite` 或 `closed` |
+| `INSTALL_LOCALE` | `zh-CN` | 安装器语言 |
+| `INSTALL_DEMO_CONTENT` | `false` | 是否写入演示内容 |
+
+数据库中的密钥使用 `APP_KEY` 加密。请务必备份 `.env`；丢失 `APP_KEY`
+会导致已保存的第三方密钥无法解密。
 
 ## 安装 JSON
 
@@ -48,8 +96,8 @@
     "createIfMissing": true
   },
   "site": {
-    "name": "uiliuili",
-    "description": "一个自托管视频社区",
+    "name": "萌悠",
+    "description": "一个自托管的弹幕视频站",
     "url": "https://video.example.com",
     "timezone": "Asia/Shanghai",
     "locale": "zh-CN",
@@ -60,6 +108,9 @@
   "demoContent": false
 }
 ```
+
+使用：`pnpm cli install --config install.json`。`APP_KEY` 仍从环境变量或 `.env`
+读取，不写在 JSON 中。
 
 ## 站点设置
 

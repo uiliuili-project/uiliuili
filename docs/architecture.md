@@ -18,11 +18,11 @@ Nginx ── Next.js public site
 Worker ── FFmpeg ── HLS ── storage
 ```
 
-Hard dependencies are Node.js 22+, PostgreSQL 16+, and FFmpeg 7+. Redis and
-Meilisearch are optional. Without Redis, the API runs in single-node mode with
-in-memory cache, rate limiting, and WebSocket broadcasting. Jobs are stored in
-PostgreSQL and claimed with `FOR UPDATE SKIP LOCKED`, so workers can scale
-independently.
+Hard dependencies are Node.js 22+, PostgreSQL 16+, and FFmpeg 6+ (7
+recommended). Redis and Meilisearch are optional. Without Redis, the API runs in
+single-node mode with in-memory cache, rate limiting, and WebSocket broadcasting.
+Jobs are stored in PostgreSQL and claimed with `FOR UPDATE SKIP LOCKED`, so
+workers can scale independently.
 
 ## Applications
 
@@ -33,6 +33,7 @@ independently.
 | `apps/web` | Next.js public site |
 | `apps/admin` | React admin panel and installer wizard |
 | `apps/cli` | Headless install and operations |
+| `apps/video-node` | Optional external video node: uploads, transcoding, and playback on another host |
 
 ## Packages
 
@@ -44,6 +45,25 @@ independently.
 | `@uiliuili/shared` | Zod contracts, permissions, error codes |
 | `@uiliuili/danmaku` | Canvas rendering engine and Bilibili XML conversion |
 | `@uiliuili/i18n` | Chinese/English message catalogs |
+| `@uiliuili/video-node-contract` | HMAC signing and request/response schemas between the main site and video nodes |
+
+## External video nodes
+
+Video nodes are an optional way to scale: accept uploads and run FFmpeg on a
+machine closer to users or with more CPU, while the main site keeps auth,
+routing, and metadata.
+
+- A node is configured with `VIDEO_NODE_*` variables: listen port, public URL,
+  region, database, shared secret, storage directory, transcoding concurrency,
+  maximum resolution, and upload size.
+- The main site and node sign requests with
+  `@uiliuili/video-node-contract` HMAC, including a timestamp and nonce to
+  prevent replay.
+- **Admin → Video nodes** adds nodes, tests connectivity, selects an upload
+  routing strategy (`load`, `fixed`, `region`), and manages asset replication.
+- It is disabled by default (`videoNodes.enabled = false`). A single host does
+  not need it; before enabling, make sure the networks, clocks, and shared keys
+  agree.
 
 ## Identity and permissions
 

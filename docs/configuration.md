@@ -7,32 +7,81 @@ The installer writes two files:
 - `.env` — infrastructure and secrets, mode `0600`
 - `config/instance.json` — installation marker, instance ID, versions
 
-Do not commit either file.
+Do not commit either file. Environment variables take precedence over database
+settings, which makes them suitable for containers, hosted platforms, and
+temporary overrides. Templates:
+
+- native install: [`.env.example`](../.env.example)
+- Docker: [`docker/.env.example`](../docker/.env.example)
 
 ## Environment variables
 
+### Core
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NODE_ENV` | no | Set to `production` on a server |
+| `APP_URL` | yes | Public site URL; must match the browser origin exactly |
+| `APP_KEY` | yes | 64 hex characters (32 bytes) encrypting stored provider secrets; never change it after installation |
+| `DATABASE_URL` | yes | PostgreSQL connection string; URL-encode special characters in the password |
+| `DB_SCHEMA` | no | Application schema, fixed to `uiliuili` in this release |
+| `UILIUILI_ROOT` | no | Directory for `.env`, `config/`, and `storage/`; defaults to the working directory (containers use `/data`) |
+| `DOTENV_CONFIG_PATH` | no | Path to `.env`, for example `/opt/uiliuili/.env`; defaults to `.env` in the working directory |
+| `API_PORT` | no | API port, default `3001` |
+| `API_INTERNAL_URL` | no | API address used by Next.js on the server, default `http://127.0.0.1:3001` |
+| `NEXT_PUBLIC_API_URL` | no | Browser API base; leave empty for same-origin, set it to `http://127.0.0.1:3001` for local WebSocket development |
+| `TRUST_PROXY` | no | Set `true` behind a reverse proxy so client IPs resolve correctly |
+| `LOG_LEVEL` | no | Log level, default `info` |
+
+### Storage and media
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `STORAGE_ROOT` | no | Local upload directory, default `./storage/uploads` |
+| `WORKER_TEMP_ROOT` | no | Transcoding scratch directory, default `STORAGE_ROOT/tmp`; put it on a disk with room to spare |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | no | Binary paths; `ffmpeg` and `ffprobe` are used by default |
+| `TRANSCODE_CONCURRENCY` | no | Concurrent FFmpeg jobs per worker, default `2` |
+
+The storage driver, S3 credentials, upload limits, and rendition ladder are site
+settings in the database and are edited in the admin panel after installation.
+
+### Optional integrations
+
 | Variable | Description |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DB_SCHEMA` | Application schema (fixed to `uiliuili` in this release) |
-| `APP_KEY` | 32-byte hex key for encrypting provider secrets |
-| `UILIUILI_ROOT` | Directory for `.env`, `config/` and `storage/`; defaults to the working directory (containers use `/data`) |
-| `APP_URL` | Public site URL |
-| `API_INTERNAL_URL` | Internal API URL used by Next.js SSR |
-| `NEXT_PUBLIC_API_URL` | Public API base, usually empty for same-origin |
-| `REDIS_URL` | Optional Redis connection |
-| `MEILISEARCH_URL`, `MEILISEARCH_KEY` | Optional search engine |
-| `API_PORT` | API port, default 3001 |
-| `STORAGE_ROOT` | Local upload directory |
-| `FFMPEG_PATH`, `FFPROBE_PATH` | Binary paths |
-| `TRANSCODE_CONCURRENCY` | Worker concurrency |
-| `INSTALL_TOKEN` | Optional fixed installer token |
-| `INSTALL_ALLOW_LOCALHOST` | Allow loopback installer access without token |
-| `TRUST_PROXY` | Trust reverse-proxy headers |
-| `UPGRADE_RESTART_CMD` | Optional fixed command run after a successful admin upgrade (for example `systemctl restart uiliuili-api uiliuili-worker`); never supplied by the browser |
+| `REDIS_URL` | Redis connection; empty means in-memory cache and broadcast, required for multiple API instances |
+| `MEILISEARCH_URL` / `MEILISEARCH_KEY` | Search engine; empty uses PostgreSQL search |
+| `MEILISEARCH_INDEX_PREFIX` | Index prefix, default `uiliuili` |
+
+`S3_*` and `MAIL_*` variables are read only during the first install
+(`pnpm cli install --from-env`, Docker `bootstrap`, or the web installer). Change
+them in the admin panel afterwards.
+
+### Installer and operations
+
+| Variable | Description |
+| --- | --- |
+| `INSTALL_TOKEN` | Optional fixed installer token; otherwise one is generated at startup and written to `storage/install-token` |
+| `INSTALL_ALLOW_LOCALHOST` | Allow loopback requests to install without a token; development only, keep `false` in production |
+| `UPGRADE_RESTART_CMD` | Fixed command run after a successful admin upgrade, for example `systemctl restart uiliuili-api uiliuili-worker`; the browser can never supply arbitrary shell |
 | `GITHUB_REPO` | Repository used by the manual update check, default `uiliuili-project/uiliuili` |
 
-Environment variables take precedence over database settings.
+### First-install defaults
+
+These apply only when creating a new instance; the admin settings win afterwards.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SITE_NAME` | `萌悠` | Site name |
+| `SITE_DESCRIPTION` | A self-hosted danmaku video site | Site description |
+| `SITE_TIMEZONE` | `Asia/Shanghai` | Timezone |
+| `SITE_LOCALE` | `zh-CN` | Default language |
+| `SITE_REGISTRATION` | `open` | `open`, `invite`, or `closed` |
+| `INSTALL_LOCALE` | `zh-CN` | Installer language |
+| `INSTALL_DEMO_CONTENT` | `false` | Seed demo content |
+
+Secrets in the database are encrypted with `APP_KEY`. Back up `.env`; losing
+`APP_KEY` makes stored provider secrets unreadable.
 
 ## Install JSON
 
@@ -50,8 +99,8 @@ Environment variables take precedence over database settings.
     "createIfMissing": true
   },
   "site": {
-    "name": "uiliuili",
-    "description": "A self-hosted video community",
+    "name": "萌悠",
+    "description": "A self-hosted danmaku video site",
     "url": "https://video.example.com",
     "timezone": "Asia/Shanghai",
     "locale": "zh-CN",
@@ -62,6 +111,9 @@ Environment variables take precedence over database settings.
   "demoContent": false
 }
 ```
+
+Use it with `pnpm cli install --config install.json`. `APP_KEY` still comes from
+the environment or `.env` and is never written into the JSON file.
 
 ## Site settings
 

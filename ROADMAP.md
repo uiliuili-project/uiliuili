@@ -2,10 +2,12 @@
 
 ## 0.1 — First public release
 
-- First-run installer with database, admin, storage, mail, and OAuth setup.
+- One-command Docker quickstart plus native installation, with a first-run
+  installer for database, storage, mail, and OAuth setup.
 - Local/S3 storage and FFmpeg HLS transcoding.
 - Danmaku player, social features, search, recommendations.
-- Admin panel and audit logging.
+- Creator studio and admin panel with audit logging.
+- Optional external video nodes for uploads and transcoding on separate hosts.
 - CLI, documentation, and release packaging.
 
 ## Later

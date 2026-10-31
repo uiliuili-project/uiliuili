@@ -2,16 +2,16 @@
 
 > [English](../deployment.md)
 
-uiliuili 运行时不依赖 Docker。典型部署包括：
+原生部署不依赖 Docker，典型环境：
 
 - Node.js 22
 - PostgreSQL 16+
-- FFmpeg 7+
+- FFmpeg 6+（推荐 7）
 - 可选的 Redis 与 Meilisearch
 - Nginx
 - systemd
 
-想用容器部署？见 [Docker 部署](docker.md)。
+只想最快跑起来？使用 [Docker 部署](docker.md)。首次安装的完整步骤见[安装 · 原生安装](installation.md#原生安装)，本文重点讲生产配置。
 
 ## 服务器推荐配置
 
@@ -33,7 +33,7 @@ PostgreSQL（内存和磁盘 IOPS）。下表是 1080p 以内 H.264 源片的起
 - PostgreSQL 独立部署：8–16 vCPU、32–64 GB 内存、NVMe，并配置只读副本用于备份和故障切换。
 - Redis 2–8 GB；Meilisearch 4–8 vCPU、8–16 GB 内存；媒体文件放在 S3 并前置 CDN。
 
-以上是规划参考，不是基准测试结果。2 核 4 GB 的 VPS 足以体验 uiliuili，
+以上是规划参考，不是基准测试结果。2 核 4 GB 的 VPS 足以体验萌悠，
 但当多个 1080p 上传和数百名观众同时出现时就会明显吃力。
 
 ### 容量与转码并发
@@ -52,24 +52,32 @@ PostgreSQL（内存和磁盘 IOPS）。下表是 1080p 以内 H.264 源片的起
 - PostgreSQL 需要较快的随机 IO，请使用 NVMe 或配置 IOPS，并将 `shared_buffers` 设为内存的约 25%。约 1000 日活以内单台小实例足够；1 万日活建议 4–8 vCPU、16 GB 内存。
 - Redis 通常占用不到 1 GB。Meilisearch 大致需要与索引文本相当的内存，10 万视频常见为 2–4 GB。
 
-建议使用 64 位 Linux（Ubuntu 24.04 LTS 或 Debian 12）、XFS 或 ext4
-文件系统，并配置 2–4 GB swap 作为 OOM 保护。swap 不能替代转码所需的内存。
+建议使用 64 位 Linux，**Ubuntu 24.04 LTS 或 Debian 13**，XFS 或 ext4 文件系统，
+并配置 2–4 GB swap 作为 OOM 保护。swap 不能替代转码所需的内存。
 
-## 目录结构
+Debian 12 也可运行，但自带 FFmpeg 与 PostgreSQL 版本偏旧：PostgreSQL 16 需从
+[PGDG](https://www.postgresql.org/download/linux/debian/) 安装，FFmpeg 建议从
+backports 获取。Ubuntu 24.04 自带 FFmpeg 6.1，满足最低要求。
+
+## 目录与用户
 
 ```text
 /opt/uiliuili/          应用目录
-/opt/uiliuili/.env      由安装器生成
+/opt/uiliuili/.env      由安装器或手工创建
 /opt/uiliuili/config/   实例标记
 /opt/uiliuili/storage/  本地上传与临时文件
 ```
 
-创建专用服务用户：
+创建专用服务用户，并确保配置与存储目录可写：
 
 ```bash
 sudo useradd --system --home /opt/uiliuili --shell /usr/sbin/nologin uiliuili
 sudo chown -R uiliuili:uiliuili /opt/uiliuili
+sudo chmod 600 /opt/uiliuili/.env
 ```
+
+服务用户需要对 `config/`、`storage/` 和 `.env` 有读写权限；Nginx 需要对
+`apps/admin/dist` 有读权限。
 
 ## 构建
 
@@ -80,61 +88,99 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
+如果以其他用户构建，构建完成后重新执行上面的 `chown`，避免服务用户无法写入
+`storage/`。
+
+构建产物：
+
+| 应用 | 产物 |
+| --- | --- |
+| API | `apps/api/dist/main.js` |
+| worker | `apps/worker/dist/main.js` |
+| 公开站 | `apps/web/.next`，由 Next.js 启动 |
+| 管理后台 | `apps/admin/dist`，由 Nginx 直接提供 |
+| CLI | `apps/cli/dist/index.js` |
+
 ## Nginx
 
 将 `infra/nginx/uiliuili.conf` 复制到
-`/etc/nginx/sites-available/uiliuili`，调整安装路径，启用站点并重载 Nginx：
+`/etc/nginx/sites-available/uiliuili`，按实际安装路径调整 `root` 与
+`alias`，启用站点并重载：
 
 ```bash
+sudo cp infra/nginx/uiliuili.conf /etc/nginx/sites-available/uiliuili
 sudo ln -s /etc/nginx/sites-available/uiliuili /etc/nginx/sites-enabled/uiliuili
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-管理后台 SPA 由 `/admin/` 提供，Next.js 站点位于 `/`，API、媒体和
-WebSocket 流量代理到 API 服务。
+配置要点：
+
+- `/admin/` 直接读取 `apps/admin/dist` 静态文件，不走 Next.js。
+- `/api/`、`/media/`、`/socket.io/` 反代到 API（默认 `127.0.0.1:3001`）。
+- `/health` 精确反代到 API，供探针和负载均衡使用。
+- `/api/install/` 关闭 `proxy_request_buffering`，避免安装请求被缓冲。
+- 上传体积由 `client_max_body_size` 控制，默认 2 GB。
+
+生产环境务必启用 HTTPS。Let's Encrypt 示例：
+
+```bash
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d video.example.com
+```
+
+然后把 `.env` 中的 `APP_URL` 改为 `https://video.example.com` 并重启 API。
+
+在 Nginx 之后运行时，请在 `.env` 中设置 `TRUST_PROXY=true`，以便限流、地区和
+安装器安全逻辑正确解析客户端 IP。API 直接暴露在公网时不要启用该选项。
 
 ## systemd
 
-将 `infra/systemd/*.service` 复制到 `/etc/systemd/system/`，然后执行：
+将 `infra/systemd/*.service` 复制到 `/etc/systemd/system/`，然后：
 
 ```bash
+sudo cp infra/systemd/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now uiliuili-api uiliuili-worker uiliuili-web
 ```
 
-当安装器以退出码 75 结束时，API 单元会自动重启。
+三个单元都直接调用 `node`，不依赖全局 pnpm：
 
-在 Nginx 之后运行时，请在 `.env` 中设置 `TRUST_PROXY=true`，以便限流和安装器安全逻辑正确解析客户端 IP。API 直接暴露在公网时不要启用该选项。
+- `uiliuili-api`：`apps/api/dist/main.js`
+- `uiliuili-worker`：`apps/worker/dist/main.js`
+- `uiliuili-web`：从 `apps/web` 启动 Next.js
+
+当安装器以退出码 75 结束时，API 单元会自动重启进入完整模式。查看状态与日志：
+
+```bash
+systemctl status uiliuili-api uiliuili-worker uiliuili-web
+journalctl -u uiliuili-api -f
+journalctl -u uiliuili-worker -f
+```
+
+如果修改了安装目录，请同步编辑单元文件中的 `WorkingDirectory`、`EnvironmentFile`
+和 `ExecStart`。
 
 ## 首次安装
 
-打开 `https://your-domain/admin/install`。API 控制台会打印一次性安装令牌。安装完成后 API 会重启，安装器随即关闭。
-
-无界面安装：
+安装令牌与站长认领码的完整流程见[安装 · 原生安装](installation.md#原生安装)。生产环境推荐：
 
 ```bash
-pnpm cli install --config install.json
+pnpm cli doctor
+pnpm cli install --from-env
 ```
 
-## 开发
+或在 API 启动后打开 `https://your-domain/admin/install` 使用网页安装器。安装完成后
+API 会重启，安装接口永久关闭。
 
-终端 1：
+## 安装后检查
 
-```bash
-pnpm --filter @uiliuili/api dev
-pnpm --filter @uiliuili/worker dev
-```
-
-终端 2：
-
-```bash
-pnpm --filter @uiliuili/web dev
-pnpm --filter @uiliuili/admin dev
-```
-
-开发环境中，如果 web 与 API 使用不同端口，请以
-`NEXT_PUBLIC_API_URL=http://127.0.0.1:3001` 启动 Next.js。
+- `curl -i https://your-domain/health` 返回 `200`；
+- 管理后台可以登录，第一个账号是站长；
+- 上传一个视频，转码完成且可以播放；
+- worker 日志没有重复失败；
+- 数据库没有待执行迁移（`pnpm cli status`）；
+- `/etc/nginx` 与 `.env` 中的路径、域名、端口一致。
 
 ## 扩容
 
@@ -142,3 +188,9 @@ pnpm --filter @uiliuili/admin dev
 - 多个 worker 可以共用同一个 PostgreSQL 队列，任务通过 `FOR UPDATE SKIP LOCKED` 领取。
 - API 与 worker 不在同一台机器上时，应使用 S3 存储。
 - 条件允许时，在公开媒体前加 CDN。
+- 管理后台是静态文件，可以在多台 Nginx 上各放一份 `apps/admin/dist`。
+
+## 开发环境
+
+本地开发、测试和目录结构见[开发指南](development.md)。生产服务器上不要运行
+`pnpm dev`。

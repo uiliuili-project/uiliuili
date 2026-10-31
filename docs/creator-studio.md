@@ -12,7 +12,7 @@ screens the same entries become a horizontal tab strip.
 | --- | --- |
 | `/studio` | Overview: recent videos, review state, quick actions |
 | `/studio/videos` | All videos with search, filters, and status |
-| `/studio/videos/new` | Upload and create a new video |
+| `/studio/videos/new` | Standalone drag-and-drop upload page |
 | `/studio/videos/:id` | Edit metadata, declaration, collaborators, appeal, status history |
 | `/studio/analytics` | Views, interactions, sources, devices, countries, top videos |
 | `/studio/comments` | Comment inbox with hide/restore/delete |
@@ -25,6 +25,30 @@ screens the same entries become a horizontal tab strip.
 | `/studio/collaborations` | Invitations to accept or reject |
 | `/studio/appeals` | Appeal history and reviewer responses |
 | `/studio/trash` | Soft-deleted videos, restore or permanently delete |
+
+## Uploading a video
+
+`/studio/videos/new` is a dedicated page designed like a Bilibili submission
+screen. It is not a dialog over the video list.
+
+1. Drop a video file anywhere on the page, or use the file picker. The first
+   page only shows the drop zone and the accepted formats.
+2. Dropping a file immediately creates a draft video and starts the upload; the
+   page switches to the submission form and shows the same-page upload progress,
+   speed, and remaining time.
+3. While the upload runs, fill in title, description, category, tags, cover, and
+   the creation declaration. The form is saved to the draft before publishing.
+4. When the upload completes the page polls the video status. The subtitle
+   follows the phase (`Uploading`, `Transcoding`, `Ready to publish`,
+   `In review`), so a draft is never shown while transcoding is still running.
+5. **Publish** saves the current form with a final `PATCH`, then calls the
+   publish endpoint. Depending on `review.videos`, the result is published
+   immediately or enters review.
+
+Only the new-upload entry is highlighted on this page; `/studio/videos` and
+`/studio/videos/:id` highlight the video management entry. **Discard
+submission** moves the draft to the recycle bin instead of leaving an empty
+video behind.
 
 ## Creation declaration
 

@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- One-command Docker quickstart (`scripts/quickstart.sh`): creates `.env`,
+  generates `APP_KEY` and `DB_PASSWORD`, builds and starts the stack, waits for
+  health, and prints the owner claim token.
+- `GET /health` and `GET /health/live` service endpoints, proxied by the Docker
+  gateway and the provided Nginx config.
+- Optional external video nodes (`apps/video-node`,
+  `@uiliuili/video-node-contract`): signed upload/transcode/playback on another
+  host, with admin registration, routing strategies, and replication jobs.
+- Standalone submission page at `/studio/videos/new`: drop a file to create a
+  draft and upload immediately, with same-page XHR progress, speed, remaining
+  time, and phase-aware status text.
+- Site-wide motion layer gated by `data-motion` and `prefers-reduced-motion`,
+  plus browser-version detection with a static upgrade notice for unsupported
+  engines.
+- Complete English translations for the creator studio navigation and upload
+  flow.
 - Initial monorepo foundation.
 - Self-hosted first-run web installer.
 - Video upload, FFmpeg HLS transcoding, danmaku, social features, search,
@@ -46,6 +62,18 @@ All notable changes to this project are documented here. The format follows
   with the video owner.
 - Collections and series management, follower/growth dashboards, studio
   message center, and an admin appeals/columns console.
+
+### Changed
+
+- Documentation reorganized by task: install, deploy, configure, operate, and
+  develop, with Chinese and English indexes and new troubleshooting and
+  development guides.
+- Installation simplified to two clear paths: Docker quickstart and native
+  install. Docker is documented as the recommended fast path; systemd now runs
+  Next.js directly instead of depending on a global pnpm shim.
+- The default Docker site name is 萌悠, and the native `.env.example` keeps
+  `INSTALL_ALLOW_LOCALHOST=false`.
+- CI runs on both `main` and `master`.
 
 ### Fixed
 
