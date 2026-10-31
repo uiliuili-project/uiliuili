@@ -2,6 +2,7 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   BellOutlined,
+  CloudServerOutlined,
   CommentOutlined,
   DashboardOutlined,
   DatabaseOutlined,
@@ -153,6 +154,12 @@ export function AdminLayout() {
             icon: <BellOutlined />,
             label: t('admin.announcements'),
             permission: 'announcement:manage',
+          },
+          {
+            key: '/video-nodes',
+            icon: <CloudServerOutlined />,
+            label: t('videoNodes.title'),
+            permission: 'video_node:manage',
           },
           {
             key: '/settings',

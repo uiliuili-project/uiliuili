@@ -19,6 +19,7 @@ import { ReviewVideosPage } from './pages/ReviewVideosPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SystemPage } from './pages/SystemPage';
 import { UsersPage } from './pages/UsersPage';
+import { VideoNodesPage } from './pages/VideoNodesPage';
 import { VideosPage } from './pages/VideosPage';
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
@@ -138,6 +139,14 @@ export function App() {
                 ]}
               >
                 <SettingsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="video-nodes"
+            element={
+              <PermissionGate permission="video_node:manage">
+                <VideoNodesPage />
               </PermissionGate>
             }
           />
