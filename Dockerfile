@@ -20,12 +20,14 @@ COPY apps/worker/package.json ./apps/worker/
 COPY apps/web/package.json ./apps/web/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/cli/package.json ./apps/cli/
+COPY apps/video-node/package.json ./apps/video-node/
 COPY packages/danmaku/package.json ./packages/danmaku/
 COPY packages/db/package.json ./packages/db/
 COPY packages/i18n/package.json ./packages/i18n/
 COPY packages/installer/package.json ./packages/installer/
 COPY packages/media/package.json ./packages/media/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/video-node-contract/package.json ./packages/video-node-contract/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
@@ -46,6 +48,9 @@ RUN pnpm --filter @uiliuili/worker deploy --prod /out/worker
 
 FROM build AS deploy-cli
 RUN pnpm --filter @uiliuili/cli deploy --prod /out/cli
+
+FROM build AS deploy-video-node
+RUN pnpm --filter @uiliuili/video-node deploy --prod /out/video-node
 
 # Shared application runtime. FFmpeg is a system dependency, not bundled into
 # the application image's Node dependencies.
@@ -76,6 +81,16 @@ FROM runtime AS cli
 COPY --from=deploy-cli --chown=node:node /out/cli /app
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "dist/index.js"]
+
+# External video node: own PostgreSQL, own storage root and FFmpeg transcoding.
+FROM runtime AS video-node
+COPY --from=deploy-video-node --chown=node:node /out/video-node /app
+ENV VIDEO_NODE_PORT=3100 \
+    VIDEO_NODE_HOST=0.0.0.0 \
+    VIDEO_NODE_STORAGE_ROOT=/data/storage/video-node
+EXPOSE 3100
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/main.js"]
 
 # Next.js standalone server. Static assets are not included in the standalone
 # bundle and must be copied next to it.

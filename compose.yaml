@@ -34,6 +34,23 @@ services:
       timeout: 5s
       retries: 20
 
+  # The video node keeps its own database; it is never shared with the site.
+  node-postgres:
+    image: postgres:16-alpine
+    profiles: ["video-node"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${VIDEO_NODE_DB_USER:-video_node}
+      POSTGRES_PASSWORD: ${VIDEO_NODE_DB_PASSWORD:-video_node}
+      POSTGRES_DB: ${VIDEO_NODE_DB_NAME:-video_node}
+    volumes:
+      - node-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VIDEO_NODE_DB_USER:-video_node} -d ${VIDEO_NODE_DB_NAME:-video_node}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -183,7 +200,62 @@ services:
       web:
         condition: service_healthy
 
+  # External video node (own DB, own storage, FFmpeg transcoding and panel).
+  # Enable with: docker compose --profile video-node up -d
+  video-node:
+    build:
+      context: .
+      target: video-node
+    image: uiliuili-video-node:local
+    profiles: ["video-node"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      VIDEO_NODE_PORT: 3100
+      VIDEO_NODE_HOST: 0.0.0.0
+      VIDEO_NODE_ID: ${VIDEO_NODE_ID:-video-node-1}
+      VIDEO_NODE_NAME: ${VIDEO_NODE_NAME:-视频节点 1}
+      VIDEO_NODE_PUBLIC_URL: ${VIDEO_NODE_PUBLIC_URL:-http://localhost:3100}
+      VIDEO_NODE_REGION: ${VIDEO_NODE_REGION:-}
+      VIDEO_NODE_REGIONS: ${VIDEO_NODE_REGIONS:-}
+      VIDEO_NODE_DATABASE_URL: postgres://${VIDEO_NODE_DB_USER:-video_node}:${VIDEO_NODE_DB_PASSWORD:-video_node}@node-postgres:5432/${VIDEO_NODE_DB_NAME:-video_node}
+      VIDEO_NODE_SECRET: ${VIDEO_NODE_SECRET:-}
+      VIDEO_NODE_KEY_ID: ${VIDEO_NODE_KEY_ID:-default}
+      VIDEO_NODE_STORAGE_ROOT: /data/storage/video-node
+      VIDEO_NODE_STORAGE_CAPACITY_BYTES: ${VIDEO_NODE_STORAGE_CAPACITY_BYTES:-0}
+      VIDEO_NODE_TRANSCODE_CONCURRENCY: ${VIDEO_NODE_TRANSCODE_CONCURRENCY:-2}
+      VIDEO_NODE_MAX_HEIGHT: ${VIDEO_NODE_MAX_HEIGHT:-1080}
+      VIDEO_NODE_MAX_UPLOAD_BYTES: ${VIDEO_NODE_MAX_UPLOAD_BYTES:-8589934592}
+      VIDEO_NODE_PANEL_PASSWORD: ${VIDEO_NODE_PANEL_PASSWORD:-}
+      VIDEO_NODE_PANEL_SECRET: ${VIDEO_NODE_PANEL_SECRET:-}
+      VIDEO_NODE_REPLICA_ALLOWED_HOSTS: ${VIDEO_NODE_REPLICA_ALLOWED_HOSTS:-}
+      FFMPEG_PATH: ffmpeg
+      FFPROBE_PATH: ffprobe
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${VIDEO_NODE_HOST_PORT:-3100}:3100"
+    volumes:
+      - node-data:/data
+    depends_on:
+      node-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+
 volumes:
   db-data:
   redis-data:
   app-data:
+  node-db-data:
+  node-data:
