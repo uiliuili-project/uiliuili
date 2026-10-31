@@ -73,7 +73,7 @@ services:
     command: ["node", "dist/index.js", "bootstrap"]
     environment:
       <<: *app-environment
-      SITE_NAME: ${SITE_NAME:-uiliuili}
+      SITE_NAME: ${SITE_NAME:-萌悠}
       SITE_DESCRIPTION: ${SITE_DESCRIPTION:-一个自托管的弹幕视频站}
       SITE_LOCALE: ${SITE_LOCALE:-zh-CN}
       SITE_TIMEZONE: ${SITE_TIMEZONE:-Asia/Shanghai}

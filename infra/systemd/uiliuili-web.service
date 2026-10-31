@@ -6,9 +6,10 @@ After=network.target uiliuili-api.service
 Type=simple
 User=uiliuili
 Group=uiliuili
-WorkingDirectory=/opt/uiliuili
+WorkingDirectory=/opt/uiliuili/apps/web
 EnvironmentFile=-/opt/uiliuili/.env
-ExecStart=/usr/bin/env pnpm --filter @uiliuili/web start
+# Run Next.js directly so the service does not depend on a global pnpm shim.
+ExecStart=/usr/bin/node /opt/uiliuili/apps/web/node_modules/next/dist/bin/next start -p 3000
 Restart=always
 RestartSec=3
 KillSignal=SIGTERM
