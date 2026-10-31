@@ -464,6 +464,7 @@ export const uiEn: Record<string, string> = {
   观看历史: 'Watch history',
   视频: 'Video',
   '视频加载失败，请稍后重试': 'Failed to load the video. Please try again later.',
+  远端上传信息不完整: 'The remote upload details are incomplete',
   视频处理失败: 'Video processing failed',
   视频处理完成: 'Video processing complete',
   视频已发布: 'Video published',
