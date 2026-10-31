@@ -129,3 +129,145 @@ select {
   background: #d4d7db;
   border-radius: 999px;
 }
+
+/*
+ * Motion set
+ * ----------
+ * Every animation and lift below is gated behind html[data-motion="full"],
+ * which the inline bootstrap in the root layout only sets for browsers from
+ * roughly 2023 onward (Chrome/Edge 110+, Firefox 110+, Safari 16.4+). Older
+ * engines, and visitors who ask for reduced motion, keep the instant,
+ * animation-free interface.
+ */
+html[data-motion="none"] *:not(.animate-spin),
+html[data-motion="none"] *:not(.animate-spin)::before,
+html[data-motion="none"] *:not(.animate-spin)::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@keyframes moe-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes moe-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes moe-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes moe-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes moe-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes moe-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-motion="full"] .motion-fade-in {
+    animation: moe-fade-in 180ms ease-out both;
+  }
+
+  html[data-motion="full"] .motion-rise-in {
+    animation: moe-rise-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  html[data-motion="full"] .motion-page {
+    animation: moe-page-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  html[data-motion="full"] .motion-pop-in {
+    animation: moe-pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  html[data-motion="full"] .motion-drop-in {
+    animation: moe-drop-in 160ms ease-out both;
+  }
+
+  html[data-motion="full"] .motion-slide-in-right {
+    animation: moe-slide-in-right 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  html[data-motion="full"] .motion-lift {
+    transition: transform 240ms ease, box-shadow 240ms ease;
+  }
+
+  html[data-motion="full"] .motion-lift:hover {
+    transform: translateY(-3px);
+  }
+
+  html[data-motion="full"] .motion-scale {
+    transition: transform 200ms ease;
+  }
+
+  html[data-motion="full"] .motion-scale:hover {
+    transform: scale(1.02);
+  }
+
+  html[data-motion="full"] .btn {
+    transition: transform 120ms ease, background-color 150ms ease, border-color 150ms ease, color
+      150ms ease, box-shadow 150ms ease;
+  }
+
+  html[data-motion="full"] .btn:active {
+    transform: scale(0.97);
+  }
+
+  html[data-motion="full"] .chip {
+    transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, color
+      150ms ease;
+  }
+
+  html[data-motion="full"] .chip:hover {
+    transform: translateY(-1px);
+  }
+}
