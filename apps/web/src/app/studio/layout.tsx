@@ -7,7 +7,6 @@ import { type AuthUser, isStaffGroup } from '@uiliuili/shared';
 import {
   BarChart3,
   BookOpen,
-  Clapperboard,
   Film,
   FolderHeart,
   Inbox,
@@ -18,6 +17,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  UploadCloud,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -27,7 +27,7 @@ import { useEffect, useState } from 'react';
 const NAV = [
   { href: '/studio', label: '概览', icon: LayoutDashboard },
   { href: '/studio/videos', label: '投稿管理', icon: ListVideo },
-  { href: '/studio/videos/new', label: '稿件编辑', icon: Clapperboard },
+  { href: '/studio/videos/new', label: '新建投稿', icon: UploadCloud },
   { href: '/studio/analytics', label: '数据', icon: BarChart3 },
   { href: '/studio/comments', label: '评论', icon: MessageSquare },
   { href: '/studio/danmaku', label: '弹幕', icon: Music2 },
@@ -70,10 +70,14 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  const isActive = (href: string) =>
-    href === '/studio'
-      ? pathname === '/studio'
-      : pathname === href || pathname.startsWith(`${href}/`);
+  // A nested route belongs to the most specific navigation entry, so
+  // `/studio/videos/new` never lights up both "投稿管理" and "新建投稿".
+  const activeHref = NAV.reduce<string | null>((best, item) => {
+    const matches = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (!matches) return best;
+    return best === null || item.href.length > best.length ? item.href : best;
+  }, null);
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <div className="container-page py-6">
