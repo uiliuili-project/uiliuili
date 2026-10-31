@@ -301,6 +301,11 @@ export const zhCN = {
     visitSite: '访问站点',
     superAdmin: '超级管理员',
   },
+  browser: {
+    unsupportedTitle: '浏览器版本过旧',
+    unsupportedBody:
+      '当前浏览器无法完整显示萌悠。请升级到最新版 Chrome、Edge、Firefox 或 Safari 后再访问。',
+  },
   videoNodes: {
     title: '视频节点',
     subtitle: '管理外部视频节点、上传路由与多节点副本',

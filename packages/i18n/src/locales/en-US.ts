@@ -306,6 +306,11 @@ export const enUS = {
     visitSite: 'Visit site',
     superAdmin: 'Super admin',
   },
+  browser: {
+    unsupportedTitle: 'Your browser is out of date',
+    unsupportedBody:
+      'This browser cannot display MoeYu correctly. Please upgrade to the latest Chrome, Edge, Firefox, or Safari.',
+  },
   videoNodes: {
     title: 'Video nodes',
     subtitle: 'Manage external video nodes, upload routing and replicas',
