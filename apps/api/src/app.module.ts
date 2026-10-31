@@ -17,6 +17,7 @@ import { SearchModule } from './search/search.module';
 import { SocialModule } from './social/social.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
+import { VideoNodesModule } from './video-nodes/video-nodes.module';
 import { VideosModule } from './videos/videos.module';
 
 @Module({
@@ -39,6 +40,7 @@ import { VideosModule } from './videos/videos.module';
     SocialModule,
     MediaModule,
     UploadsModule,
+    VideoNodesModule,
   ],
   controllers: [HealthController],
 })

@@ -257,6 +257,7 @@ export class AdminController {
     'settings:content',
     'settings:integration',
     'settings:security',
+    'video_node:manage',
   )
   async settings(@CurrentUser() actor: AuthUser) {
     return this.admin.getSettings(actor);
@@ -283,6 +284,7 @@ export class AdminController {
     'settings:content',
     'settings:integration',
     'settings:security',
+    'video_node:manage',
   )
   async updateSettings(
     @CurrentUser() actor: AuthUser,

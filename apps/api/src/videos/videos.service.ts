@@ -63,6 +63,7 @@ import {
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
 import { InterestsService } from '../interests/interests.service';
+import { type SignedRemotePlayback, VideoNodesService } from '../video-nodes/video-nodes.service';
 import {
   type VideoJoinRow,
   categoryPayload,
@@ -82,6 +83,7 @@ export class VideosService {
     private readonly storage: StorageService,
     private readonly queue: QueueService,
     private readonly interests: InterestsService,
+    private readonly videoNodes: VideoNodesService,
   ) {}
 
   async list(
@@ -346,6 +348,16 @@ export class VideosService {
         url: await this.storage.signedUrl(subtitle.storageKey, 3600),
       })),
     );
+    const remoteMain: SignedRemotePlayback | null =
+      row.video.storageMode === 'remote' && partRows.length === 0
+        ? await this.videoNodes.signPlayback(id, null)
+        : null;
+    const remoteParts: Map<string, SignedRemotePlayback> =
+      row.video.storageMode === 'remote' && partRows.length > 0
+        ? await this.videoNodes.signPartPlaylists(id)
+        : new Map();
+    const primaryRemote: SignedRemotePlayback | null =
+      remoteMain ?? remoteParts.values().next().value ?? null;
     const parts =
       partRows.length > 0
         ? partRows.map((part) => ({
@@ -355,9 +367,11 @@ export class VideosService {
             durationSeconds: part.durationSeconds,
             status: part.status,
             playlistUrl:
-              part.playlistKey && ['ready', 'published'].includes(part.status)
-                ? `/api/v1/videos/${id}/parts/${part.id}/hls/master.m3u8`
-                : null,
+              part.storageMode === 'remote'
+                ? (remoteParts.get(part.id)?.masterUrl ?? null)
+                : part.playlistKey && ['ready', 'published'].includes(part.status)
+                  ? `/api/v1/videos/${id}/parts/${part.id}/hls/master.m3u8`
+                  : null,
           }))
         : [
             {
@@ -367,7 +381,8 @@ export class VideosService {
               durationSeconds: row.video.durationSeconds,
               status: row.video.status,
               playlistUrl:
-                row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null,
+                remoteMain?.masterUrl ??
+                (row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null),
             },
           ];
     const playablePart = parts.find((part) => part.playlistUrl);
@@ -390,14 +405,23 @@ export class VideosService {
       collaborators: collaboratorRows,
       playlistUrl:
         playablePart?.playlistUrl ??
+        primaryRemote?.masterUrl ??
         (row.video.playlistKey && canPlay ? `/api/v1/videos/${id}/hls/master.m3u8` : null),
-      renditions: renditions.map((rendition) => ({
-        quality: rendition.quality,
-        width: rendition.width,
-        height: rendition.height,
-        bitrate: rendition.bitrate,
-        playlistUrl: `/api/v1/videos/${id}/hls/${rendition.quality}/index.m3u8`,
-      })),
+      renditions: primaryRemote
+        ? primaryRemote.renditions.map((rendition) => ({
+            quality: rendition.quality,
+            width: rendition.width,
+            height: rendition.height,
+            bitrate: rendition.bitrate,
+            playlistUrl: rendition.playlistUrl,
+          }))
+        : renditions.map((rendition) => ({
+            quality: rendition.quality,
+            width: rendition.width,
+            height: rendition.height,
+            bitrate: rendition.bitrate,
+            playlistUrl: `/api/v1/videos/${id}/hls/${rendition.quality}/index.m3u8`,
+          })),
       subtitles: subtitlePayload,
       parts,
       collections: collectionRows.map((collection) => ({
@@ -507,8 +531,8 @@ export class VideosService {
     const row = await this.getRow(id);
     this.assertCanView(row.video, viewer);
     const part = partId ? await this.getPart(id, partId) : null;
-    const playlistKey = part?.playlistKey ?? row.video.playlistKey;
-    if (!playlistKey) {
+    const isRemote = row.video.storageMode === 'remote' || part?.storageMode === 'remote';
+    if (!isRemote && !(part?.playlistKey ?? row.video.playlistKey)) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, '视频尚未完成转码', 400);
     }
     await this.database.db
@@ -524,18 +548,45 @@ export class VideosService {
       device: meta.device ?? 'unknown',
       country: currentRegionContext().code ?? '',
     });
-    const [renditions, subtitles] = await Promise.all([
-      this.database.db
-        .select()
-        .from(videoRenditions)
-        .where(
-          part
-            ? eq(videoRenditions.partId, part.id)
-            : and(eq(videoRenditions.videoId, id), isNull(videoRenditions.partId)),
-        )
-        .orderBy(desc(videoRenditions.height)),
-      this.database.db.select().from(videoSubtitles).where(eq(videoSubtitles.videoId, id)),
-    ]);
+    const subtitles = await this.database.db
+      .select()
+      .from(videoSubtitles)
+      .where(eq(videoSubtitles.videoId, id));
+    const subtitlePayload = await Promise.all(
+      subtitles.map(async (subtitle) => ({
+        language: subtitle.language,
+        label: subtitle.label,
+        url: await this.storage.signedUrl(subtitle.storageKey, 3600),
+      })),
+    );
+    if (isRemote) {
+      const signed = await this.videoNodes.signPlayback(id, part?.id ?? null);
+      if (!signed) {
+        throw new AppError(ERROR_CODES.INTERNAL_ERROR, '远端视频节点暂时不可用', 503);
+      }
+      return {
+        playlistUrl: signed.masterUrl,
+        partId: part?.id ?? null,
+        nodeId: signed.nodeId,
+        renditions: signed.renditions.map((rendition) => ({
+          quality: rendition.quality,
+          width: rendition.width,
+          height: rendition.height,
+          bitrate: rendition.bitrate,
+          playlistUrl: rendition.playlistUrl,
+        })),
+        subtitles: subtitlePayload,
+      };
+    }
+    const renditions = await this.database.db
+      .select()
+      .from(videoRenditions)
+      .where(
+        part
+          ? eq(videoRenditions.partId, part.id)
+          : and(eq(videoRenditions.videoId, id), isNull(videoRenditions.partId)),
+      )
+      .orderBy(desc(videoRenditions.height));
     const prefix = part ? `/api/v1/videos/${id}/parts/${part.id}/hls` : `/api/v1/videos/${id}/hls`;
     return {
       playlistUrl: `${prefix}/master.m3u8`,
@@ -547,13 +598,7 @@ export class VideosService {
         bitrate: rendition.bitrate,
         playlistUrl: `${prefix}/${rendition.quality}/index.m3u8`,
       })),
-      subtitles: await Promise.all(
-        subtitles.map(async (subtitle) => ({
-          language: subtitle.language,
-          label: subtitle.label,
-          url: await this.storage.signedUrl(subtitle.storageKey, 3600),
-        })),
-      ),
+      subtitles: subtitlePayload,
     };
   }
 

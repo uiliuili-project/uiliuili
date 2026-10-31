@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   type DbVideo,
   categories,
@@ -18,6 +18,7 @@ import {
   users,
   videoAppeals,
   videoCollaborators,
+  videoNodeUploadLeases,
   videoParts,
   videoStatusLogs,
   videoSubtitles,
@@ -42,16 +43,20 @@ import { RateLimitService } from '../common/rate-limit.service';
 import { currentRegionContext } from '../common/region-context';
 import { SettingsService } from '../common/settings.service';
 import { StorageService } from '../common/storage.service';
+import { VideoNodesService } from '../video-nodes/video-nodes.service';
 import { tagSlug } from './video.helpers';
 
 @Injectable()
 export class StudioService {
+  private readonly logger = new Logger(StudioService.name);
+
   constructor(
     private readonly database: DatabaseService,
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly queue: QueueService,
     private readonly rateLimit: RateLimitService,
+    private readonly videoNodes: VideoNodesService,
   ) {}
 
   async list(userId: string, page = 1, limit = 20) {
@@ -284,6 +289,97 @@ export class StudioService {
         ),
       );
 
+    const remote = await this.tryBeginRemoteUpload({
+      videoId,
+      partId: part?.id ?? null,
+      filename: input.filename,
+      size: input.size,
+      contentType: input.contentType,
+      region: currentRegionContext().code,
+    });
+    if (remote) {
+      const [remoteSession] = await this.database.db
+        .insert(uploadSessions)
+        .values({
+          userId,
+          videoId,
+          partId: part?.id ?? null,
+          filename: input.filename.slice(0, 255),
+          size: input.size,
+          contentType: input.contentType,
+          storageDriver: 'remote',
+          storageKey: '',
+          nodeId: remote.nodeId,
+          remoteUploadId: remote.remoteUploadId,
+          remoteAssetId: remote.remoteAssetId,
+          chunkSize: remote.partSize,
+          totalChunks: remote.totalParts,
+          uploadedChunks: 0,
+          status: 'uploading',
+          expiresAt: remote.expiresAt,
+        })
+        .returning();
+      if (!remoteSession) {
+        throw new AppError(ERROR_CODES.INTERNAL_ERROR, '创建上传会话失败', 500);
+      }
+      await this.database.db.insert(videoNodeUploadLeases).values({
+        uploadSessionId: remoteSession.id,
+        nodeId: remote.nodeId,
+        remoteUploadId: remote.remoteUploadId,
+        remoteAssetId: remote.remoteAssetId,
+        status: 'uploading',
+        expiresAt: remote.expiresAt,
+      });
+      await this.database.db
+        .update(videos)
+        .set({
+          status: 'uploading',
+          sourceFilename: input.filename,
+          sourceSize: input.size,
+          sourceKey: null,
+          playlistKey: null,
+          spriteKey: null,
+          previewVttKey: null,
+          storageMode: 'remote',
+          primaryNodeId: remote.nodeId,
+          remoteAssetId: remote.remoteAssetId,
+          durationSeconds: 0,
+          updatedAt: new Date(),
+        })
+        .where(eq(videos.id, videoId));
+      if (part) {
+        await this.database.db
+          .update(videoParts)
+          .set({
+            status: 'uploading',
+            sourceFilename: input.filename,
+            sourceSize: input.size,
+            sourceKey: null,
+            playlistKey: null,
+            spriteKey: null,
+            previewVttKey: null,
+            storageMode: 'remote',
+            primaryNodeId: remote.nodeId,
+            remoteAssetId: remote.remoteAssetId,
+            durationSeconds: 0,
+            updatedAt: new Date(),
+          })
+          .where(eq(videoParts.id, part.id));
+      }
+      return {
+        mode: 'remote' as const,
+        uploadId: remoteSession.id,
+        nodeId: remote.nodeId,
+        nodeName: remote.nodeName,
+        nodeBaseUrl: remote.nodeBaseUrl,
+        remoteUploadId: remote.remoteUploadId,
+        uploadToken: remote.uploadToken,
+        partSize: remote.partSize,
+        totalChunks: remote.totalParts,
+        expiresAt: remote.expiresAt.toISOString(),
+      };
+    }
+
     const storageKey = part
       ? `videos/${videoId}/parts/${part.id}/source/${crypto.randomUUID()}.${extension}`
       : `videos/${videoId}/source/${crypto.randomUUID()}.${extension}`;
@@ -440,6 +536,29 @@ export class StudioService {
     providedParts?: Array<{ partNumber: number; etag: string }>,
   ) {
     const session = await this.getSession(userId, uploadId);
+    if (session.storageDriver === 'remote') {
+      if (!session.nodeId || !session.remoteUploadId || !session.remoteAssetId) {
+        throw new AppError(ERROR_CODES.BAD_REQUEST, '远端上传会话信息不完整', 400);
+      }
+      await this.videoNodes.completeRemoteUpload({
+        sessionId: session.id,
+        videoId: session.videoId,
+        partId: session.partId,
+        nodeId: session.nodeId,
+        remoteUploadId: session.remoteUploadId,
+        remoteAssetId: session.remoteAssetId,
+      });
+      await this.database.db
+        .update(uploadSessions)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(eq(uploadSessions.id, session.id));
+      return {
+        videoId: session.videoId,
+        status: 'processing',
+        mode: 'remote',
+        nodeId: session.nodeId,
+      };
+    }
     const stored = await this.database.db
       .select()
       .from(uploadParts)
@@ -1810,6 +1929,27 @@ export class StudioService {
   /** Resolves a video the caller owns, excluding collaborative access. */
   private getOwnedVideo(userId: string, id: string): Promise<DbVideo> {
     return this.getOwnVideo(userId, id);
+  }
+
+  private async tryBeginRemoteUpload(input: {
+    videoId: string;
+    partId: string | null;
+    filename: string;
+    size: number;
+    contentType: string;
+    region?: string;
+  }) {
+    try {
+      return await this.videoNodes.beginRemoteUpload(input);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      this.logger.warn(
+        `Remote upload unavailable, falling back to site storage: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   private async getSession(userId: string, uploadId: string) {

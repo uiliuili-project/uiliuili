@@ -120,6 +120,9 @@ importers:
       '@uiliuili/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@uiliuili/video-node-contract':
+        specifier: workspace:*
+        version: link:../../packages/video-node-contract
       argon2:
         specifier: ^0.41.1
         version: 0.41.1

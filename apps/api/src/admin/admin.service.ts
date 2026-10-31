@@ -1111,6 +1111,10 @@ export class AdminService {
       if (securityFields.length > 0) this.assertPermission(actor, 'settings:security');
       return;
     }
+    if (key === 'videoNodes') {
+      this.assertPermission(actor, 'video_node:manage');
+      return;
+    }
     if (['branding', 'navigation', 'customCode', 'analytics', 'legal'].includes(key)) {
       this.assertPermission(actor, 'settings:site');
       return;
@@ -1178,6 +1182,7 @@ export class AdminService {
     }
     if (this.hasPermission(actor, 'settings:integration')) groupKeys.push('mail', 'aiModeration');
     if (this.hasPermission(actor, 'settings:security')) groupKeys.push('security', 'captcha');
+    if (this.hasPermission(actor, 'video_node:manage')) groupKeys.push('videoNodes');
 
     const groups = await Promise.all(
       groupKeys.map(async (key) => {
