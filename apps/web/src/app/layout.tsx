@@ -5,10 +5,13 @@ import { GoogleAnalytics } from '@/components/GoogleAnalytics';
 import { Header } from '@/components/Header';
 import { I18nProvider } from '@/components/I18nProvider';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { PageTransition } from '@/components/PageTransition';
 import { Providers } from '@/components/Providers';
 import { PwaRegister } from '@/components/PwaRegister';
+import { MOTION_BOOTSTRAP_SCRIPT } from '@/lib/browser-support';
 import { getLocale, getT } from '@/lib/i18n-server';
 import { serverFetchSafe } from '@/lib/server-api';
+import { createTranslator } from '@uiliuili/i18n';
 import { isStaffGroup } from '@uiliuili/shared';
 import type { Metadata } from 'next';
 import './globals.css';
@@ -59,6 +62,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     getLocale(),
     serverFetchSafe<LayoutSettings>('/api/v1/settings', {}),
   ]);
+  const t = createTranslator(locale);
   const customCode = settings.customCode ?? {};
   const analytics = settings.analytics ?? {};
   const siteName = settings.site?.name || '萌悠';
@@ -70,8 +74,28 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     : null;
   const staff = isStaffGroup(viewer?.user?.group);
   return (
-    <html lang={locale}>
+    <html lang={locale} suppressHydrationWarning>
       <body>
+        <div
+          id="browser-support-notice"
+          role="alert"
+          suppressHydrationWarning
+          style={{
+            display: 'none',
+            padding: '10px 16px',
+            background: '#18191c',
+            color: '#fff',
+            fontSize: 14,
+            lineHeight: 1.6,
+            textAlign: 'center',
+          }}
+        >
+          <strong style={{ display: 'block' }}>{t('browser.unsupportedTitle')}</strong>
+          {t('browser.unsupportedBody')}
+        </div>
+        {/* Runs before the app mounts so old engines never start an animation. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted static constant */}
+        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOTSTRAP_SCRIPT }} />
         <I18nProvider initialLocale={locale}>
           <Providers>
             <CaptchaGate />
@@ -92,7 +116,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {customCode.headerEnabled && customCode.headerHtml ? (
                     <CustomHtml html={customCode.headerHtml} />
                   ) : null}
-                  <main className="flex-1">{children}</main>
+                  <main className="flex-1">
+                    <PageTransition>{children}</PageTransition>
+                  </main>
                   {customCode.footerEnabled && customCode.footerHtml ? (
                     <CustomHtml html={customCode.footerHtml} />
                   ) : null}
