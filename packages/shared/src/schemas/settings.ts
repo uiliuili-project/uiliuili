@@ -150,6 +150,24 @@ export const reviewSettingsSchema = z.object({
   articles: z.boolean().default(false),
 });
 
+export const videoNodeReplicationSchema = z.object({
+  enabled: z.boolean().default(false),
+  mode: z.enum(['manual', 'auto']).default('manual'),
+  maxCopies: z.number().int().min(1).max(10).default(2),
+  sameRegionOnly: z.boolean().default(true),
+});
+
+export const videoNodesSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  uploadStrategy: z.enum(['fixed', 'region', 'load']).default('load'),
+  fixedNodeId: z.string().trim().max(64).default(''),
+  /** Country code -> node id overrides used before falling back to load. */
+  regionMap: z.record(countryCode, z.string().trim().max(64)).default({}),
+  playbackTtlSeconds: z.number().int().min(30).max(86_400).default(300),
+  syncIntervalSeconds: z.number().int().min(10).max(600).default(30),
+  replication: videoNodeReplicationSchema,
+});
+
 /** Group names accepted by the settings update endpoint. */
 export const SETTINGS_GROUP_SCHEMAS = {
   branding: brandingSettingsSchema,
@@ -161,6 +179,7 @@ export const SETTINGS_GROUP_SCHEMAS = {
   rateLimit: rateLimitSettingsSchema,
   aiModeration: aiModerationSettingsSchema,
   review: reviewSettingsSchema,
+  videoNodes: videoNodesSettingsSchema,
 } as const;
 
 export type SettingsGroupKey = keyof typeof SETTINGS_GROUP_SCHEMAS;

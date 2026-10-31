@@ -43,6 +43,7 @@ export const PERMISSIONS = [
   'system:update',
   'audit:read',
   'owner:transfer',
+  'video_node:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -80,6 +81,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'settings:content',
     'system:view',
     'audit:read',
+    'video_node:manage',
   ],
   SUPER_ADMIN: [...PERMISSIONS],
 };
@@ -108,6 +110,31 @@ export type VideoStatus = (typeof VIDEO_STATUSES)[number];
 
 export const VIDEO_VISIBILITIES = ['public', 'unlisted', 'private'] as const;
 export type VideoVisibility = (typeof VIDEO_VISIBILITIES)[number];
+
+/** Where a video's source files and HLS output live. */
+export const VIDEO_STORAGE_MODES = ['local', 's3', 'remote'] as const;
+export type VideoStorageMode = (typeof VIDEO_STORAGE_MODES)[number];
+
+/** How a new upload picks an external video node. */
+export const VIDEO_NODE_ROUTING_MODES = ['fixed', 'region', 'load'] as const;
+export type VideoNodeRoutingMode = (typeof VIDEO_NODE_ROUTING_MODES)[number];
+
+export const VIDEO_NODE_REPLICATION_MODES = ['manual', 'auto'] as const;
+export type VideoNodeReplicationMode = (typeof VIDEO_NODE_REPLICATION_MODES)[number];
+
+export const VIDEO_NODE_STATUSES = ['unknown', 'online', 'degraded', 'offline'] as const;
+export type VideoNodeStatus = (typeof VIDEO_NODE_STATUSES)[number];
+
+/** Lifecycle of one remote copy of a site asset. */
+export const VIDEO_NODE_ASSET_STATUSES = [
+  'pending',
+  'uploading',
+  'transcoding',
+  'ready',
+  'failed',
+  'deleted',
+] as const;
+export type VideoNodeAssetStatus = (typeof VIDEO_NODE_ASSET_STATUSES)[number];
 
 /** How the uploader declares the origin of a video. */
 export const VIDEO_CONTENT_TYPES = ['original', 'repost', 'ai'] as const;
@@ -517,6 +544,25 @@ export const DEFAULT_SETTINGS = {
     comments: false,
     dynamics: false,
     articles: false,
+  },
+  videoNodes: {
+    /** Remote nodes are optional and stay disabled until an admin enables them. */
+    enabled: false,
+    /** fixed: always use fixedNodeId, region: country map, load: least loaded. */
+    uploadStrategy: 'load' as VideoNodeRoutingMode,
+    fixedNodeId: '',
+    /** Country code -> node id overrides used by the region strategy. */
+    regionMap: {} as Record<string, string>,
+    /** Lifetime of a node-issued playback URL. */
+    playbackTtlSeconds: 300,
+    /** Seconds between asset status and replication sweeps. */
+    syncIntervalSeconds: 30,
+    replication: {
+      enabled: false,
+      mode: 'manual' as VideoNodeReplicationMode,
+      maxCopies: 2,
+      sameRegionOnly: true,
+    },
   },
 } as const;
 
