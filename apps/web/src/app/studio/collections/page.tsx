@@ -182,7 +182,7 @@ export default function StudioCollectionsPage() {
             </div>
 
             {expanded === row.id && (
-              <div className="mt-3 border-t border-[var(--border)] pt-3">
+              <div className="motion-rise-in mt-3 border-t border-[var(--border)] pt-3">
                 <div className="mb-2 flex flex-wrap gap-2">
                   <input
                     value={videoId}

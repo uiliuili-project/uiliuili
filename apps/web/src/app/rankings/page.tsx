@@ -60,7 +60,7 @@ export default async function RankingsPage({ searchParams }: PageProps) {
       {data.items.length === 0 ? (
         <div className="card py-16 text-center text-sm text-muted">{t('暂无排行数据')}</div>
       ) : (
-        <div className="space-y-2">
+        <div key={period} className="motion-rise-in space-y-2">
           {data.items.map((item, index) => (
             <Link
               key={item.video.id}

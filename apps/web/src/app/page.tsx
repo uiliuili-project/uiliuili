@@ -76,7 +76,7 @@ export default async function HomePage({
       ) : (
         <>
           <HomeModeSwitch t={t} moments={false} />
-          <div className="mb-6 flex flex-wrap items-center gap-2">
+          <div className="motion-rise-in mb-6 flex flex-wrap items-center gap-2">
             <Link href="/" className="chip chip-active">
               {t('推荐')}
             </Link>
@@ -99,7 +99,7 @@ export default async function HomePage({
           </div>
 
           {isEmpty ? (
-            <div className="card flex min-h-[360px] flex-col items-center justify-center p-10 text-center">
+            <div className="motion-rise-in card flex min-h-[360px] flex-col items-center justify-center p-10 text-center">
               <Sparkles className="mb-4 h-10 w-10 text-brand" />
               <h1 className="text-2xl font-semibold">{t('欢迎来到萌悠')}</h1>
               <p className="mt-2 max-w-lg text-sm text-muted">
@@ -115,7 +115,7 @@ export default async function HomePage({
           ) : (
             <>
               {hero && (
-                <section className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+                <section className="motion-rise-in mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
                   <Link
                     href={`/video/${hero.id}`}
                     className="group relative overflow-hidden rounded-2xl bg-black"
@@ -195,7 +195,7 @@ export default async function HomePage({
               )}
 
               {feed.sections.continueWatching.items.length > 0 && (
-                <section className="mb-9">
+                <section className="motion-rise-in mb-9">
                   <SectionHeader
                     title={t('继续观看')}
                     description={t('接着上次的进度继续')}
@@ -210,7 +210,7 @@ export default async function HomePage({
               )}
 
               {recommended.length > 0 && (
-                <section className="mb-9">
+                <section className="motion-rise-in mb-9">
                   <SectionHeader title={t('为你推荐')} description={t('根据你的观看与互动生成')} />
                   <div className="video-grid">
                     {recommended.map((video) => (
@@ -220,7 +220,7 @@ export default async function HomePage({
                 </section>
               )}
 
-              <section className="mb-9">
+              <section className="motion-rise-in mb-9">
                 <SectionHeader title={t('最新投稿')} href="/trending" />
                 <div className="video-grid">
                   {feed.sections.newest.items.map((video) => (

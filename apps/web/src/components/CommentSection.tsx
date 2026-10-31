@@ -224,7 +224,7 @@ export function CommentSection({
                 {t('表情')}
               </button>
               {emojiOpen && (
-                <div className="absolute bottom-8 left-0 z-20 grid w-48 grid-cols-6 gap-1 rounded-xl border border-line bg-white p-2 shadow-float">
+                <div className="motion-pop-in absolute bottom-8 left-0 z-20 grid w-48 origin-bottom-left grid-cols-6 gap-1 rounded-xl border border-line bg-white p-2 shadow-float">
                   {EMOJIS.map((emoji) => (
                     <button
                       key={emoji}

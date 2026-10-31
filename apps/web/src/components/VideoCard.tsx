@@ -10,7 +10,7 @@ export function VideoCard({ video }: { video: VideoCardType }) {
   const t = useT();
   const locale = useLocale();
   return (
-    <article className="group min-w-0">
+    <article className="motion-lift group min-w-0">
       <Link
         href={`/video/${video.id}`}
         className="relative block aspect-video overflow-hidden rounded-xl2 bg-gradient-to-br from-slate-200 to-slate-100"

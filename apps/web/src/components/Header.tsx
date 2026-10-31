@@ -358,7 +358,7 @@ export function Header() {
                       ref={accountMenuRef}
                       role="menu"
                       style={{ top: menuPosition.top, right: menuPosition.right }}
-                      className="fixed z-[70] w-52 overflow-hidden rounded-xl border border-line bg-white p-1 shadow-float"
+                      className="motion-drop-in fixed z-[70] w-52 origin-top-right overflow-hidden rounded-xl border border-line bg-white p-1 shadow-float"
                     >
                       <div className="px-3 py-2">
                         <div className="truncate text-sm font-semibold">{user.displayName}</div>

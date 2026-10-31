@@ -189,17 +189,19 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
 
         {tab === 'videos' &&
           (videos.items.length > 0 ? (
-            <div className="video-grid">
+            <div className="motion-rise-in video-grid">
               {videos.items.map((video) => (
                 <VideoCard key={video.id} video={video} />
               ))}
             </div>
           ) : (
-            <div className="card py-16 text-center text-sm text-muted">{t('还没有公开投稿')}</div>
+            <div className="motion-rise-in card py-16 text-center text-sm text-muted">
+              {t('还没有公开投稿')}
+            </div>
           ))}
 
         {tab === 'collections' && (
-          <div>
+          <div className="motion-rise-in">
             {collections.items.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {collections.items.map((collection) => (
@@ -238,7 +240,7 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
         )}
 
         {tab === 'favorites' && (
-          <div>
+          <div key={favorites.folderId ?? 'all'} className="motion-rise-in">
             {favorites.folders.length > 0 && (
               <div className="mb-4 flex flex-wrap gap-2">
                 {favorites.folders.map((item) => (
@@ -266,7 +268,7 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
         )}
 
         {tab === 'dynamics' && (
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div className="motion-rise-in mx-auto max-w-3xl space-y-4">
             {dynamics.items.map((dynamic) => (
               <article key={dynamic.id} className="card p-4">
                 <div className="flex items-center gap-3">
@@ -365,7 +367,7 @@ export default async function SpacePage({ params, searchParams }: PageProps) {
         )}
 
         {tab === 'about' && (
-          <div className="card max-w-2xl p-6">
+          <div className="motion-rise-in card max-w-2xl p-6">
             <h2 className="mb-3 text-base font-semibold">{t('关于')}</h2>
             <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted">
               {profile.user.bio || t('这个人很神秘，什么都没有写')}

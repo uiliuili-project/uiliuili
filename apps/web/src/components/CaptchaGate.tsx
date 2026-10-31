@@ -160,9 +160,9 @@ export function CaptchaGate() {
       open
       aria-modal="true"
       aria-label={t('人机验证')}
-      className="fixed inset-0 z-[80] m-0 flex h-full w-full max-w-none items-center justify-center border-0 bg-black/40 p-4"
+      className="motion-fade-in fixed inset-0 z-[80] m-0 flex h-full w-full max-w-none items-center justify-center border-0 bg-black/40 p-4"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-float">
+      <div className="motion-pop-in w-full max-w-sm rounded-2xl bg-white p-6 shadow-float">
         <h2 className="text-lg font-semibold">{t('人机验证')}</h2>
         <p className="mt-1 text-sm text-muted">{t('为确认你不是自动程序，请完成下方验证。')}</p>
         {!settings?.enabled || !settings.siteKey ? (

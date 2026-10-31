@@ -116,7 +116,7 @@ export function MomentsFeed() {
   }
 
   return (
-    <div>
+    <div className="motion-rise-in">
       {error && (
         <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
       )}
@@ -187,11 +187,11 @@ export function MomentsFeed() {
 
       {active && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:items-center"
+          className="motion-fade-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:items-center"
           onClick={() => setActive(null)}
         >
           <div
-            className="relative w-full max-w-3xl rounded-2xl bg-white p-4 shadow-float sm:p-6"
+            className="motion-pop-in relative w-full max-w-3xl rounded-2xl bg-white p-4 shadow-float sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <button

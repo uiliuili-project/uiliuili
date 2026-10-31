@@ -369,7 +369,7 @@ export default function SettingsPage() {
             </div>
           )}
           {tab === 'profile' && (
-            <form onSubmit={saveProfile} className="max-w-xl space-y-4">
+            <form onSubmit={saveProfile} className="motion-rise-in max-w-xl space-y-4">
               <div className="rounded-xl border border-line p-4">
                 <div className="text-sm font-medium">{t('空间头图')}</div>
                 <p className="mt-1 text-xs text-muted">
@@ -456,7 +456,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'region' && (
-            <div className="max-w-xl space-y-5">
+            <div className="motion-rise-in max-w-xl space-y-5">
               <div className="rounded-xl border border-line p-4">
                 <div className="text-sm font-medium">{t('当前地区')}</div>
                 <div className="mt-1 text-sm text-muted">
@@ -491,7 +491,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'recommend' && (
-            <div className="max-w-2xl space-y-5">
+            <div className="motion-rise-in max-w-2xl space-y-5">
               <div className="rounded-xl border border-line p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -550,7 +550,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'security' && (
-            <div className="max-w-xl space-y-6">
+            <div className="motion-rise-in max-w-xl space-y-6">
               <div className="rounded-xl border border-line p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -607,7 +607,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'sessions' && (
-            <div className="space-y-3">
+            <div className="motion-rise-in space-y-3">
               {sessions.map((session) => (
                 <div
                   key={session.id}
@@ -636,7 +636,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'groups' && (
-            <div className="max-w-2xl space-y-5">
+            <div className="motion-rise-in max-w-2xl space-y-5">
               <div className="flex gap-2">
                 <input
                   value={groupName}
@@ -717,7 +717,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'blocked' && (
-            <div className="max-w-2xl space-y-2">
+            <div className="motion-rise-in max-w-2xl space-y-2">
               {blocked.map((item) => (
                 <div
                   key={item.id}
@@ -750,7 +750,7 @@ export default function SettingsPage() {
           )}
 
           {tab === 'notifications' && (
-            <div className="max-w-xl space-y-4">
+            <div className="motion-rise-in max-w-xl space-y-4">
               <div className="rounded-xl border border-line p-4">
                 <div className="text-sm font-medium">{t('浏览器通知')}</div>
                 <p className="mt-1 text-sm text-muted">

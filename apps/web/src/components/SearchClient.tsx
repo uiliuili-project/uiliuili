@@ -45,6 +45,7 @@ export function SearchClient() {
   const [hot, setHot] = useState<Array<{ query: string; count: number }>>([]);
   const [history, setHistory] = useState<Array<{ query: string; createdAt: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const [resultVersion, setResultVersion] = useState(0);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export function SearchClient() {
     try {
       const data = await api.get<SearchResponse>(buildUrl(trimmed, nextType));
       setResponse(data);
+      setResultVersion((version) => version + 1);
       if (replaceUrl) router.replace(`/search?q=${encodeURIComponent(trimmed)}`);
       void api
         .get<{ items: Array<{ query: string; createdAt: string }> }>('/api/v1/search/history')
@@ -146,7 +148,10 @@ export function SearchClient() {
     setLoading(true);
     void api
       .get<SearchResponse>(`/api/v1/search?${search.toString()}`)
-      .then(setResponse)
+      .then((data) => {
+        setResponse(data);
+        setResultVersion((version) => version + 1);
+      })
       .catch(() => setError(t('搜索失败')))
       .finally(() => setLoading(false));
   };
@@ -334,7 +339,7 @@ export function SearchClient() {
       {loading && <p className="mt-8 text-sm text-muted">{t('搜索中…')}</p>}
 
       {!loading && response && (
-        <div className="mt-6">
+        <div key={resultVersion} className="motion-rise-in mt-6">
           {videos.length > 0 && type === 'videos' && (
             <div className="video-grid">
               {videos.map((video) => (

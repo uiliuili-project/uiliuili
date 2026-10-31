@@ -342,7 +342,7 @@ export function StudioManage({
       )}
 
       {tab === 'parts' && (
-        <div className="space-y-3">
+        <div className="motion-rise-in space-y-3">
           <div className="flex gap-2">
             <input
               value={newPartTitle}
@@ -450,7 +450,7 @@ export function StudioManage({
       )}
 
       {tab === 'subtitles' && (
-        <div className="space-y-3">
+        <div className="motion-rise-in space-y-3">
           <div className="grid gap-2 sm:grid-cols-[120px_160px_minmax(0,1fr)_auto]">
             <input
               value={language}
@@ -505,7 +505,7 @@ export function StudioManage({
       )}
 
       {tab === 'stats' && (
-        <div>
+        <div className="motion-rise-in">
           {stats ? (
             <>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -561,7 +561,7 @@ export function StudioManage({
       )}
 
       {tab === 'publish' && (
-        <div className="max-w-xl space-y-4">
+        <div className="motion-rise-in max-w-xl space-y-4">
           <div className="rounded-xl border border-line p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <ImageIcon className="h-4 w-4 text-brand" />

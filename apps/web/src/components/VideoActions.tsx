@@ -195,7 +195,7 @@ export function VideoActions({ video }: { video: VideoDetail }) {
             {t('举报')}{' '}
           </button>
           {reportOpen && (
-            <div className="absolute left-0 top-12 z-20 w-44 rounded-xl border border-line bg-white p-1 shadow-float">
+            <div className="motion-drop-in absolute left-0 top-12 z-20 w-44 origin-top-left rounded-xl border border-line bg-white p-1 shadow-float">
               {reportReasons.map((reason) => (
                 <button
                   key={reason.value}

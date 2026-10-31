@@ -827,7 +827,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         )}
 
         {listOpen && (
-          <div className="absolute bottom-20 right-3 top-3 w-72 overflow-hidden rounded-xl bg-black/85 text-xs text-white shadow-float backdrop-blur">
+          <div className="motion-slide-in-right absolute bottom-20 right-3 top-3 w-72 overflow-hidden rounded-xl bg-black/85 text-xs text-white shadow-float backdrop-blur">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
               <span className="font-semibold">
                 {t('弹幕列表')}（{visibleItems.length}）
@@ -880,7 +880,7 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         )}
 
         {settingsOpen && (
-          <div className="absolute right-3 top-3 w-80 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
+          <div className="motion-slide-in-right absolute right-3 top-3 w-80 rounded-xl bg-black/85 p-4 text-xs text-white shadow-float backdrop-blur">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-semibold">{t('弹幕设置')}</span>
               <button

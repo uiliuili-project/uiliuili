@@ -80,7 +80,7 @@ export function AddToCollection({ videoId }: { videoId: string }) {
         <Layers className="h-4 w-4" />
         {t('加入合集')}
       </button>
-      <div className="absolute left-0 top-12 z-30 w-72 rounded-xl border border-line bg-white p-3 shadow-float">
+      <div className="motion-drop-in absolute left-0 top-12 z-30 w-72 origin-top-left rounded-xl border border-line bg-white p-3 shadow-float">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold">{t('加入合集')}</span>
           <button type="button" onClick={() => setOpen(false)} className="text-muted">
