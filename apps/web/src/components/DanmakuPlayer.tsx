@@ -25,7 +25,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Socket, io } from 'socket.io-client';
 
 interface SegmentResponse {
@@ -136,6 +136,9 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   const [subtitlesOn, setSubtitlesOn] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** A freshly signed node URL, used after the previous one expired. */
+  const [remoteSource, setRemoteSource] = useState<{ key: string; url: string } | null>(null);
+  const refreshingSource = useRef(false);
 
   const activePart = useMemo(
     () => video.parts.find((part) => part.id === activePartId) ?? initialPart,
@@ -143,7 +146,37 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
   );
   const activeIndex = video.parts.findIndex((part) => part.id === activePart?.id);
   const nextPart = activeIndex >= 0 ? video.parts[activeIndex + 1] : undefined;
-  const source = activePart?.playlistUrl ?? video.playlistUrl;
+  const sourceKey = activePart?.id ?? 'main';
+  const source =
+    remoteSource?.key === sourceKey
+      ? remoteSource.url
+      : (activePart?.playlistUrl ?? video.playlistUrl);
+
+  /**
+   * Node playback URLs live for a few minutes. When a segment request comes
+   * back 401/403, ask the site for a new signature instead of failing the
+   * video; at most one refresh runs at a time.
+   */
+  const refreshRemoteSource = useCallback(async () => {
+    if (refreshingSource.current) return;
+    refreshingSource.current = true;
+    try {
+      const query = activePartId ? `?partId=${encodeURIComponent(activePartId)}` : '';
+      const data = await api.get<{ playlistUrl: string | null }>(
+        `/api/v1/videos/${video.id}/playlist${query}`,
+      );
+      if (data.playlistUrl) {
+        setRemoteSource({ key: activePartId ?? 'main', url: data.playlistUrl });
+        setError(null);
+      } else {
+        setError(t('视频加载失败，请稍后重试'));
+      }
+    } catch {
+      setError(t('视频加载失败，请稍后重试'));
+    } finally {
+      refreshingSource.current = false;
+    }
+  }, [activePartId, t, video.id]);
 
   useEffect(() => {
     setBlockedUsers(readBlockedUsers());
@@ -231,6 +264,11 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
         );
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
+        const status = data.response?.code;
+        if (status === 401 || status === 403) {
+          void refreshRemoteSource();
+          return;
+        }
         if (data.fatal) setError(t('视频加载失败，请稍后重试'));
       });
       return () => {
@@ -239,8 +277,12 @@ export function DanmakuPlayer({ video }: { video: VideoDetail }) {
       };
     }
     videoEl.src = source;
-    return undefined;
-  }, [source]);
+    const onNativeError = () => {
+      void refreshRemoteSource();
+    };
+    videoEl.addEventListener('error', onNativeError);
+    return () => videoEl.removeEventListener('error', onNativeError);
+  }, [refreshRemoteSource, source, t]);
 
   useEffect(() => {
     const socket = io(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/danmaku`, {

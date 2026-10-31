@@ -20,12 +20,18 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 interface InitUpload {
-  mode: 'local' | 's3';
+  mode: 'local' | 's3' | 'remote';
   uploadId: string;
-  storageKey: string;
+  storageKey?: string;
   partSize: number;
   totalChunks: number;
   parts?: Array<{ partNumber: number; url: string | null }>;
+  nodeId?: string;
+  nodeName?: string;
+  nodeBaseUrl?: string;
+  remoteUploadId?: string;
+  uploadToken?: string;
+  expiresAt?: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -164,6 +170,35 @@ export default function StudioPage() {
                 ...csrfHeader(),
               },
               body: chunk,
+            },
+          );
+          if (!response.ok) {
+            const body = (await response.json().catch(() => null)) as {
+              error?: { message?: string };
+            } | null;
+            throw new Error(body?.error?.message ?? t('分片 {0} 上传失败', { 0: index + 1 }));
+          }
+          setUploadedBytes(end);
+        }
+        await api.post(`/api/v1/studio/uploads/${init.uploadId}/complete`, {});
+      } else if (init.mode === 'remote') {
+        if (!init.nodeBaseUrl || !init.remoteUploadId || !init.uploadToken) {
+          throw new Error(t('远端上传信息不完整'));
+        }
+        for (let index = 0; index < total; index += 1) {
+          const start = index * init.partSize;
+          const end = Math.min(file.size, start + init.partSize);
+          const response = await fetch(
+            `${init.nodeBaseUrl}/api/v1/node/uploads/${encodeURIComponent(
+              init.remoteUploadId,
+            )}/parts/${index + 1}`,
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'X-Upload-Token': init.uploadToken,
+              },
+              body: file.slice(start, end),
             },
           );
           if (!response.ok) {
