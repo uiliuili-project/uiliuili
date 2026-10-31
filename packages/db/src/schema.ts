@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   date,
   index,
@@ -238,6 +239,11 @@ export const videos = appSchema.table(
     playlistKey: text('playlist_key'),
     spriteKey: text('sprite_key'),
     previewVttKey: text('preview_vtt_key'),
+    /** `local`, `s3` or `remote`; remote assets keep their paths on a node. */
+    storageMode: text('storage_mode').default('local').notNull(),
+    primaryNodeId: uuid('primary_node_id'),
+    /** Identifier assigned by the node; the site never stores a real path. */
+    remoteAssetId: text('remote_asset_id'),
     featured: boolean('featured').default(false).notNull(),
     recommendWeight: integer('recommend_weight').default(0).notNull(),
     blockReason: text('block_reason'),
@@ -292,6 +298,9 @@ export const videoParts = appSchema.table(
     playlistKey: text('playlist_key'),
     spriteKey: text('sprite_key'),
     previewVttKey: text('preview_vtt_key'),
+    storageMode: text('storage_mode').default('local').notNull(),
+    primaryNodeId: uuid('primary_node_id'),
+    remoteAssetId: text('remote_asset_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -549,6 +558,9 @@ export const uploadSessions = appSchema.table(
     storageDriver: text('storage_driver').notNull(),
     storageKey: text('storage_key').notNull(),
     s3UploadId: text('s3_upload_id'),
+    nodeId: uuid('node_id'),
+    remoteUploadId: text('remote_upload_id'),
+    remoteAssetId: text('remote_asset_id'),
     chunkSize: integer('chunk_size').notNull(),
     totalChunks: integer('total_chunks').notNull(),
     uploadedChunks: integer('uploaded_chunks').default(0).notNull(),
@@ -571,6 +583,103 @@ export const uploadParts = appSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [primaryKey({ columns: [table.uploadSessionId, table.partNumber] })],
+);
+
+export const videoNodes = appSchema.table(
+  'video_nodes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    baseUrl: text('base_url').notNull(),
+    keyId: text('key_id').default('default').notNull(),
+    /** Encrypted with APP_KEY; never returned by the admin API. */
+    secretEncrypted: text('secret_encrypted').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    /** Primary region of the node, two-letter country code. */
+    region: text('region').default('').notNull(),
+    /** Regions the node may serve, including its primary region. */
+    regions: text('regions').array().default(sql`ARRAY[]::text[]`).notNull(),
+    weight: integer('weight').default(100).notNull(),
+    maxConcurrency: integer('max_concurrency').default(2).notNull(),
+    status: text('status').default('unknown').notNull(),
+    version: text('version').default('').notNull(),
+    storageUsedBytes: bigint('storage_used_bytes', { mode: 'number' }).default(0).notNull(),
+    storageCapacityBytes: bigint('storage_capacity_bytes', { mode: 'number' }).default(0).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    ...timestamps,
+  },
+  (table) => [index('video_nodes_enabled_idx').on(table.enabled, table.status)],
+);
+
+export const videoNodeAssets = appSchema.table(
+  'video_node_assets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    partId: uuid('part_id').references(() => videoParts.id, { onDelete: 'cascade' }),
+    nodeId: uuid('node_id')
+      .notNull()
+      .references(() => videoNodes.id, { onDelete: 'cascade' }),
+    remoteAssetId: text('remote_asset_id').notNull(),
+    status: text('status').default('pending').notNull(),
+    profile: text('profile').default('auto').notNull(),
+    durationSeconds: integer('duration_seconds').default(0).notNull(),
+    width: integer('width').default(0).notNull(),
+    height: integer('height').default(0).notNull(),
+    error: text('error'),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('video_node_assets_node_remote_unique').on(table.nodeId, table.remoteAssetId),
+    index('video_node_assets_video_idx').on(table.videoId, table.partId),
+    index('video_node_assets_status_idx').on(table.status, table.updatedAt),
+  ],
+);
+
+export const videoNodeUploadLeases = appSchema.table(
+  'video_node_upload_leases',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    uploadSessionId: uuid('upload_session_id')
+      .notNull()
+      .references(() => uploadSessions.id, { onDelete: 'cascade' }),
+    nodeId: uuid('node_id')
+      .notNull()
+      .references(() => videoNodes.id, { onDelete: 'cascade' }),
+    remoteUploadId: text('remote_upload_id').notNull(),
+    remoteAssetId: text('remote_asset_id').notNull(),
+    status: text('status').default('uploading').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [index('video_node_upload_leases_session_idx').on(table.uploadSessionId)],
+);
+
+export const videoNodeReplicationJobs = appSchema.table(
+  'video_node_replication_jobs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => videoNodeAssets.id, { onDelete: 'cascade' }),
+    sourceNodeId: uuid('source_node_id')
+      .notNull()
+      .references(() => videoNodes.id, { onDelete: 'cascade' }),
+    targetNodeId: uuid('target_node_id')
+      .notNull()
+      .references(() => videoNodes.id, { onDelete: 'cascade' }),
+    status: text('status').default('pending').notNull(),
+    error: text('error'),
+    attempts: integer('attempts').default(0).notNull(),
+    remoteAssetId: text('remote_asset_id'),
+    ...timestamps,
+  },
+  (table) => [index('video_node_replication_status_idx').on(table.status, table.createdAt)],
 );
 
 export const danmaku = appSchema.table(
