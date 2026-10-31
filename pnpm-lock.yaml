@@ -201,6 +201,31 @@ importers:
         specifier: ^4.19.2
         version: 4.23.15
 
+  apps/video-node:
+    dependencies:
+      '@uiliuili/media':
+        specifier: workspace:*
+        version: link:../../packages/media
+      '@uiliuili/video-node-contract':
+        specifier: workspace:*
+        version: link:../../packages/video-node-contract
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      fastify:
+        specifier: ^4.29.0
+        version: 4.29.1
+      postgres:
+        specifier: ^3.4.5
+        version: 3.4.9
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
+
   apps/web:
     dependencies:
       '@tanstack/react-query':
