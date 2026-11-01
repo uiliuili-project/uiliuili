@@ -11,7 +11,7 @@
     "clean": "rm -rf .next .turbo"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.62.11",
+    "@tanstack/react-query": "^5.105.0",
     "@uiliuili/danmaku": "workspace:*",
     "@uiliuili/i18n": "workspace:*",
     "@uiliuili/shared": "workspace:*",
