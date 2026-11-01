@@ -22,7 +22,7 @@
     "@uiliuili/media": "workspace:*",
     "@uiliuili/shared": "workspace:*",
     "argon2": "^0.41.1",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^10.3.1",
     "postgres": "^3.4.5",
     "drizzle-orm": "^0.44.0"
   },
